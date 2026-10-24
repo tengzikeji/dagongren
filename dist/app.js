@@ -372,7 +372,6 @@ function storedBookMatches() {
   return canonicalJSON(normalized(stored))===canonicalJSON(normalized(db));
 }
 function confirmCleanup() {
-  if(nativeSync)nativeSync.beforeCleanup();
   const plan=pendingCleanupPlan;if(!plan)return;
   const error=document.getElementById('cleanup-error');
   try {
@@ -386,6 +385,7 @@ function confirmCleanup() {
     const message=`已清理${cleanupLabel(plan.options)}：${parts.join('，')}。`;
     next.sync.logs.unshift({text:message,icon:'trash',time:new Date().toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit'})});next.sync.logs=next.sync.logs.slice(0,20);
     localStorage.setItem(STORAGE,JSON.stringify(next));
+    if(nativeSync)nativeSync.beforeCleanup();
     cancelDemoSync();db=next;pendingCleanupPlan=null;cleanupNotice=message;view='cleanup';closeModal();render();toast(message);
     if(plan.options.target==='both'&&db.sync.auto&&db.sync.pending&&!db.sync.offline)scheduleDemoSync();
   } catch(e) { if(error)error.textContent=/[\u4e00-\u9fff]/.test(e.message||'')?e.message:'无法保存清理结果，未清理任何数据。'; }

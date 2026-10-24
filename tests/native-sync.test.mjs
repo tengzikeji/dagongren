@@ -78,3 +78,21 @@ test('冲突界面出现时没有写入请求',async()=>{
  const f=fixture(wages(),{exists:true,etag:'"one"',envelope:{format:'dagongren.webdav.v1',book:wages(700000)}});
  await f.sync.run();assert.equal(f.writes(),0);assert.match(f.modal(),/采用网盘账本/);assert.match(f.modal(),/采用本机账本/);
 });
+
+test('明确采用本机才写入，仍提交原版本',async()=>{
+ const remote={exists:true,etag:'"one"',envelope:{format:'dagongren.webdav.v1',book:wages(700000)}};
+ const f=fixture(wages(),remote);await f.sync.run();assert.equal(f.writes(),0);
+ await f.sync.run('upload');assert.equal(f.writes(),1);
+ assert.equal(f.calls.find(x=>x.action==='write').payload.etag,'"one"');
+ assert.equal(f.get().sync.baseline,hash(f.get()));
+});
+test('选择后远端再次变化仍阻止覆盖',async()=>{
+ const remote={exists:true,etag:'"one"',envelope:{format:'dagongren.webdav.v1',book:wages(700000)}};
+ const f=fixture(wages(),remote);await f.sync.run();
+ remote.envelope.book=wages(800000);remote.etag='"two"';
+ await f.sync.run('upload');assert.equal(f.writes(),0);
+});
+test('远端删除后不提供采用不存在账本的按钮',async()=>{
+ const f=fixture(wages(),{exists:false});f.get().sync.baseline='previous';
+ await f.sync.run();assert.match(f.modal(),/已不存在/);assert.doesNotMatch(f.modal(),/native-use-remote/);assert.equal(f.writes(),0);
+});
