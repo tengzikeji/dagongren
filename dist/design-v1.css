@@ -31,3 +31,10 @@ html{scroll-padding-bottom:110px}body{background:var(--bg);font-size:14px;color:
 @media(max-width:360px){.profile-main{gap:11px}.profile-info>.profile-company{font-size:17px}.profile-info>.profile-join{gap:6px;font-size:10px}.profile-avatar{height:43px;width:43px;border-radius:13px;font-size:21px}.profile-edit{width:25px;height:25px}}
 
 .calendar-rights{font-size:12px;line-height:1.9;color:#52627c;overflow-wrap:anywhere}.calendar-rights h2{font-size:15px;line-height:1.7;color:#203250;margin:16px 0 9px}.calendar-rights p,.calendar-rights ol{margin:10px 0}.calendar-rights ol{padding-left:22px}.calendar-rights a{color:#245ce3}.source-rights{margin-top:15px;width:100%}
+
+/* 前缀参与正常布局，避免旧版绝对定位压住输入金额。 */
+.money-input{display:flex;align-items:center}
+.money-input>span{position:static;inset:auto;transform:none;flex:0 0 auto;line-height:1.5}
+.money-input>input{width:0;min-width:0;flex:1;margin:0}
+@media(max-width:600px){.calendar-day small{font-size:10px}.calendar-day .day-wage{font-size:9px}}
+@media(max-width:360px){.calendar-day small{font-size:9px}.calendar-day .day-wage{font-size:9px}}

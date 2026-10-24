@@ -33,7 +33,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          previous=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=dagongren-signing-key&per_page=100" --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0].workflow_run.id // empty')
+          previous=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=dagongren-signing-key&per_page=100" --jq '.artifacts | map(select(.expired == false and .name == "dagongren-signing-key")) | sort_by(.created_at) | reverse | .[0].workflow_run.id // empty')
           echo "run_id=$previous" >> "$GITHUB_OUTPUT"
           if [ -z "$previous" ] && [ -f .github/signing-identity.json ]; then
             echo "::error::Signing backup missing. Restore the saved keystore before rebuilding; do not rotate the signing identity."
@@ -46,18 +46,20 @@ jobs:
           path: signing-key
           github-token: ${{ github.token }}
           run-id: ${{ steps.signing.outputs.run_id }}
-      - name: Restore fixed test signing identity
-        if: steps.signing.outputs.run_id != ''
+      - name: Prepare fixed test signing identity
         run: |
-          mkdir -p "$HOME/.android"
-          install -m 600 signing-key/debug.keystore "$HOME/.android/debug.keystore"
+          mkdir -p signing-key
+          if [ ! -f signing-key/debug.keystore ]; then
+            keytool -genkeypair -keystore signing-key/debug.keystore -alias androiddebugkey -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
+          fi
+          chmod 600 signing-key/debug.keystore
       - name: Build, unit tests and Android lint
         run: gradle -p android --no-daemon testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
       - name: Preserve private signing backup
         run: |
           mkdir -p signing-key
-          install -m 600 "$HOME/.android/debug.keystore" signing-key/debug.keystore
           keytool -exportcert -alias androiddebugkey -keystore signing-key/debug.keystore -storepass android -file signing-key/certificate.der
+          node .github/scripts/verify-signing.mjs
           sha256sum signing-key/certificate.der > signing-key/certificate.sha256
       - uses: actions/upload-artifact@v4
         with:
