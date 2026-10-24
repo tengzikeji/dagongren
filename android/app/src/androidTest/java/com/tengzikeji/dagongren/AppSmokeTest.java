@@ -9,7 +9,6 @@ import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.UiDevice;
-import java.io.File;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -30,7 +29,9 @@ public class AppSmokeTest {
             last=evaluate(scenario,script);if("true".equals(last))return;
             Thread.sleep(150);
         }
-        fail("Condition did not become true: "+script+"; last result: "+last);
+        screenshot("condition-failed");
+        String details=evaluate(scenario,"JSON.stringify({viewport:[innerWidth,innerHeight,visualViewport.height],keyboard:document.body.classList.contains('keyboard-open'),focused:document.activeElement.id,rects:['.modal','.modal-body','.modal-footer','#company-name'].map(s=>{const e=document.querySelector(s);return e?{s,top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom}:null})})");
+        fail("Condition did not become true: "+script+"; last result: "+last+"; "+details);
     }
     private void waitReady(ActivityScenario<MainActivity> scenario) throws Exception {
         waitTrue(scenario,"Boolean(document.querySelector('.bottom-nav'))");
@@ -43,9 +44,10 @@ public class AppSmokeTest {
         scenario.onActivity(activity->{WindowInsets insets=activity.getWindow().getDecorView().getRootWindowInsets();result.set(insets!=null&&insets.isVisible(WindowInsets.Type.ime()));});
         return result.get();
     }
-    private void screenshot(String name) {
-        Context context=ApplicationProvider.getApplicationContext();
-        assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(new File(context.getExternalFilesDir(null),name+".png")));
+    private void screenshot(String name) throws Exception {
+        UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        device.executeShellCommand("mkdir -p /sdcard/Download/dagongren-test");
+        device.executeShellCommand("screencap -p /sdcard/Download/dagongren-test/"+name+".png");
     }
     @Test public void appLoadsSavesWagesAndOffersEditableConnection() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
@@ -93,8 +95,9 @@ public class AppSmokeTest {
             long deadline=System.currentTimeMillis()+15000;
             while(!keyboardVisible(scenario)&&System.currentTimeMillis()<deadline)Thread.sleep(150);
             assertTrue("Real Android keyboard did not open",keyboardVisible(scenario));
+            screenshot("keyboard-open-before-check");
             waitTrue(scenario,"(()=>{const input=document.activeElement,footer=document.querySelector('.modal-footer'),body=document.querySelector('.modal-body'),modal=document.querySelector('.modal');if(input.id!=='company-name')return false;const r=input.getBoundingClientRect(),f=footer.getBoundingClientRect(),b=body.getBoundingClientRect(),m=modal.getBoundingClientRect(),h=Math.min(innerHeight,visualViewport.height);return r.top>=b.top-1&&r.bottom<=b.bottom+1&&f.bottom<=h+1&&m.top>=8&&m.bottom<=h-8})()");
-            assertEquals("true",evaluate(scenario,"document.body.classList.contains('keyboard-open')"));
+            waitTrue(scenario,"document.body.classList.contains('keyboard-open')");
             screenshot("keyboard-centered");
             device.pressBack();
             deadline=System.currentTimeMillis()+10000;

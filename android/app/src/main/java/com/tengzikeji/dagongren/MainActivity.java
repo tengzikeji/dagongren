@@ -35,6 +35,7 @@ public final class MainActivity extends Activity {
     private CredentialVault vault;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private byte[] pendingFile;
+    private Boolean reportedKeyboard;
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
@@ -48,10 +49,20 @@ public final class MainActivity extends Activity {
                 android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());
                 android.graphics.Insets keyboard=insets.getInsets(WindowInsets.Type.ime());
                 v.setPadding(bars.left,bars.top,bars.right,Math.max(bars.bottom,keyboard.bottom));
-                if(webView!=null)webView.evaluateJavascript("globalThis.dagongrenKeyboard && globalThis.dagongrenKeyboard("+insets.isVisible(WindowInsets.Type.ime())+");",null);
                 return new WindowInsets.Builder(insets).setInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout()|WindowInsets.Type.ime(),android.graphics.Insets.NONE).build();
             }else v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
             return insets.replaceSystemWindowInsets(0,0,0,0);
+        });
+        // Read unmodified decor insets after layout; child insets may already be cleared.
+        android.graphics.Rect visibleFrame=new android.graphics.Rect();
+        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{
+            if(Build.VERSION.SDK_INT>=30){
+                WindowInsets current=getWindow().getDecorView().getRootWindowInsets();
+                if(current!=null)reportKeyboard(current.isVisible(WindowInsets.Type.ime()));
+            }else{
+                root.getWindowVisibleDisplayFrame(visibleFrame);
+                reportKeyboard(root.getRootView().getHeight()-visibleFrame.bottom>getResources().getDisplayMetrics().density*150);
+            }
         });
         webView=new WebView(this);webView.setId(R.id.web_view);
         webView.setBackgroundColor(Color.rgb(243,246,251));
@@ -87,6 +98,12 @@ public final class MainActivity extends Activity {
         setContentView(root);root.requestApplyInsets();
         if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
         webView.loadUrl(HOME);
+    }
+
+    private void reportKeyboard(boolean visible){
+        if(webView==null||Boolean.valueOf(visible).equals(reportedKeyboard))return;
+        reportedKeyboard=visible;
+        webView.evaluateJavascript("globalThis.dagongrenKeyboard && globalThis.dagongrenKeyboard("+visible+");",null);
     }
 
     private void openExternal(Uri uri){
