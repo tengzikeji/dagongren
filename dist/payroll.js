@@ -1,3 +1,4 @@
+import {holidayName,isMakeupDate,statutoryYearDates} from './calendar.js';
 export function daysInMonth(month) {
   const [year, m] = month.split('-').map(Number);
   return new Date(Date.UTC(year, m, 0)).getUTCDate();
@@ -12,28 +13,11 @@ export function validDate(date) {
   return +date.slice(8) >= 1 && +date.slice(8) <= daysInMonth(date.slice(0, 7));
 }
 
-// 2026 年放假调休区间；不是每一天都属于法定节日当天。
-const breaks2026 = [
-  ['2026-01-01', '2026-01-03', '元旦'],
-  ['2026-02-15', '2026-02-23', '春节'],
-  ['2026-04-04', '2026-04-06', '清明'],
-  ['2026-05-01', '2026-05-05', '劳动节'],
-  ['2026-06-19', '2026-06-21', '端午'],
-  ['2026-09-25', '2026-09-27', '中秋'],
-  ['2026-10-01', '2026-10-07', '国庆']
-];
-const makeup = new Set(['2026-01-04', '2026-02-14', '2026-02-28', '2026-05-09', '2026-09-20', '2026-10-10']);
-// 法定节日当天，与整段放假调休区间分别统计。
-const statutory2026 = ['2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-04-05','2026-05-01','2026-05-02','2026-06-19','2026-09-25','2026-10-01','2026-10-02','2026-10-03'];
-export function statutoryDates(month) { return statutory2026.filter(date => date.startsWith(month + '-')); }
-export function isStatutory(date) { return statutory2026.includes(date); }
-export function isAdjustedDay(date) { return !!holiday(date) && !isStatutory(date); }
-
-export function holiday(date) {
-  return breaks2026.find(([start, end]) => date >= start && date <= end)?.[2] || '';
-}
-
-export function makeupWorkday(date) { return makeup.has(date); }
+export function statutoryDates(month){return statutoryYearDates(Number(month.slice(0,4))).filter(date=>date.startsWith(month+'-'));}
+export function isStatutory(date){return statutoryYearDates(Number(date.slice(0,4))).includes(date);}
+export function isAdjustedDay(date){return !!holiday(date)&&!isStatutory(date);}
+export function holiday(date){return holidayName(date);}
+export function makeupWorkday(date){return isMakeupDate(date);}
 
 export function datesBetween(start, end) {
   if (!validDate(start) || !validDate(end) || start > end || start.slice(0, 7) !== end.slice(0, 7)) return [];

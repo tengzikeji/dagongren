@@ -84,4 +84,22 @@ for(const target of ['local','cloud','both']){
  const ui=boot(fixture);ui.click('nav',{view:'settings'});assert.match(ui.el('app').innerHTML,/界面动效/);ui.click('toggle-motion');assert.equal(ui.data().defaults.motion,false);ui.click('toggle-motion');assert.equal(ui.data().defaults.motion,true);const css=inner.match(/<style>([\s\S]*?)<\/style>/)[1];for(const name of ['quiet-scan','digit-highlight','page-enter','card-enter','sheet-in','prefers-reduced-motion','motion-off'])assert.ok(css.includes(name));
  ui.click('prepare-cleanup-demo');ui.click('record-kind',{kind:'subsidy'});ui.submit('subsidy-form',{category:'__custom__',customCategory:'夜间项目',date:'2026-10-22',amount:'123.45',note:'导出测试'});ui.click('record-kind',{kind:'deduction'});ui.submit('deduction-form',{category:'餐费',date:'2026-10-22',amount:'23.45',note:'导出测试'});ui.flush(700);ui.flush(1000);assert.deepEqual(ui.data().months,ui.data().sync.cloudMonths);ui.click('export');const csv=await ui.blobs[0].text();const rows=csv.trim().split('\r\n').map(line=>[...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m=>m[1]));for(const row of rows)assert.equal(row.length,24);const s=rows.find(x=>x[0]==='补贴'),d=rows.find(x=>x[0]==='扣款');assert.equal(s[19],'夜间项目');assert.equal(s[20],'123.45');assert.equal(s[12],'');assert.equal(d[21],'23.45');assert.equal(d[22],'已生效');ui.click('open-cleanup');ui.click('quick-cleanup',{target:'both'});assert.match(ui.el('modal-root').innerHTML,/补贴1笔/);assert.match(ui.el('modal-root').innerHTML,/扣款1笔/);ui.click('confirm-cleanup');assert.deepEqual(ui.data().months,{});assert.deepEqual(ui.data().sync.cloudMonths,{});
 }
+
+{
+ const ui=boot(fixture);
+ assert.doesNotMatch(ui.el('app').innerHTML,/aria-label="打开我的"/);
+ ui.click('nav',{view:'calendar'});ui.click('shift-month',{delta:'-1'});
+ assert.match(ui.el('app').innerHTML,/2026年9月/);
+ ui.click('calendar-today');assert.match(ui.el('app').innerHTML,/2026年10月/);
+ assert.match(ui.el('app').innerHTML,/aria-current="date"/);
+ ui.click('nav',{view:'settings'});
+ assert.match(ui.el('app').innerHTML,/class="profile-company">公司甲<\/strong>/);
+ assert.match(ui.el('app').innerHTML,/class="profile-join"><span>入职日期<\/span><time/);
+ for(const action of ['company-settings','salary-settings']){
+  ui.click(action);const html=ui.el('modal-root').innerHTML;
+  assert.match(html,/modal-body/);assert.match(html,/modal-footer/);
+  const form=action==='company-settings'?'company-form':'salary-form';
+  assert.ok(html.includes('form="'+form+'"'));assert.ok(html.indexOf('</form>')<html.indexOf('modal-footer'));
+ }
+}
 console.log('Passed: all prior wage, leave, pay-period, cash, sync, cleanup, and migration flows; six record types; preset/custom adjustment CRUD; dated accrual; exact metric drilldowns by month/year/day/period; negative-wage carry and receipt preservation; date-specific calendar records; monthly filters; motion preferences; and aligned 24-column exports. These are calculation and VM interaction checks, not browser or Android visual tests.');

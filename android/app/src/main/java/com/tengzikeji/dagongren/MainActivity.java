@@ -48,8 +48,10 @@ public final class MainActivity extends Activity {
                 android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());
                 android.graphics.Insets keyboard=insets.getInsets(WindowInsets.Type.ime());
                 v.setPadding(bars.left,bars.top,bars.right,Math.max(bars.bottom,keyboard.bottom));
+                if(webView!=null)webView.evaluateJavascript("globalThis.dagongrenKeyboard && globalThis.dagongrenKeyboard("+insets.isVisible(WindowInsets.Type.ime())+");",null);
+                return new WindowInsets.Builder(insets).setInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout()|WindowInsets.Type.ime(),android.graphics.Insets.NONE).build();
             }else v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
-            return insets;
+            return insets.replaceSystemWindowInsets(0,0,0,0);
         });
         webView=new WebView(this);webView.setId(R.id.web_view);
         webView.setBackgroundColor(Color.rgb(243,246,251));
