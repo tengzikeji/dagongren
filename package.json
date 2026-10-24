@@ -1,0 +1,13 @@
+{
+  "name": "dagongren",
+  "version": "0.9.0",
+  "private": true,
+  "type": "module",
+  "description": "打工人工资账本，支持用户配置坚果云与安卓版安装包",
+  "scripts": {
+    "dev": "node server.mjs",
+    "build": "node build-preview.mjs",
+    "check": "node --check dist/app.js && node --check dist/native-sync.js && node --test tests/*.test.mjs",
+    "test:ui": "node build-preview.mjs && node tools/verify-ui-v8.mjs"
+  }
+}

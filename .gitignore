@@ -1,0 +1,17 @@
+preview/
+node_modules/
+android/.gradle/
+android/.idea/
+android/local.properties
+android/**/build/
+android/app/src/main/assets/
+*.apk
+*.aab
+*.jks
+*.keystore
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+test-results/

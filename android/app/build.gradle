@@ -1,0 +1,31 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.tengzikeji.dagongren'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.tengzikeji.dagongren'
+        minSdk 26
+        targetSdk 35
+        versionCode 9
+        versionName '0.9.0-test'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    buildTypes { release { minifyEnabled false } }
+    lint { abortOnError true }
+}
+tasks.register('syncWebAssets', Sync) {
+    from '../../dist'
+    into 'src/main/assets/www'
+}
+tasks.named('preBuild').configure { dependsOn 'syncWebAssets' }
+dependencies {
+    implementation 'androidx.webkit:webkit:1.14.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+    testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test:core:1.6.1'
+}

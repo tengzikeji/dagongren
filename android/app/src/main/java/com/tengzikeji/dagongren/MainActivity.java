@@ -1,0 +1,180 @@
+package com.tengzikeji.dagongren;
+
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.Intent;
+import android.graphics.Color;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.view.View;
+import android.view.WindowInsets;
+import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
+import android.widget.Toast;
+import androidx.webkit.WebViewAssetLoader;
+import java.io.ByteArrayInputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.json.JSONObject;
+
+public final class MainActivity extends Activity {
+    private static final String HOME="https://appassets.androidplatform.net/assets/www/index.html";
+    private static final int SAVE_FILE=7101;
+    private WebView webView;
+    private CredentialVault vault;
+    private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private byte[] pendingFile;
+
+    @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
+    public void onCreate(Bundle state) {
+        super.onCreate(state); vault=new CredentialVault(this);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(Color.rgb(243,246,251));
+        if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
+        root.setOnApplyWindowInsetsListener((v,insets)->{
+            if(Build.VERSION.SDK_INT>=30){
+                android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());
+                android.graphics.Insets keyboard=insets.getInsets(WindowInsets.Type.ime());
+                v.setPadding(bars.left,bars.top,bars.right,Math.max(bars.bottom,keyboard.bottom));
+            }else v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
+            return insets;
+        });
+        webView=new WebView(this);webView.setId(R.id.web_view);
+        webView.setBackgroundColor(Color.rgb(243,246,251));
+        WebSettings settings=webView.getSettings();
+        settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        settings.setGeolocationEnabled(false);
+        WebView.setWebContentsDebuggingEnabled((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0);
+        WebViewAssetLoader loader=new WebViewAssetLoader.Builder().addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(this)).build();
+        webView.setWebViewClient(new WebViewClient(){
+            @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){
+                Uri uri=request.getUrl();
+                if("https".equals(uri.getScheme())&&"appassets.androidplatform.net".equals(uri.getHost())&&uri.getPath()!=null&&uri.getPath().startsWith("/assets/www/")){
+                    WebResourceResponse asset=loader.shouldInterceptRequest(uri);
+                    if(asset!=null)return asset;
+                }
+                return new WebResourceResponse("text/plain","UTF-8",403,"Forbidden",java.util.Collections.emptyMap(),new ByteArrayInputStream(new byte[0]));
+            }
+            @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
+                Uri uri=request.getUrl();
+                if("https".equals(uri.getScheme())&&"appassets.androidplatform.net".equals(uri.getHost())&&uri.getPath()!=null&&uri.getPath().startsWith("/assets/www/"))return false;
+                if(request.isForMainFrame()&&request.hasGesture())openExternal(uri);
+                return true;
+            }
+            @Override public void onPageFinished(WebView view,String url){
+                view.evaluateJavascript("document.addEventListener('click',function(e){var a=e.target.closest('a[target=\"_blank\"]');if(a&&a.href.startsWith('https:')){e.preventDefault();AndroidFiles.openLink(a.href);}});",null);
+            }
+        });
+        webView.setWebChromeClient(new WebChromeClient());
+        webView.addJavascriptInterface(new NativeFiles(),"AndroidFiles");
+        root.addView(webView,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
+        setContentView(root);root.requestApplyInsets();
+        if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
+        webView.loadUrl(HOME);
+    }
+
+    private void openExternal(Uri uri){
+        if(!"https".equals(uri.getScheme())||uri.getHost()==null)return;
+        try{startActivity(new Intent(Intent.ACTION_VIEW,uri));}catch(android.content.ActivityNotFoundException ignored){notice("手机上没有可用浏览器。");}
+    }
+    private void handleBack(){
+        webView.evaluateJavascript("Boolean(globalThis.dagongrenBack && globalThis.dagongrenBack())",value->{if(!"true".equals(value))moveTaskToBack(true);});
+    }
+    @Override @SuppressWarnings("deprecation") public void onBackPressed(){handleBack();}
+    private void notice(String text){runOnUiThread(()->Toast.makeText(this,text,Toast.LENGTH_LONG).show());}
+    private JSONObject currentConfig() throws Exception {
+        JSONObject config=vault.load();if(config==null)throw new IllegalStateException("请先配置坚果云账号和应用密码。");return config;
+    }
+    private void respond(String id,JSONObject result){
+        runOnUiThread(()->{if(!isDestroyed())webView.evaluateJavascript("globalThis.dagongrenNativeResult && globalThis.dagongrenNativeResult("+JSONObject.quote(id)+","+result+");",null);});
+    }
+    public final class NativeFiles {
+        @JavascriptInterface public String status(){
+            try{return CredentialVault.publicConfig(vault.load()).toString();}
+            catch(Exception ignored){return "{\"configured\":false,\"error\":\"原连接配置无法读取，请重新配置。\"}";}
+        }
+        @JavascriptInterface public String fingerprint(String input){
+            try{
+                byte[] bytes=MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8));
+                StringBuilder result=new StringBuilder();for(byte value:bytes)result.append(String.format(java.util.Locale.US,"%02x",value&255));
+                return result.toString();
+            }catch(Exception ignored){throw new IllegalStateException("无法校验账本，已暂停同步。");}
+        }
+        @JavascriptInterface public void openLink(String link){runOnUiThread(()->openExternal(Uri.parse(link)));}
+        @JavascriptInterface public void request(String id,String action,String payload){
+            if(id==null||id.length()>100)return;
+            worker.execute(()->{
+                JSONObject result=new JSONObject();
+                try{
+                    JSONObject input=new JSONObject(payload),output;
+                    switch(action){
+                        case "configure":
+                            JSONObject old=vault.load();
+                            String url=input.getString("url").trim();if(!url.endsWith("/"))url+="/";
+                            String username=input.getString("username").trim(),password=input.getString("password");
+                            if(password.isEmpty()){
+                                if(old==null||!old.getString("url").equals(url)||!old.getString("username").equals(username))
+                                    throw new IllegalArgumentException("修改服务地址或账号时，请重新填写应用密码。");
+                                password=old.getString("password");
+                            }
+                            JSONObject candidate=new JSONObject().put("url",url).put("username",username).put("password",password).put("path",input.getString("path").trim());
+                            new WebDavClient(candidate).testConnection();vault.save(candidate);output=CredentialVault.publicConfig(candidate);break;
+                        case "read": output=new WebDavClient(currentConfig()).read();break;
+                        case "write": output=new WebDavClient(currentConfig()).write(input);break;
+                        case "disconnect": vault.clear();output=new JSONObject().put("removed",true);break;
+                        default: throw new IllegalArgumentException("不支持的操作。");
+                    }
+                    result.put("ok",true).put("data",output);
+                }catch(Exception error){
+                    String message=error.getMessage();
+                    if(message==null||!message.chars().anyMatch(c->c>127))message="网络连接未完成，请检查网络或服务地址后重试。本机记录保留。";
+                    try{result.put("ok",false).put("error",message);}catch(Exception ignored){}
+                }
+                respond(id,result);
+            });
+        }
+        @JavascriptInterface public void saveFile(String name,String mime,String content){
+            if(content==null||content.getBytes(StandardCharsets.UTF_8).length>10*1024*1024){notice("导出文件过大，请减少记录范围。");return;}
+            if(!"text/csv".equals(mime)&&!"application/json".equals(mime))return;
+            if(name==null)return;
+            String safeName=name.replace((char)47,'_').replace((char)92,'_').replace((char)10,'_').replace((char)13,'_');
+            runOnUiThread(()->{
+                if(pendingFile!=null){notice("请先完成上一次文件保存。");return;}
+                pendingFile=content.getBytes(StandardCharsets.UTF_8);
+                Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(mime).putExtra(Intent.EXTRA_TITLE,safeName);
+                try{startActivityForResult(intent,SAVE_FILE);}catch(android.content.ActivityNotFoundException ignored){pendingFile=null;notice("手机没有可用的文件保存界面。");}
+            });
+        }
+    }
+    @Override @SuppressWarnings("deprecation")
+    protected void onActivityResult(int requestCode,int resultCode,Intent data){
+        super.onActivityResult(requestCode,resultCode,data);if(requestCode!=SAVE_FILE)return;
+        byte[] bytes=pendingFile;pendingFile=null;
+        if(resultCode!=RESULT_OK||data==null||data.getData()==null||bytes==null)return;
+        Uri uri=data.getData();
+        worker.execute(()->{
+            try(OutputStream stream=getContentResolver().openOutputStream(uri,"wt")){
+                if(stream==null)throw new java.io.IOException();stream.write(bytes);notice("账本已保存到所选位置。");
+            }catch(Exception ignored){notice("文件保存失败，账本仍保存在本机。");}
+        });
+    }
+    @Override protected void onResume(){super.onResume();if(webView!=null)webView.onResume();}
+    @Override protected void onPause(){if(webView!=null)webView.onPause();super.onPause();}
+    @Override protected void onDestroy(){
+        worker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
+    }
+}
