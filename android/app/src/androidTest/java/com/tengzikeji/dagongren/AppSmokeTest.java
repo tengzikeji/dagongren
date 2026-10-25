@@ -52,10 +52,15 @@ public class AppSmokeTest {
     private void paintedScreenshot(ActivityScenario<MainActivity> scenario,String name) throws Exception {
         evaluate(scenario,"window.__upgradePaintReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>{window.__upgradePaintReady=true;}))");
         waitTrue(scenario,"window.__upgradePaintReady===true");
+        CountDownLatch frame=new CountDownLatch(1);
+        scenario.onActivity(activity->((WebView)activity.findViewById(R.id.web_view)).postVisualStateCallback(1,new WebView.VisualStateCallback(){@Override public void onComplete(long requestId){frame.countDown();}}));
+        assertTrue("WebView frame was not committed",frame.await(10,TimeUnit.SECONDS));
+        Thread.sleep(100);
         screenshot(name);
     }
     @Test public void appLoadsSavesWagesAndOffersEditableConnection() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            scenario.onActivity(activity->{assertEquals("打工人",activity.getString(R.string.app_name));assertEquals(0,activity.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE);});
             resetBook(scenario);
             assertEquals("4",evaluate(scenario,"document.querySelectorAll('.bottom-nav button').length"));
             assertEquals("0",evaluate(scenario,"JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.salaryCents"));
@@ -90,6 +95,8 @@ public class AppSmokeTest {
             waitTrue(scenario,"!document.querySelector('#company-form')");
             assertEquals("true",evaluate(scenario,"document.querySelector('.profile-join').getBoundingClientRect().top>=document.querySelector('.profile-company').getBoundingClientRect().bottom"));
             assertEquals("true",evaluate(scenario,"document.body.scrollWidth<=innerWidth"));
+            assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('.profile-company')).whiteSpace==='nowrap'"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('.profile-name-viewport').clientWidth>document.querySelector('.profile-card').clientWidth*.8"));
             paintedScreenshot(scenario,"profile-wrap");
             evaluate(scenario,"document.querySelector('[data-action=company-settings]').click()");
             JSONObject position=new JSONObject(new org.json.JSONTokener(evaluate(scenario,"JSON.stringify((()=>{const r=document.getElementById('company-name').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})())")).nextValue().toString());
@@ -130,7 +137,10 @@ public class AppSmokeTest {
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=salary-settings]').click();document.getElementById('salary').value='6000';document.querySelector('.modal-footer button[type=submit]').click()");
             evaluate(scenario,"document.querySelector('[data-action=company-settings]').click();document.getElementById('company-name').value='升级测试公司';const d=new Date();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-2);document.getElementById('join-date').value=d.toISOString().slice(0,10);document.querySelector('.modal-footer button[type=submit]').click()");
             assertEquals("3",evaluate(scenario,"Object.keys(JSON.parse(localStorage.getItem('dagongren.paybook.v1')).months).length"));
-            evaluate(scenario,"document.querySelector('[data-action=open-cleanup]').click();const s=document.getElementById('cleanup-scope');s.value='all';s.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('[data-action=review-cleanup]').click();document.querySelector('[data-action=confirm-cleanup]').click()");
+            evaluate(scenario,"document.querySelector('[data-action=open-cleanup]').click();document.querySelector('[data-action=cleanup-scope][data-scope=year]').click();document.querySelector('[data-action=cleanup-scope][data-scope=all]').click()");
+            assertEquals("3",evaluate(scenario,"document.querySelectorAll('.cleanup-scope-card').length"));
+            paintedScreenshot(scenario,"cleanup-range-cards");
+            evaluate(scenario,"document.querySelector('[data-action=review-cleanup]').click();document.querySelector('[data-action=confirm-cleanup]').click()");
             assertEquals("0",evaluate(scenario,"Object.keys(JSON.parse(localStorage.getItem('dagongren.paybook.v1')).months).length"));
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=company-settings]').click();document.querySelector('.modal-footer button[type=submit]').click()");
             assertEquals("3",evaluate(scenario,"Object.keys(JSON.parse(localStorage.getItem('dagongren.paybook.v1')).months).length"));
@@ -153,22 +163,104 @@ public class AppSmokeTest {
             paintedScreenshot(scenario,"stable-date-query");
         }
     }
-    @Test public void coldStartupShowsOriginalAnimatedWordmark() throws Exception {
+    @Test public void coldStartupUsesOneSurfaceAndFlowsIntoHome() throws Exception {
+        UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        device.executeShellCommand("settings put global window_animation_scale 1");
+        device.executeShellCommand("settings put global transition_animation_scale 1");
+        device.executeShellCommand("settings put global animator_duration_scale 1");
+        device.executeShellCommand("mkdir -p /sdcard/Download/dagongren-test");
+        device.executeShellCommand("screenrecord --time-limit 8 /sdcard/Download/dagongren-test/startup-transition.mp4 >/dev/null 2>&1 &");
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            waitTrue(scenario,"Boolean(document.querySelector('.launch-page[data-phase=playing]'))");
+            assertEquals("1",evaluate(scenario,"document.querySelectorAll('.launch-page').length"));
+            assertEquals("false",evaluate(scenario,"Boolean(document.querySelector('.brand-intro'))"));
+            assertEquals("true",evaluate(scenario,"document.getElementById('app').inert"));
+            assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('.launch-ledger')).animationName==='launch-card-in'"));
+            paintedScreenshot(scenario,"startup-interface");
+            waitTrue(scenario,"!document.querySelector('.launch-page')");
+            assertEquals("false",evaluate(scenario,"document.getElementById('app').inert"));
+            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.bottom-nav'))"));
+            paintedScreenshot(scenario,"startup-home");
+        } finally {
+            device.executeShellCommand("settings put global window_animation_scale 0");
+            device.executeShellCommand("settings put global transition_animation_scale 0");
+            device.executeShellCommand("settings put global animator_duration_scale 0");
+        }
+    }
+    private void swipeCalendar(ActivityScenario<MainActivity> scenario,int direction) throws Exception {
+        swipeRegion(scenario,".calendar-days",direction);
+    }
+    private void swipeRegion(ActivityScenario<MainActivity> scenario,String selector,int direction) throws Exception {
+        JSONObject rect=new JSONObject(new org.json.JSONTokener(evaluate(scenario,"JSON.stringify((()=>{const r=document.querySelector('"+selector+"').getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,y:Math.min(r.top+Math.min(100,r.height*.5),visualViewport.height-120)}})())")).nextValue().toString());
+        int[] origin=new int[2];float[] density=new float[1];
+        scenario.onActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(origin);density[0]=activity.getResources().getDisplayMetrics().density;});
+        double left=rect.getDouble("left"),width=rect.getDouble("width"),y=rect.getDouble("y");
+        double from=left+width*(direction==0?.5:direction>0?.8:.2),to=left+width*(direction==0?.5:direction>0?.2:.8);
+        int x1=origin[0]+Math.round((float)from*density[0]),x2=origin[0]+Math.round((float)to*density[0]),y1=origin[1]+Math.round((float)y*density[0]),y2=origin[1]+Math.round((float)(direction==0?y-80:y)*density[0]);
+        assertTrue("Swipe gesture could not be delivered",UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(x1,y1,x2,y2,24));
+    }
+    @Test public void calendarRollsAndEntryFiltersRemainStableAndReadable() throws Exception {
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         device.executeShellCommand("settings put global window_animation_scale 1");
         device.executeShellCommand("settings put global transition_animation_scale 1");
         device.executeShellCommand("settings put global animator_duration_scale 1");
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
-            waitTrue(scenario,"Boolean(document.querySelector('.brand-intro svg'))");
-            assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector(\'.brand-intro path\')).animationName===\'intro-write\'"));
-            evaluate(scenario,"document.querySelectorAll(\'.brand-intro path\').forEach(p=>{p.style.animation=\'none\';p.style.opacity=\'1\';});document.querySelector(\'.intro-wordmark p\').style.opacity=\'1\'");
-            paintedScreenshot(scenario,"startup-wordmark");
-            waitTrue(scenario,"!document.querySelector('.brand-intro')");
-            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.bottom-nav'))"));
+            resetBook(scenario);
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=salary-settings]').click();document.getElementById('salary').value='6000';document.querySelector('.modal-footer button[type=submit]').click()");
+            evaluate(scenario,"document.querySelector('[data-action=company-settings]').click();const d=new Date();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-2);document.getElementById('join-date').value=d.toISOString().slice(0,10);document.querySelector('.modal-footer button[type=submit]').click();document.querySelector('[data-view=home]').click()");
+            evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click()");
+            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.number-roll-strip'))"));
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.number-roll-strip')].every(e=>Number(e.style.getPropertyValue('--roll-steps'))>=30)"));
+            evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
+            waitTrue(scenario,"!document.querySelector('.number-roll-strip')");
+            evaluate(scenario,"document.querySelector('[data-view=calendar]').click();window.__calendarHeight=document.querySelector('.calendar-days').getBoundingClientRect().height;for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
+            assertEquals("42",evaluate(scenario,"document.querySelector('.calendar-days').children.length"));
+            assertEquals("true",evaluate(scenario,"Math.abs(document.querySelector('.calendar-days').getBoundingClientRect().height-window.__calendarHeight)<1"));
+            assertEquals("0",evaluate(scenario,"document.querySelectorAll('.calendar-day .number-roll-strip').length"));
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.calendar-day[data-date]')].every(e=>Number(e.dataset.date.slice(8))===Number(e.querySelector('.day-number').childNodes[0].nodeValue))"));
+            evaluate(scenario,"window.__beforeSwipe=document.querySelector('.month-display').textContent");
+            swipeCalendar(scenario,1);
+            waitTrue(scenario,"document.querySelector('.month-display').textContent!==window.__beforeSwipe");
+            assertEquals("false",evaluate(scenario,"Boolean(document.getElementById('modal-root').firstElementChild)"));
+            swipeCalendar(scenario,-1);
+            waitTrue(scenario,"document.querySelector('.month-display').textContent===window.__beforeSwipe");
+            swipeCalendar(scenario,0);
+            assertEquals("true",evaluate(scenario,"document.querySelector('.month-display').textContent===window.__beforeSwipe"));
+            paintedScreenshot(scenario,"calendar-stable");
+            evaluate(scenario,"document.querySelector('[data-view=records]').click();document.querySelector('[data-action=detail-tab][data-tab=entries]').click()");
+            for(String kind:new String[]{"all","leave","overtime","subsidy","deduction","advance","payment"}){
+                evaluate(scenario,"document.querySelector('[data-action=entry-filter][data-filter="+kind+"]').click()");
+                assertEquals("true",evaluate(scenario,"(()=>{const el=document.querySelector('.entry-filters [aria-pressed=true]'),s=getComputedStyle(el),rgb=v=>v.match(/[\\d.]+/g).slice(0,3).map(Number).map(c=>{c/=255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4}),lum=v=>{const a=rgb(v);return .2126*a[0]+.7152*a[1]+.0722*a[2]},a=lum(s.color),b=lum(s.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5})()"));
+            }
+            paintedScreenshot(scenario,"entry-filter-contrast");
         } finally {
             device.executeShellCommand("settings put global window_animation_scale 0");
             device.executeShellCommand("settings put global transition_animation_scale 0");
             device.executeShellCommand("settings put global animator_duration_scale 0");
+        }
+    }
+
+    @Test public void mainPageSwipesKeepCalendarNamesAndFormsIndependent() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            String[] forward={"calendar","records","settings"};
+            for(String next:forward){
+                swipeRegion(scenario,".topbar",1);
+                waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='"+next+"'");
+            }
+            evaluate(scenario,"document.querySelector('[data-action=company-settings]').click();document.getElementById('company-name').value='页面滑动保留草稿'");
+            swipeRegion(scenario,".modal-body",1);
+            assertEquals("true",evaluate(scenario,"Boolean(document.getElementById('company-form'))"));
+            assertEquals("\"页面滑动保留草稿\"",evaluate(scenario,"document.getElementById('company-name').value"));
+            evaluate(scenario,"document.querySelector('[data-action=close-modal]').click()");
+            swipeRegion(scenario,".profile-name-viewport",1);
+            assertEquals("\"settings\"",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view"));
+            for(String previous:new String[]{"records","calendar","home"}){
+                swipeRegion(scenario,".topbar",-1);
+                waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='"+previous+"'");
+            }
+            swipeRegion(scenario,".topbar",-1);
+            assertEquals("\"home\"",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view"));
         }
     }
 

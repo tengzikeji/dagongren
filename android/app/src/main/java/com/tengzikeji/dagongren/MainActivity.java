@@ -37,14 +37,22 @@ public final class MainActivity extends Activity {
     private final ExecutorService calendarWorker=Executors.newSingleThreadExecutor();
     private byte[] pendingFile;
     private Boolean reportedKeyboard;
-    private boolean launchIntro=true;
+    private volatile boolean launchIntro=true;
+    private boolean systemSplashDelivered=Build.VERSION.SDK_INT<31,launchSurfacePrepared=false,launchNotified=false;
+    private Runnable dismissSystemSplash;
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
         super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;
+        if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(splash->{
+            systemSplashDelivered=true;dismissSystemSplash=splash::remove;
+            if(launchSurfacePrepared)completeLaunchSurface();
+            else splash.postDelayed(this::completeLaunchSurface,2000);
+        });
+
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        getWindow().getDecorView().setSystemUiVisibility(launchIntro?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(launchIntro?Color.rgb(8,20,38):Color.rgb(243,246,251));
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(Color.rgb(243,246,251));
         if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
         root.setOnApplyWindowInsetsListener((v,insets)->{
             if(Build.VERSION.SDK_INT>=30){
@@ -67,7 +75,7 @@ public final class MainActivity extends Activity {
             }
         });
         webView=new WebView(this);webView.setId(R.id.web_view);
-        webView.setBackgroundColor(launchIntro?Color.rgb(8,20,38):Color.rgb(243,246,251));
+        webView.setBackgroundColor(Color.rgb(243,246,251));
         WebSettings settings=webView.getSettings();
         settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
@@ -102,6 +110,16 @@ public final class MainActivity extends Activity {
         webView.loadUrl(HOME);
     }
 
+    private void completeLaunchSurface(){
+        launchSurfacePrepared=true;
+        if(!systemSplashDelivered)return;
+        if(dismissSystemSplash!=null){dismissSystemSplash.run();dismissSystemSplash=null;}
+        if(!launchNotified&&webView!=null&&!isDestroyed()){
+            launchNotified=true;
+            webView.evaluateJavascript("globalThis.dagongrenLaunchReady && globalThis.dagongrenLaunchReady();",null);
+        }
+    }
+
     private void reportKeyboard(boolean visible){
         if(webView==null||Boolean.valueOf(visible).equals(reportedKeyboard))return;
         reportedKeyboard=visible;
@@ -125,11 +143,12 @@ public final class MainActivity extends Activity {
     }
     public final class NativeFiles {
         @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
+        @JavascriptInterface public void introReady(){runOnUiThread(MainActivity.this::completeLaunchSurface);}
         @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{
-            int color=active?Color.rgb(8,20,38):Color.rgb(243,246,251);
+            int color=Color.rgb(243,246,251);
             getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(color));getWindow().getDecorView().setBackgroundColor(color);
             getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
-            getWindow().getDecorView().setSystemUiVisibility(active?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
             if(webView!=null){webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
             if(!active)launchIntro=false;
         });}

@@ -94,7 +94,7 @@ for(const target of ['local','cloud','both']){
  assert.match(ui.el('app').innerHTML,/aria-current="date"/);
  ui.click('nav',{view:'settings'});
  assert.match(ui.el('app').innerHTML,/class="profile-company">公司甲<\/strong>/);
- assert.match(ui.el('app').innerHTML,/class="profile-join"><span>入职日期<\/span><time/);
+ assert.match(ui.el('app').innerHTML,/class="profile-join"><svg[\s\S]*?<\/svg><span>入职日期<\/span><time/);
  for(const action of ['company-settings','salary-settings']){
   ui.click(action);const html=ui.el('modal-root').innerHTML;
   assert.match(html,/modal-body/);assert.match(html,/modal-footer/);

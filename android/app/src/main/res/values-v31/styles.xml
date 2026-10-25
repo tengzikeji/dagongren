@@ -6,9 +6,9 @@
     <item name="android:navigationBarColor">#F3F6FB</item>
     <item name="android:windowActionModeOverlay">true</item>
     <item name="android:colorAccent">#3276F5</item>
-    <item name="android:windowBackground">#081426</item>
-    <item name="android:windowSplashScreenBackground">#081426</item>
-    <item name="android:windowSplashScreenAnimatedIcon">@drawable/intro_wordmark</item>
-    <item name="android:windowSplashScreenAnimationDuration">200</item>
+    <item name="android:windowBackground">#F3F6FB</item>
+    <item name="android:windowSplashScreenBackground">#F3F6FB</item>
+    <item name="android:windowSplashScreenAnimatedIcon">@drawable/launch_blank</item>
+    <item name="android:windowSplashScreenAnimationDuration">0</item>
 </style>
 </resources>

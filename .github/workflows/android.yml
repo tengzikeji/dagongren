@@ -1,6 +1,8 @@
 name: Android APK
 on:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -46,7 +48,7 @@ jobs:
           path: signing-key
           github-token: ${{ github.token }}
           run-id: ${{ steps.signing.outputs.run_id }}
-      - name: Prepare fixed test signing identity
+      - name: Prepare fixed upgrade signing identity
         run: |
           mkdir -p signing-key
           if [ ! -f signing-key/debug.keystore ]; then
@@ -54,7 +56,7 @@ jobs:
           fi
           chmod 600 signing-key/debug.keystore
       - name: Build, unit tests and Android lint
-        run: gradle -p android --no-daemon testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
+        run: gradle -p android --no-daemon testReleaseUnitTest lintRelease assembleRelease assembleReleaseAndroidTest
       - name: Preserve private signing backup
         run: |
           mkdir -p signing-key
@@ -67,17 +69,19 @@ jobs:
           path: signing-key/
           retention-days: 90
           if-no-files-found: error
+      - name: Verify production APK
+        run: node .github/scripts/verify-release.mjs
       - name: Prepare installable APK
         run: |
           mkdir -p artifacts
-          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/dagongren-1.1.0-upgrade.apk
+          cp android/app/build/outputs/apk/release/app-release.apk artifacts/dagongren-1.2.0.apk
           cd artifacts
-          sha256sum dagongren-1.1.0-upgrade.apk > SHA256SUMS.txt
+          sha256sum dagongren-1.2.0.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: dagongren-1.1.0-upgrade-apk
+          name: dagongren-1.2.0-apk
           path: artifacts/
-          retention-days: 14
+          retention-days: 30
           if-no-files-found: error
       - name: Enable emulator acceleration
         run: |
@@ -111,7 +115,7 @@ jobs:
                           print((failure.text or '')[:12000])
               except Exception:
                   pass
-          wanted = ['startup-wordmark', 'payment-period-cards', 'keyboard-centered', 'stable-date-query']
+          wanted = ['startup-interface', 'profile-wrap', 'cleanup-range-cards', 'entry-filter-contrast', 'calendar-stable', 'payment-period-cards', 'keyboard-centered', 'startup-home']
           root = Path('android/app/build/reports')
           found = []
           for name in wanted:
@@ -124,13 +128,45 @@ jobs:
                   ImageDraw.Draw(tile).text((10, 635), name, fill='#233954')
                   found.append(tile)
           if found:
-              sheet = Image.new('RGB', (320*len(found), 660), '#e8edf5')
+              sheet = Image.new('RGB', (320*min(4,len(found)), 660*((len(found)+3)//4)), '#e8edf5')
               for i, im in enumerate(found):
-                  sheet.paste(im, (320*i, 0))
+                  sheet.paste(im, (320*(i%4), 660*(i//4)))
               sheet.save(root/'upgrade-preview.jpg', quality=78)
               b = io.BytesIO()
               sheet.save(b, format='JPEG', quality=65)
               print('UPGRADE_PREVIEW_BASE64:' + base64.b64encode(b.getvalue()).decode())
+          PY
+      - name: Review launch transition frames
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import base64, io, shutil, subprocess
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+          root=Path('android/app/build/reports')
+          videos=list(root.rglob('startup-transition.mp4'))
+          ffmpeg=shutil.which('ffmpeg')
+          tiles=[]
+          if videos and ffmpeg:
+              frames=root/'launch-frames'
+              frames.mkdir(exist_ok=True)
+              for index,second in enumerate([.5,1,1.5,2,2.5,3,3.5,4]):
+                  frame=frames/(str(index)+'.jpg')
+                  result=subprocess.run([ffmpeg,'-loglevel','error','-y','-ss',str(second),'-i',str(videos[0]),'-frames:v','1','-vf','scale=270:-1',str(frame)],capture_output=True)
+                  if result.returncode==0 and frame.exists():
+                      im=Image.open(frame).convert('RGB')
+                      im.thumbnail((270,500))
+                      tile=Image.new('RGB',(290,530),'#e8edf5')
+                      tile.paste(im,((290-im.width)//2,6))
+                      ImageDraw.Draw(tile).text((10,512),str(second)+'s',fill='#233954')
+                      tiles.append(tile)
+          if tiles:
+              sheet=Image.new('RGB',(1160,530*((len(tiles)+3)//4)),'#e8edf5')
+              for i,tile in enumerate(tiles):sheet.paste(tile,((i%4)*290,(i//4)*530))
+              sheet.save(root/'launch-transition.jpg',quality=82)
+              buf=io.BytesIO()
+              sheet.save(buf,format='JPEG',quality=70)
+              print('LAUNCH_PREVIEW_BASE64:'+base64.b64encode(buf.getvalue()).decode())
           PY
       - name: Save test reports
         if: always()
@@ -140,4 +176,26 @@ jobs:
           path: |
             android/app/build/reports/
             android/app/build/outputs/androidTest-results/
-          retention-days: 14
+          retention-days: 30
+
+  publish-release:
+    needs: verify-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dagongren-1.2.0-apk
+          path: artifacts
+      - name: Publish signed release from verified main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd artifacts
+          sha256sum -c SHA256SUMS.txt
+          cd ..
+          gh release create v1.2.0 artifacts/dagongren-1.2.0.apk artifacts/SHA256SUMS.txt --target "$GITHUB_SHA" --title "打工人 1.2.0" --notes-file .github/release-notes/1.2.0.md
