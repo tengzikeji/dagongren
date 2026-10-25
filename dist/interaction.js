@@ -180,7 +180,7 @@ export function installPageSwipe(root,api){
  let gesture=null,busy=false,blockedUntil=0;
  const reset=()=>{root.classList.remove('is-paging');root.style.removeProperty('--page-drag');gesture=null;};
  const change=async(from,to,delta,offset)=>{
-  busy=true;
+  busy=true;root.classList.add('page-transitioning');
   const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.body.classList.contains('motion-off'),old=root.querySelector('#view-content');
   let animation;
   try{
@@ -189,7 +189,7 @@ export function installPageSwipe(root,api){
    api.navigate(to);
    const incoming=root.querySelector('#view-content');
    if(!reduced&&incoming?.animate)await incoming.animate([{transform:'translate3d('+(delta*30)+'px,0,0)',opacity:.15},{transform:'translate3d(0,0,0)',opacity:1}],{duration:260,easing:'cubic-bezier(.2,.75,.2,1)'}).finished;
-  }catch{}finally{animation?.cancel();busy=false;}
+  }catch{}finally{animation?.cancel();busy=false;root.classList.remove('page-transitioning');}
  };
  root.addEventListener('pointerdown',event=>{
   if(gesture)reset();

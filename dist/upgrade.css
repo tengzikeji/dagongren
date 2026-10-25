@@ -60,3 +60,5 @@
 #view-content{transition:transform .18s cubic-bezier(.2,.7,.2,1)}.motion-off #view-content{transition:none}@media(prefers-reduced-motion:reduce){#view-content{transition:none!important}}
 
 .number-roll-slot{margin-right:var(--number-tracking,0px)}
+
+#app.page-transitioning #view-content{pointer-events:none}
