@@ -4,7 +4,7 @@ import {snapshotBook,chooseSyncAction,isEmptyBook,validateRemoteEnvelope} from '
 import {mergeBooks,rememberDeletions} from './sync-merge.js';
 export function installNativeSync(api){
  const native=globalThis.AndroidFiles,pending=new Map(),requestPrefix=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
- let config=JSON.parse(native.status()),busy=false,timer,pollTimer,lastAttempt=0,conflict=null,lastError='',sequence=0,failures=0,disposed=false;
+ let config=JSON.parse(native.status()),busy=false,timer,pollTimer,lastAttempt=0,conflict=null,lastError='',sequence=0,failures=0,disposed=false,cleanupGeneration=0;
  const db=()=>api.getBook(),signature=book=>native.fingerprint(canonicalJSON(snapshotBook(book)));
  const visible=()=>globalThis.document?.visibilityState!=='hidden',online=()=>globalThis.navigator?.onLine!==false;
  db().sync.demo=false;db().sync.cloudMonths=null;db().sync.connected=!!config.configured;
@@ -50,10 +50,10 @@ export function installNativeSync(api){
   if(api.storageBlocked()){if(!silent)message('本机存储不可用，已暂停同步，请先导出账本。');return;}
   if(!online()){lastError='网络已断开，修改保存在本机，联网后会自动补齐。';armPoll();if(!silent)api.toast(lastError);return;}
   if(api.editing?.()){if(!silent)api.toast('请先保存或取消当前编辑，自动同步会在编辑完成后继续。');schedule();return;}
-  busy=true;clearTimeout(timer);clearTimeout(pollTimer);lastAttempt=Date.now();if(!silent)api.render();
+  const generation=cleanupGeneration;busy=true;clearTimeout(timer);clearTimeout(pollTimer);lastAttempt=Date.now();if(!silent)api.render();
   try{
    for(let attempt=0;attempt<3;attempt++){
-    const initialHash=signature(db()),remote=await request('read');
+    const initialHash=signature(db()),remote=await request('read');if(cleanupGeneration!==generation)return;
     let local=snapshotBook(db()),remoteBook=null,remoteHash=null,base=db().sync.baseBook;
     const localHash=signature(local);if(api.editing?.())return;
     if(base&&signature(base)!==db().sync.baseline)base=null;
@@ -81,6 +81,7 @@ export function installNativeSync(api){
     saveBeforeReplace(db());
     try{await request('write',{content:canonicalJSON(candidate),exists:remote.exists,etag:remote.etag||''});}
     catch(error){if([409,412].includes(error.code)&&attempt<2)continue;throw error;}
+    if(cleanupGeneration!==generation)return;
     if(api.editing?.()){db().sync.pending=Math.max(1,db().sync.pending||0);api.persist();return;}
     const current=snapshotBook(db());
     if(signature(current)!==localHash){
@@ -130,5 +131,5 @@ export function installNativeSync(api){
  globalThis.window?.addEventListener?.('online',foreground);
  globalThis.document?.addEventListener?.('visibilitychange',()=>{if(visible())foreground();else{clearTimeout(timer);clearTimeout(pollTimer);}});
  queueMicrotask(()=>{if(canAuto())schedule(500);});
- return {view,showConfig,run,schedule,submit,handleClick,status,configured:()=>!!config.configured,beforeCleanup(){clearTimeout(timer);clearTimeout(pollTimer);},foreground,fetchCalendar:year=>request('calendar-read',{year}),dispose(){disposed=true;clearTimeout(timer);clearTimeout(pollTimer);}};
+ return {view,showConfig,run,schedule,submit,handleClick,status,configured:()=>!!config.configured,beforeCleanup(){cleanupGeneration++;clearTimeout(timer);clearTimeout(pollTimer);},foreground,fetchCalendar:year=>request('calendar-read',{year}),dispose(){disposed=true;clearTimeout(timer);clearTimeout(pollTimer);}};
 }

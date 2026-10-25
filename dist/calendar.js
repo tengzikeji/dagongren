@@ -35,7 +35,7 @@ function yearRows(year){
 }
 export function hasOfficialSchedule(year){return !!arrangements[Number(year)]||onlineSchedules.has(Number(year));}
 export function holidayName(date){const row=onlineScheduleDay(date);if(row)return row.isOffDay?row.name:'';if(onlineSchedules.has(Number(date.slice(0,4))))return '';return ranges.find(([start,end])=>date>=start&&date<=end)?.[2]||'';}
-export function isMakeupDate(date){const row=onlineScheduleDay(date);if(row)return !row.isOffDay;if(onlineSchedules.has(Number(date.slice(0,4))))return false;return workdays.has(date);}
+export function isMakeupDate(date){const row=onlineScheduleDay(date);if(row)return !row.isOffDay&&[0,6].includes(new Date(date+'T12:00:00Z').getUTCDay());if(onlineSchedules.has(Number(date.slice(0,4))))return false;return workdays.has(date);}
 export function statutoryYearDates(year){
  year=Number(year);if(legalCache.has(year))return legalCache.get(year);
  const dates=new Set([year+'-01-01',year+'-05-01',year+'-10-01',year+'-10-02',year+'-10-03']);
