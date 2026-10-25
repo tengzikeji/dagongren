@@ -136,6 +136,13 @@ jobs:
               sheet.save(b, format='JPEG', quality=65)
               print('UPGRADE_PREVIEW_BASE64:' + base64.b64encode(b.getvalue()).decode())
           PY
+      - name: Prepare launch video review
+        if: always()
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ffmpeg
+          fi
       - name: Review launch transition frames
         if: always()
         run: |
@@ -146,11 +153,15 @@ jobs:
           root=Path('android/app/build/reports')
           videos=list(root.rglob('startup-transition.mp4'))
           ffmpeg=shutil.which('ffmpeg')
+          offsets=list(root.rglob('startup-playing-second.txt'))
+          center=float(offsets[0].read_text().strip()) if offsets else 10.0
+          seconds=[max(0,center+offset) for offset in [-2,-1,-.5,0,.3,.6,.9,1.2,1.5,2,3,4]]
           tiles=[]
+          print('LAUNCH_REVIEW:',len(videos),'videos; playback at',center,'seconds; ffmpeg:',bool(ffmpeg))
           if videos and ffmpeg:
               frames=root/'launch-frames'
               frames.mkdir(exist_ok=True)
-              for index,second in enumerate([.5,1,1.5,2,2.5,3,3.5,4]):
+              for index,second in enumerate(seconds):
                   frame=frames/(str(index)+'.jpg')
                   result=subprocess.run([ffmpeg,'-loglevel','error','-y','-ss',str(second),'-i',str(videos[0]),'-frames:v','1','-vf','scale=270:-1',str(frame)],capture_output=True)
                   if result.returncode==0 and frame.exists():
@@ -158,7 +169,7 @@ jobs:
                       im.thumbnail((270,500))
                       tile=Image.new('RGB',(290,530),'#e8edf5')
                       tile.paste(im,((290-im.width)//2,6))
-                      ImageDraw.Draw(tile).text((10,512),str(second)+'s',fill='#233954')
+                      ImageDraw.Draw(tile).text((10,512),str(round(second,2))+'s',fill='#233954')
                       tiles.append(tile)
           if tiles:
               sheet=Image.new('RGB',(1160,530*((len(tiles)+3)//4)),'#e8edf5')

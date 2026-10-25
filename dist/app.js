@@ -591,7 +591,7 @@ function saveSettingsForm(formId,fd,error) {
 }
 
 function refreshAccrualDay() {
-  const next=chinaDate();if(next!==today){today=next;ensureAccrualMonths(db,today);if(db.sync.demo||db.sync.connected)db.sync.pending++;persist();render();if((db.sync.demo||db.sync.connected)&&db.sync.auto&&!db.sync.offline)scheduleDemoSync();}installPageSwipe(app,{current:()=>view,blocked:()=>Boolean(modalRoot.firstElementChild),navigate:next=>app.querySelector('.bottom-nav [data-view="'+next+'"]')?.click()});
+  const next=chinaDate();if(next!==today){today=next;ensureAccrualMonths(db,today);if(db.sync.demo||db.sync.connected)db.sync.pending++;persist();render();if((db.sync.demo||db.sync.connected)&&db.sync.auto&&!db.sync.offline)scheduleDemoSync();}
 setTimeout(refreshAccrualDay,60000);
 }
 
@@ -784,6 +784,7 @@ ensureAccrualMonths(db,today);persist();
 calendarUpdater.refresh(Number(today.slice(0,4)));
 render();
 playBrandIntro(db.defaults.motion!==false);
+installPageSwipe(app,{current:()=>view,blocked:()=>Boolean(modalRoot.firstElementChild),navigate:next=>app.querySelector('.bottom-nav [data-view="'+next+'"]')?.click()});
 installCalendarSwipe(app,delta=>app.querySelector('[data-action=shift-month][data-delta="'+delta+'"]')?.click());
 setTimeout(refreshAccrualDay,60000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(nativeSync)nativeSync.foreground();calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)));const next=chinaDate();if(next!==today){today=next;ensureAccrualMonths(db,today);if(db.sync.demo||db.sync.connected)db.sync.pending++;persist();render();if((db.sync.demo||db.sync.connected)&&db.sync.auto&&!db.sync.offline)scheduleDemoSync();}}});

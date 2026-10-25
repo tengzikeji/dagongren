@@ -39,7 +39,7 @@ public class AppSmokeTest {
             Thread.sleep(150);
         }
         screenshot("condition-failed");
-        String details=evaluate(scenario,"JSON.stringify({viewport:[innerWidth,innerHeight,visualViewport.height],keyboard:document.body.classList.contains('keyboard-open'),focused:document.activeElement.id,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,motion:JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion,introAllowed:AndroidFiles.shouldPlayIntro(),rects:['.modal','.modal-body','.modal-footer','#company-name'].map(s=>{const e=document.querySelector(s);return e?{s,top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom}:null})})");
+        String details=evaluate(scenario,"JSON.stringify({view:document.querySelector('.bottom-nav [aria-current=page]')?.dataset.view,classes:document.getElementById('app').className,viewport:[innerWidth,innerHeight,visualViewport.height],keyboard:document.body.classList.contains('keyboard-open'),focused:document.activeElement.id,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,motion:JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion,introAllowed:AndroidFiles.shouldPlayIntro(),rects:['.modal','.modal-body','.modal-footer','#company-name'].map(s=>{const e=document.querySelector(s);return e?{s,top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom}:null})})");
         fail("Condition did not become true: "+script+"; last result: "+last+"; "+details);
     }
     private void waitReady(ActivityScenario<MainActivity> scenario) throws Exception {
@@ -178,16 +178,19 @@ public class AppSmokeTest {
         device.executeShellCommand("settings put global transition_animation_scale 1");
         device.executeShellCommand("settings put global animator_duration_scale 1");
         device.executeShellCommand("mkdir -p /sdcard/Download/dagongren-test");
-        Thread recording=new Thread(()->{try{device.executeShellCommand("screenrecord --size 720x1280 --bit-rate 2000000 --time-limit 10 /sdcard/Download/dagongren-test/startup-transition.mp4");}catch(Exception ignored){}},"startup-recording");recording.setDaemon(true);recording.start();
+        long recordingStarted=System.currentTimeMillis();
+        Thread recording=new Thread(()->{try{device.executeShellCommand("screenrecord --size 720x1280 --bit-rate 2000000 --time-limit 30 /sdcard/Download/dagongren-test/startup-transition.mp4");}catch(Exception ignored){}},"startup-recording");recording.setDaemon(true);recording.start();
         ActivityScenario<MainActivity> scenario=null;
         android.content.Context target=InstrumentationRegistry.getInstrumentation().getTargetContext();
         target.startActivity(new android.content.Intent(target,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK));
         try{
-            waitTrue(scenario,"Boolean(document.querySelector('.launch-page[data-phase=playing]'))");
-            assertEquals("1",evaluate(scenario,"document.querySelectorAll('.launch-page').length"));
-            assertEquals("false",evaluate(scenario,"Boolean(document.querySelector('.brand-intro'))"));
-            assertEquals("true",evaluate(scenario,"document.getElementById('app').inert"));
-            assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('.launch-ledger')).animationName==='launch-card-in'"));
+            waitTrue(scenario,"(()=>{if(!document.querySelector('.launch-page[data-phase=playing]'))return false;window.__launchObserved={at:Date.now(),surfaces:document.querySelectorAll('.launch-page').length,oldBrand:Boolean(document.querySelector('.brand-intro')),inert:document.getElementById('app').inert,animated:getComputedStyle(document.querySelector('.launch-ledger')).animationName==='launch-card-in'};return true})()");
+            assertEquals("1",evaluate(scenario,"window.__launchObserved.surfaces"));
+            assertEquals("false",evaluate(scenario,"window.__launchObserved.oldBrand"));
+            assertEquals("true",evaluate(scenario,"window.__launchObserved.inert"));
+            assertEquals("true",evaluate(scenario,"window.__launchObserved.animated"));
+            double playingSecond=(Long.parseLong(evaluate(scenario,"window.__launchObserved.at"))-recordingStarted)/1000.0;
+            device.executeShellCommand("echo "+playingSecond+" > /sdcard/Download/dagongren-test/startup-playing-second.txt");
             paintedScreenshot(scenario,"startup-interface");
             waitTrue(scenario,"!document.querySelector('.launch-page')");
             assertEquals("false",evaluate(scenario,"document.getElementById('app').inert"));
@@ -195,7 +198,7 @@ public class AppSmokeTest {
             paintedScreenshot(scenario,"startup-home");
         } finally {
             withActivity(activity->activity.finish());
-            recording.join(12000);
+            recording.join(35000);
             device.executeShellCommand("settings put global window_animation_scale 0");
             device.executeShellCommand("settings put global transition_animation_scale 0");
             device.executeShellCommand("settings put global animator_duration_scale 0");
