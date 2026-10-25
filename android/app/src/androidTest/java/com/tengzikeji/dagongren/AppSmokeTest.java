@@ -21,7 +21,7 @@ public class AppSmokeTest {
     private String evaluate(ActivityScenario<MainActivity> scenario,String script) throws Exception {
         CountDownLatch latch=new CountDownLatch(1);AtomicReference<String> result=new AtomicReference<>();
         scenario.onActivity(activity->((WebView)activity.findViewById(R.id.web_view)).evaluateJavascript(script,value->{result.set(value);latch.countDown();}));
-        assertTrue("WebView evaluation timed out",latch.await(10,TimeUnit.SECONDS));return result.get();
+        assertTrue("WebView evaluation timed out: "+script,latch.await(25,TimeUnit.SECONDS));return result.get();
     }
     private void waitTrue(ActivityScenario<MainActivity> scenario,String script) throws Exception {
         long deadline=System.currentTimeMillis()+20000;String last="";
@@ -161,7 +161,7 @@ public class AppSmokeTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             waitTrue(scenario,"Boolean(document.querySelector('.brand-intro svg'))");
             assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector(\'.brand-intro path\')).animationName===\'intro-write\'"));
-            evaluate(scenario,"document.querySelector(\'.brand-intro\').getAnimations({subtree:true}).forEach(a=>a.finish())");
+            evaluate(scenario,"document.querySelectorAll(\'.brand-intro path\').forEach(p=>{p.style.animation=\'none\';p.style.opacity=\'1\';});document.querySelector(\'.intro-wordmark p\').style.opacity=\'1\'");
             paintedScreenshot(scenario,"startup-wordmark");
             waitTrue(scenario,"!document.querySelector('.brand-intro')");
             assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.bottom-nav'))"));

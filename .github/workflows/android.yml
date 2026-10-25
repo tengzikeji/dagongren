@@ -101,6 +101,16 @@ jobs:
           import base64, io
           from pathlib import Path
           from PIL import Image, ImageOps, ImageDraw
+          import xml.etree.ElementTree as ET
+          for xml in Path('android/app/build/outputs/androidTest-results').rglob('*.xml'):
+              try:
+                  report=ET.parse(xml)
+                  for case in report.iter('testcase'):
+                      for failure in list(case.findall('failure'))+list(case.findall('error')):
+                          print('DEVICE_FAILURE_DETAIL:'+case.get('name',''))
+                          print((failure.text or '')[:12000])
+              except Exception:
+                  pass
           wanted = ['startup-wordmark', 'payment-period-cards', 'keyboard-centered', 'stable-date-query']
           root = Path('android/app/build/reports')
           found = []
