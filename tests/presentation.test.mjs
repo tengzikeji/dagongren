@@ -4,7 +4,7 @@ import {numberRollPlan} from '../dist/interaction.js';
 test('数码轮从最高位依次启动，每位至少滚动三圈并精确落位',()=>{
  const plan=numberRollPlan('1,234.56','9,876.54');
  assert.equal(plan.length,6);
- plan.forEach((wheel,i)=>{assert.equal(wheel.delay,i*60);assert.ok(wheel.steps>=30);assert.equal(wheel.digits[0],wheel.from);assert.equal(wheel.digits.at(-1),Number('987654'[i]));assert.equal(wheel.digits.length,wheel.steps+1);assert.ok(wheel.digits.every(x=>Number.isInteger(x)&&x>=0&&x<=9));});
+ plan.forEach((wheel,i)=>{assert.equal(wheel.delay,i*35);assert.ok(wheel.steps>=30);assert.equal(wheel.digits[0],wheel.from);assert.equal(wheel.digits.at(-1),Number('987654'[i]));assert.equal(wheel.digits.length,wheel.steps+1);assert.ok(wheel.digits.every(x=>Number.isInteger(x)&&x>=0&&x<=9));});
  assert.ok(plan.every((x,i)=>i===0||x.delay>plan[i-1].delay));
 });
 test('金额跨位、负数及零保留小数的目标数字',()=>{
@@ -50,7 +50,7 @@ function swipeFixture(owner=''){
  const handlers={},classes=new Set(),variables=new Map(),style={setProperty:(k,v)=>variables.set(k,v),removeProperty:k=>variables.delete(k)},classList={add:x=>classes.add(x),remove:x=>classes.delete(x)};
  const panel={style,classList},root={style,classList,addEventListener:(name,fn)=>handlers[name]=fn,querySelector:()=>null};
  const target={closest:selector=>owner==='calendar'&&selector.includes('[data-calendar-swipe]')?panel:owner==='name'&&selector.includes('.profile-name-viewport')?panel:null};
- const event=(time,x,y)=>({pointerId:1,isPrimary:true,button:0,timeStamp:time,clientX:x,clientY:y,target,cancelable:true,preventDefault(){this.prevented=true},stopImmediatePropagation(){this.stopped=true}});
+ const event=(time,x,y)=>({pointerId:1,isPrimary:true,isTrusted:true,button:0,timeStamp:time,clientX:x,clientY:y,target,cancelable:true,preventDefault(){this.prevented=true},stopImmediatePropagation(){this.stopped=true}});
  return {root,panel,handlers,event,classes};
 }
 test('卡顿延迟处理触摸事件时，日历仍按真实事件时间切月份并阻止误点',()=>{
@@ -62,6 +62,7 @@ test('卡顿延迟处理触摸事件时，日历仍按真实事件时间切月�
   f.handlers.pointerup(f.event(1320,100,104));
   assert.deepEqual(changes,[1]);
   const ghost=f.event(1321,100,104);f.handlers.click(ghost);assert.equal(ghost.prevented,true);assert.equal(ghost.stopped,true);
+  const routed=f.event(1322,100,104);routed.isTrusted=false;f.handlers.click(routed);assert.notEqual(routed.prevented,true);
   f.handlers.pointerdown(f.event(2000,200,100));f.handlers.pointermove(f.event(2030,204,180));f.handlers.pointerup(f.event(2100,204,200));
   assert.deepEqual(changes,[1]);assert.equal(f.classes.has('is-swiping'),false);
  }finally{Date.now=oldNow;}

@@ -184,7 +184,7 @@ public final class MainActivity extends Activity {
                                 password=old.getString("password");
                             }
                             JSONObject candidate=new JSONObject().put("url",url).put("username",username).put("password",password).put("path",input.getString("path").trim());
-                            new WebDavClient(candidate).testConnection();vault.save(candidate);output=CredentialVault.publicConfig(candidate);break;
+                            WebDavClient connection=new WebDavClient(candidate);connection.testConnection();connection.prepareBookLocation();vault.save(candidate);output=CredentialVault.publicConfig(candidate);break;
                         case "read": output=new WebDavClient(currentConfig()).read();break;
                         case "write": output=new WebDavClient(currentConfig()).write(input);break;
                         case "disconnect": vault.clear();output=new JSONObject().put("removed",true);break;
