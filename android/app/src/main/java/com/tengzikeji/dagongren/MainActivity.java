@@ -43,7 +43,7 @@ public final class MainActivity extends Activity {
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
-        super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;
+        super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;systemSplashDelivered=Build.VERSION.SDK_INT<31||state!=null;
         if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(splash->{
             systemSplashDelivered=true;dismissSystemSplash=splash::remove;
             if(launchSurfacePrepared)completeLaunchSurface();
