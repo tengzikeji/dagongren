@@ -1,0 +1,213 @@
+name: Android APK
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check web logic and interactions
+        run: |
+          npm run check
+          npm run test:ui
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Find previous private signing backup
+        id: signing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          previous=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=dagongren-signing-key&per_page=100" --jq '.artifacts | map(select(.expired == false and .name == "dagongren-signing-key")) | sort_by(.created_at) | reverse | .[0].workflow_run.id // empty')
+          echo "run_id=$previous" >> "$GITHUB_OUTPUT"
+          if [ -z "$previous" ] && [ -f .github/signing-identity.json ]; then
+            echo "::error::Signing backup missing. Restore the saved keystore before rebuilding; do not rotate the signing identity."
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        if: steps.signing.outputs.run_id != ''
+        with:
+          name: dagongren-signing-key
+          path: signing-key
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.signing.outputs.run_id }}
+      - name: Prepare fixed upgrade signing identity
+        run: |
+          mkdir -p signing-key
+          if [ ! -f signing-key/debug.keystore ]; then
+            keytool -genkeypair -keystore signing-key/debug.keystore -alias androiddebugkey -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
+          fi
+          chmod 600 signing-key/debug.keystore
+      - name: Build, unit tests and Android lint
+        run: gradle -p android --no-daemon testReleaseUnitTest lintRelease assembleRelease assembleReleaseAndroidTest
+      - name: Preserve private signing backup
+        run: |
+          mkdir -p signing-key
+          keytool -exportcert -alias androiddebugkey -keystore signing-key/debug.keystore -storepass android -file signing-key/certificate.der
+          node .github/scripts/verify-signing.mjs
+          sha256sum signing-key/certificate.der > signing-key/certificate.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dagongren-signing-key
+          path: signing-key/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Verify production APK
+        run: node .github/scripts/verify-release.mjs
+      - name: Prepare installable APK
+        run: |
+          mkdir -p artifacts
+          cp android/app/build/outputs/apk/release/app-release.apk artifacts/dagongren-1.2.0.apk
+          cd artifacts
+          sha256sum dagongren-1.2.0.apk > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dagongren-1.2.0-apk
+          path: artifacts/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Android device smoke tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: bash .github/scripts/run-device-tests.sh
+      - name: Render emulator preview for review
+        if: always()
+        run: |
+          python3 -m pip install --quiet Pillow
+          python3 - <<'PY'
+          import base64, io
+          from pathlib import Path
+          from PIL import Image, ImageOps, ImageDraw
+          import xml.etree.ElementTree as ET
+          for xml in Path('android/app/build/outputs/androidTest-results').rglob('*.xml'):
+              try:
+                  report=ET.parse(xml)
+                  for case in report.iter('testcase'):
+                      for failure in list(case.findall('failure'))+list(case.findall('error')):
+                          print('DEVICE_FAILURE_DETAIL:'+case.get('name',''))
+                          print((failure.text or '')[:12000])
+              except Exception:
+                  pass
+          wanted = ['startup-interface', 'profile-wrap', 'cleanup-range-cards', 'entry-filter-contrast', 'calendar-stable', 'payment-period-cards', 'keyboard-centered', 'startup-home']
+          root = Path('android/app/build/reports')
+          found = []
+          for name in wanted:
+              matches = list(root.rglob(name + '.png'))
+              if matches:
+                  im = Image.open(matches[0]).convert('RGB')
+                  im.thumbnail((300, 620))
+                  tile = Image.new('RGB', (320, 660), '#e8edf5')
+                  tile.paste(im, ((320-im.width)//2, 10))
+                  ImageDraw.Draw(tile).text((10, 635), name, fill='#233954')
+                  found.append(tile)
+          if found:
+              sheet = Image.new('RGB', (320*min(4,len(found)), 660*((len(found)+3)//4)), '#e8edf5')
+              for i, im in enumerate(found):
+                  sheet.paste(im, (320*(i%4), 660*(i//4)))
+              sheet.save(root/'upgrade-preview.jpg', quality=78)
+              b = io.BytesIO()
+              sheet.save(b, format='JPEG', quality=65)
+              print('UPGRADE_PREVIEW_BASE64:' + base64.b64encode(b.getvalue()).decode())
+          PY
+      - name: Prepare launch video review
+        if: always()
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ffmpeg
+          fi
+      - name: Review launch transition frames
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import base64, io, re, shutil, subprocess
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+          root=Path('android/app/build/reports')
+          videos=list(root.rglob('startup-transition.mp4'))
+          ffmpeg=shutil.which('ffmpeg')
+          logs=list(Path('android/app/build/outputs/androidTest-results').rglob('*coldStartup*.txt'))
+          marker=next((m for log in logs if (m:=re.search(r'PLAYING_SECOND=([0-9.]+)',log.read_text(errors='replace')))),None)
+          center=float(marker.group(1)) if marker else 10.0
+          seconds=[max(0,center+offset) for offset in [-2,-1,-.5,0,.3,.6,.9,1.2,1.5,2,3,4]]
+          tiles=[]
+          print('LAUNCH_REVIEW:',len(videos),'videos; playback at',center,'seconds; ffmpeg:',bool(ffmpeg))
+          if videos and ffmpeg:
+              frames=root/'launch-frames'
+              frames.mkdir(exist_ok=True)
+              for index,second in enumerate(seconds):
+                  frame=frames/(str(index)+'.jpg')
+                  result=subprocess.run([ffmpeg,'-loglevel','error','-y','-ss',str(second),'-i',str(videos[0]),'-frames:v','1','-vf','scale=270:-1',str(frame)],capture_output=True)
+                  if result.returncode==0 and frame.exists():
+                      im=Image.open(frame).convert('RGB')
+                      im.thumbnail((270,500))
+                      tile=Image.new('RGB',(290,530),'#e8edf5')
+                      tile.paste(im,((290-im.width)//2,6))
+                      ImageDraw.Draw(tile).text((10,512),str(round(second,2))+'s',fill='#233954')
+                      tiles.append(tile)
+          if tiles:
+              sheet=Image.new('RGB',(1160,530*((len(tiles)+3)//4)),'#e8edf5')
+              for i,tile in enumerate(tiles):sheet.paste(tile,((i%4)*290,(i//4)*530))
+              sheet.save(root/'launch-transition.jpg',quality=82)
+              buf=io.BytesIO()
+              sheet.save(buf,format='JPEG',quality=70)
+              print('LAUNCH_PREVIEW_BASE64:'+base64.b64encode(buf.getvalue()).decode())
+          PY
+      - name: Save test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            android/app/build/reports/
+            android/app/build/outputs/androidTest-results/
+          retention-days: 30
+
+  publish-release:
+    needs: verify-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dagongren-1.2.0-apk
+          path: artifacts
+      - name: Publish signed release from verified main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd artifacts
+          sha256sum -c SHA256SUMS.txt
+          cd ..
+          gh release create v1.2.0 artifacts/dagongren-1.2.0.apk artifacts/SHA256SUMS.txt --target "$GITHUB_SHA" --title "打工人 1.2.0" --notes-file .github/release-notes/1.2.0.md

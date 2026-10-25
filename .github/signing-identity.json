@@ -1,0 +1,7 @@
+{
+  "applicationId": "com.tengzikeji.dagongren.upgrade",
+  "certificateSha256": "a4c749b16f9eaec17e1df4901a9a7ea0d79961c32260a57b105ba85305a2d7b9",
+  "keyAlias": "androiddebugkey",
+  "artifactName": "dagongren-signing-key",
+  "introducedVersion": "1.0.0-test"
+}

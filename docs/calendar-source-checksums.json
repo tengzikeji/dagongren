@@ -1,0 +1,115 @@
+{
+  "checked": "2026-10-24",
+  "sources": [
+    {
+      "year": 2020,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2020c.txt",
+      "sha256": "c49fbda6bb20a32a4ed98a14c1fa2586c3010464e4cfe6055b7752593e5c53a0"
+    },
+    {
+      "year": 2019,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2019c.txt",
+      "sha256": "c3053a786ee9d17322ac1ac8ec1c826bdc1f38c4074af58359db53e1a4a5dbad"
+    },
+    {
+      "year": 2021,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2021c.txt",
+      "sha256": "d1971a4b8874afa4e1d72177fc1d060a1e39e8b3fb296f577dc9a68fe5c3eeb3"
+    },
+    {
+      "year": 2022,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2022c.txt",
+      "sha256": "ca6f99fc3370f9f1e79001406ea217fb3167877804180cee9150ccc3122c10b9"
+    },
+    {
+      "year": 2023,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2023c.txt",
+      "sha256": "cc6cb90798c1aa8a1b02d1ade054f25a32d9edcaa956fe39094492c5bac39df3"
+    },
+    {
+      "year": 2024,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2024c.txt",
+      "sha256": "10e5a6cae3664e380fe86496ee16c71e99c4b0095b3e9df19c1cae906070fa04"
+    },
+    {
+      "year": 2025,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2025c.txt",
+      "sha256": "e34ae50b3560bb661fe64e7acd2d5282e009ab9c8c565d82aba0397ac6644aaa"
+    },
+    {
+      "year": 2026,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2026c.txt",
+      "sha256": "5401798499f2ac270ba56011607785670837008f8836484a180562df92e826a9"
+    },
+    {
+      "year": 2027,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2027c.txt",
+      "sha256": "7ce16dc48f65027928c971e9b592877d70455f4687b3adb8df25cf501c9f05e9"
+    },
+    {
+      "year": 2028,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2028c.txt",
+      "sha256": "72aff1cce069f25770156f6575136ff28fbafd4321828a544ebab646f72486bf"
+    },
+    {
+      "year": 2029,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2029c.txt",
+      "sha256": "2ac6974c9e87db4eff4bea2cc87d3ba1df00c5407ee44a0c8dd993a66d70600b"
+    },
+    {
+      "year": 2030,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2030c.txt",
+      "sha256": "cc9b11f3d214445c77aad60c9d1ffd46d54afbe0833c806368658e4c5f78d5e6"
+    },
+    {
+      "year": 2031,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2031c.txt",
+      "sha256": "1ae7a997a4174d84cdda0b48ba7966c03d06ebf2f003d08d9e4da8a290c203a0"
+    },
+    {
+      "year": 2032,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2032c.txt",
+      "sha256": "1d3f1034b1cf8052c2c008ee3ebfcb11c76700621df90b127e101ced76fc45df"
+    },
+    {
+      "year": 2033,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2033c.txt",
+      "sha256": "9f25a14f2a6a14cc092a6d5f23ecb07e538c4e01789a4816e94c04f7d0d82dc7"
+    },
+    {
+      "year": 2034,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2034c.txt",
+      "sha256": "adfe09d89c78d250045d8bed3ff3c822332146ef5d80e51bc6aceb86aea34ca9"
+    },
+    {
+      "year": 2035,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2035c.txt",
+      "sha256": "f849b4232f795a88f907f4736236efbfe617abd38dbce052ee9418823e2e9442"
+    },
+    {
+      "year": 2036,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2036c.txt",
+      "sha256": "8c8e41166f0696f4f11f97728cb79a6606772ffa3f36dd9cfa2176a351492c81"
+    },
+    {
+      "year": 2037,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2037c.txt",
+      "sha256": "7ef739e298568df2e0077956f73cdb70510f462bd4d858e6ded96340c6859739"
+    },
+    {
+      "year": 2038,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2038c.txt",
+      "sha256": "48eabb9b1bb76f63673ae0562c99d46988b40399439d48576af1914791b92e23"
+    },
+    {
+      "year": 2039,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2039c.txt",
+      "sha256": "6ec3f382eb0749637aba9e0dcd6b504477319408b1e17a7357d0159f324eb851"
+    },
+    {
+      "year": 2040,
+      "url": "https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T2040c.txt",
+      "sha256": "94bfe4bcef5203e08608ce7a775c6c1915fd2744f6f6bafad72084668e3943d7"
+    }
+  ]
+}
