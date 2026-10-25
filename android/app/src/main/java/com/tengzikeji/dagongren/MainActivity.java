@@ -127,6 +127,7 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
         @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{
             int color=active?Color.rgb(8,20,38):Color.rgb(243,246,251);
+            getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(color));getWindow().getDecorView().setBackgroundColor(color);
             getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
             getWindow().getDecorView().setSystemUiVisibility(active?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
             if(webView!=null){webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}

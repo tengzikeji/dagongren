@@ -160,7 +160,8 @@ public class AppSmokeTest {
         device.executeShellCommand("settings put global animator_duration_scale 1");
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             waitTrue(scenario,"Boolean(document.querySelector('.brand-intro svg'))");
-            Thread.sleep(650);
+            assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector(\'.brand-intro path\')).animationName===\'intro-write\'"));
+            evaluate(scenario,"document.querySelector(\'.brand-intro\').getAnimations({subtree:true}).forEach(a=>a.finish())");
             paintedScreenshot(scenario,"startup-wordmark");
             waitTrue(scenario,"!document.querySelector('.brand-intro')");
             assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.bottom-nav'))"));
