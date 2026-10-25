@@ -162,8 +162,8 @@ export function installCalendarSwipe(root,onShift){
  root.addEventListener('pointerup',event=>{
   if(!gesture||event.pointerId!==gesture.id)return;
   const current=gesture,dx=event.clientX-current.x,dy=event.clientY-current.y;
-  const delta=current.drag?calendarSwipeDelta(dx,dy,event.timeStamp-current.time):0;
-  if(current.drag){blockedUntil=Date.now()+250;if(event.cancelable)event.preventDefault();}
+  const delta=calendarSwipeDelta(dx,dy,event.timeStamp-current.time);
+  if(current.drag||delta){blockedUntil=Date.now()+250;if(event.cancelable)event.preventDefault();}
   reset();if(delta)onShift(delta);
  },{passive:false});
  root.addEventListener('pointercancel',reset,{passive:true});
@@ -208,8 +208,8 @@ export function installPageSwipe(root,api){
  },{passive:false});
  root.addEventListener('pointerup',event=>{
   if(!gesture||event.pointerId!==gesture.id)return;
-  const from=gesture.view,dx=event.clientX-gesture.x,dy=event.clientY-gesture.y,drag=gesture.drag;
-  const delta=drag?calendarSwipeDelta(dx,dy,event.timeStamp-gesture.time):0,target=pageSwipeTarget(from,delta),offset=Math.max(-44,Math.min(44,dx*.18));
+  const from=gesture.view,dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
+  const delta=calendarSwipeDelta(dx,dy,event.timeStamp-gesture.time),drag=gesture.drag||Boolean(delta),target=pageSwipeTarget(from,delta),offset=Math.max(-44,Math.min(44,dx*.18));
   if(drag){blockedUntil=Date.now()+250;if(event.cancelable)event.preventDefault();}
   reset();if(target)change(from,target,delta,offset);
  },{passive:false});

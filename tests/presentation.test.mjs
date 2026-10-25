@@ -77,3 +77,16 @@ test('延迟触屏事件切主页面，日历、长名称和表单保持操作�
   editing=true;view='records';const f=swipeFixture();installPageSwipe(f.root,api);f.handlers.pointerdown(f.event(1000,300,100));f.handlers.pointermove(f.event(1060,200,100));f.handlers.pointerup(f.event(1120,100,100));assert.equal(view,'records');
  }finally{Date.now=previousNow;if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;}
 });
+
+test('浏览器合并移动帧时，按下与抬起坐标仍能识别有效横滑',()=>{
+ const previousWindow=globalThis.window,previousDocument=globalThis.document;
+ try{
+  globalThis.window={matchMedia:()=>({matches:true})};globalThis.document={documentElement:{clientWidth:400},body:{classList:{contains:()=>false}}};
+  const calendar=swipeFixture('calendar'),changes=[];installCalendarSwipe(calendar.root,delta=>changes.push(delta));
+  calendar.handlers.pointerdown(calendar.event(1000,300,100));calendar.handlers.pointerup(calendar.event(1120,100,102));assert.deepEqual(changes,[1]);
+  let view='home';const page=swipeFixture();installPageSwipe(page.root,{current:()=>view,navigate:next=>view=next});
+  page.handlers.pointerdown(page.event(2000,300,100));page.handlers.pointerup(page.event(2120,100,102));assert.equal(view,'calendar');
+  view='home';page.handlers.pointerdown(page.event(3000,200,100));page.handlers.pointerup(page.event(3120,205,103));assert.equal(view,'home');
+  page.handlers.pointerdown(page.event(4000,200,100));page.handlers.pointerup(page.event(4120,204,200));assert.equal(view,'home');
+ }finally{if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;}
+});
