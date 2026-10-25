@@ -56,7 +56,7 @@ export function renderStable(root,markup,view,motion=true){
  for(const node of root.querySelectorAll('.number')){
   const old=oldNumbers.get(uiKey(node,root)),numeric=uiNumericText(node);if(!old||!numeric)continue;
   const {text,match}=numeric,original=text.nodeValue,target=match[0],plan=numberRollPlan(old,target);if(!plan.length)continue;
-  const finalText=node.textContent,fragment=document.createDocumentFragment(),wrapper=document.createElement('span');wrapper.className='number-roll';wrapper.setAttribute('aria-hidden','true');let digitIndex=0;
+  const finalText=node.textContent,fragment=document.createDocumentFragment(),wrapper=document.createElement('span');wrapper.className='number-roll';wrapper.setAttribute('aria-hidden','true');const tracking=getComputedStyle(node).letterSpacing;wrapper.style.setProperty('--number-tracking',tracking==='normal'?'0px':tracking);let digitIndex=0;
   for(const char of target){
    if(!/\d/.test(char)){wrapper.appendChild(document.createTextNode(char));continue;}
    const wheel=plan[digitIndex++],slot=document.createElement('span'),strip=document.createElement('span');
@@ -192,6 +192,7 @@ export function installPageSwipe(root,api){
   }catch{}finally{animation?.cancel();busy=false;}
  };
  root.addEventListener('pointerdown',event=>{
+  if(gesture)reset();
   if(busy||event.isPrimary===false||event.button>0||api.blocked?.()||!['home','calendar','records','settings'].includes(api.current()))return;
   if(event.target.closest?.('[data-calendar-swipe],.profile-name-viewport,.entry-filters,.month-control,input,textarea,select,.select-trigger,[role=dialog]'))return;
   const width=document.documentElement.clientWidth;if(event.clientX<18||event.clientX>width-18)return;
