@@ -189,7 +189,7 @@ public class AppSmokeTest {
             assertEquals("false",evaluate(scenario,"window.__launchObserved.oldBrand"));
             assertEquals("true",evaluate(scenario,"window.__launchObserved.inert"));
             assertEquals("true",evaluate(scenario,"window.__launchObserved.animated"));
-            double playingSecond=(Long.parseLong(evaluate(scenario,"window.__launchObserved.at"))-recordingStarted)/1000.0;
+            double playingSecond=(Double.parseDouble(evaluate(scenario,"window.__launchObserved.at"))-recordingStarted)/1000.0;
             device.executeShellCommand("echo "+playingSecond+" > /sdcard/Download/dagongren-test/startup-playing-second.txt");
             paintedScreenshot(scenario,"startup-interface");
             waitTrue(scenario,"!document.querySelector('.launch-page')");
