@@ -30,7 +30,7 @@ public class WebDavClientTest {
         server.enqueue(new MockResponse().setResponseCode(404));assertFalse(client().read().getBoolean("exists"));
     }
     @Test public void readPreservesVersionAndData() throws Exception {
-        server.enqueue(new MockResponse().setBody("{\"format\":\"dagongren.webdav.v1\",\"book\":{\"version\":2}}").addHeader("ETag","\"rev-1\""));
+        server.enqueue(new MockResponse().setBody("{\"format\":\"dagongren.webdav.v2\",\"book\":{\"version\":2}}").addHeader("ETag","\"rev-1\""));
         JSONObject result=client().read();assertTrue(result.getBoolean("exists"));assertEquals("\"rev-1\"",result.getString("etag"));assertEquals(2,result.getJSONObject("envelope").getJSONObject("book").getInt("version"));
     }
     @Test public void invalidRemoteDoesNotBecomeAnEmptyBook() throws Exception {
@@ -45,7 +45,7 @@ public class WebDavClientTest {
         assertTrue(client().write(payload(false)).getBoolean("saved"));
         assertEquals("MKCOL",server.takeRequest().getMethod());RecordedRequest put=server.takeRequest();
         assertEquals("PUT",put.getMethod());assertEquals("*",put.getHeader("If-None-Match"));assertNull(put.getHeader("If-Match"));
-        JSONObject envelope=new JSONObject(put.getBody().readUtf8());assertEquals("dagongren.webdav.v1",envelope.getString("format"));assertFalse(envelope.toString().contains("password"));
+        JSONObject envelope=new JSONObject(put.getBody().readUtf8());assertEquals("dagongren.webdav.v2",envelope.getString("format"));assertFalse(envelope.toString().contains("password"));
     }
     @Test public void updateChecksTheVersionReadEarlier() throws Exception {
         server.enqueue(new MockResponse().setResponseCode(204));client().write(payload(true));RecordedRequest put=server.takeRequest();assertEquals("\"rev-1\"",put.getHeader("If-Match"));assertEquals("PUT",put.getMethod());

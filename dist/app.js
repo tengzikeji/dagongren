@@ -1,11 +1,16 @@
+import {createCalendarUpdater} from './holiday-updates.js';
+import {renderStable,enhanceModalChoices,closeChoicePicker,playBrandIntro} from './interaction.js';
 import {calendarRights} from './calendar-rights.js';
 import {calendarDay,calendarCoverage} from './calendar.js';
-import { daysInMonth, validMonth, validDate, holiday, makeupWorkday, datesBetween, calculate, formatMoney, statutoryDates, isStatutory, isAdjustedDay, overtimeAmount, wagePayments, chinaDate, shiftDay, leaveDeducts, calculateBook, migrateBook, ensureAccrualMonths, payPeriodForDate } from './payroll.js';
+import { daysInMonth, validMonth, validDate, holiday, makeupWorkday, datesBetween, calculate, formatMoney, statutoryDates, isStatutory, isAdjustedDay, overtimeAmount, wagePayments, chinaDate, shiftDay, leaveDeducts, calculateBook, migrateBook, ensureAccrualMonths, payPeriodForDate, rebuildAccrualFromJoin } from './payroll.js';
 import { copyRecords, canonicalJSON, makeCleanupPlan, applyCleanupPlan, mergeDemoRecords } from './data-tools.js';
 
+import {snapshotBook} from './sync-tools.js';
+import {rememberDeletions} from './sync-merge.js';
 import { installNativeSync } from './native-sync.js';
 const isAndroid=typeof globalThis.AndroidFiles?.request==='function';
 let nativeSync=null;
+let calendarUpdater=null;
 
 const paths = {
   minus: '<rect x="4" y="4" width="16" height="16" rx="5"/><path d="M8 12h8"/>',
@@ -72,6 +77,7 @@ function loadData() {
 }
 
 let db = loadData();
+let persistedBook=snapshotBook(db);
 let bookCache = null;
 let view = 'home';
 let selectedMonth = today.slice(0,7);
@@ -110,7 +116,7 @@ function calculated(month=selectedMonth) {
 
 function persist() {
   if (storageBlocked) return;
-  try { localStorage.setItem(STORAGE, JSON.stringify(db)); }
+  try { rememberDeletions(db,persistedBook,Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));localStorage.setItem(STORAGE, JSON.stringify(db));persistedBook=snapshotBook(db); }
   catch { storageBlocked = true; toast('存储空间不足，当前修改暂未保存到本机。'); }
 }
 function changed(message) {
@@ -141,9 +147,11 @@ function render() {
   document.body.classList?.toggle('motion-off',db.defaults.motion===false);
   app.classList.toggle('motion-off',db.defaults.motion===false);
   const home=view==='home',mine=view==='settings';
-  app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-icon">${icon('bag')}</div><div><div class="brand-name">打工人</div><div class="brand-sub">工资有数，生活有底。</div></div></div><nav class="side-nav" aria-label="主导航">${navItems.map(([key,i,label])=>`<button class="nav-item ${navActive(key)?'active':''}" data-action="nav" data-view="${key}" ${navActive(key)?'aria-current="page"':''}>${icon(i)}<span>${label}</span></button>`).join('')}</nav><div class="side-bottom"><div class="side-status"><span class="status-dot ${db.sync.demo&&!db.sync.offline?'good':''}"></span>${storageBlocked?'临时保存模式':'本机账本'}${icon('lock')}</div><p>${isAndroid?'本机账本 · 可配置坚果云同步':'交互预览 · 坚果云同步为演示'}</p></div></aside>
-  <main class="workspace"><div class="content"><header class="topbar"><div class="page-heading">${home?`<div class="brand-icon">${icon('bag')}</div>`:''}<div><p class="hello">${home?'你的每一份努力，都有记录。':view==='calendar'?'每日计薪与工作记录':view==='records'?'计薪、收款与变动，逐笔可查。':mine?'工资档案与账本管理':view==='cleanup'?'按范围管理你的账本':'账本与数据同步'}</p><h1 class="page-title">${home?'打工人':titles[view]}</h1></div></div><div class="top-actions"><button class="cloud-button ${db.sync.demo&&!db.sync.offline?'connected':''}" data-action="nav" data-view="sync" aria-label="查看坚果云同步">${icon('cloud')}<span>${syncStatus()}</span></button>${!mine&&!home?`<button class="avatar" data-action="nav" data-view="settings" aria-label="打开我的">${icon('person')}</button>`:''}</div></header>${storageBlocked?'<div class="notice">当前仅临时保存，请通过“我的”导出账本备份。</div>':''}<div id="view-content" class="view-${view}">${home?homeView():view==='calendar'?calendarPage():view==='records'?recordsView():view==='sync'?syncView():view==='cleanup'?cleanupView():settingsView()}</div><footer class="page-foot">${icon('lock')}${isAndroid?'账本保存在本机':'交互预览 · 示例账本'} · ${storageBlocked?'修改仅在当前页面保留':isAndroid?'可在“我的”配置坚果云':'修改保存在当前浏览器'}</footer></div></main>
+  const markup=`<aside class="sidebar"><div class="brand"><div class="brand-icon">${icon('bag')}</div><div><div class="brand-name">打工人</div><div class="brand-sub">工资有数，生活有底。</div></div></div><nav class="side-nav" aria-label="主导航">${navItems.map(([key,i,label])=>`<button class="nav-item ${navActive(key)?'active':''}" data-action="nav" data-view="${key}" ${navActive(key)?'aria-current="page"':''}>${icon(i)}<span>${label}</span></button>`).join('')}</nav><div class="side-bottom"><div class="side-status"><span class="status-dot ${db.sync.demo&&!db.sync.offline?'good':''}"></span>${storageBlocked?'临时保存模式':'本机账本'}${icon('lock')}</div><p>${isAndroid?'本机账本 · 可配置坚果云同步':'交互预览 · 坚果云同步为演示'}</p></div></aside>
+  <main class="workspace"><div class="content"><header class="topbar"><div class="page-heading">${home?`<div class="brand-icon">${icon('bag')}</div>`:''}<div><p class="hello">${home?'你的每一份努力，都有记录。':view==='calendar'?'每日计薪与工作记录':view==='records'?'计薪、收款与变动，逐笔可查。':mine?'工资档案与账本管理':view==='cleanup'?'按范围管理你的账本':'账本与数据同步'}</p><h1 class="page-title">${home?'打工人':titles[view]}</h1></div></div><div class="top-actions"><button class="cloud-button ${db.sync.demo&&!db.sync.offline?'connected':''}" data-action="nav" data-view="sync" aria-label="查看坚果云同步">${icon('cloud')}<span>${syncStatus()}</span></button></div></header>${storageBlocked?'<div class="notice">当前仅临时保存，请通过“我的”导出账本备份。</div>':''}<div id="view-content" class="view-${view}">${home?homeView():view==='calendar'?calendarPage():view==='records'?recordsView():view==='sync'?syncView():view==='cleanup'?cleanupView():settingsView()}</div><footer class="page-foot">${icon('lock')}${isAndroid?'账本保存在本机':'交互预览 · 示例账本'} · ${storageBlocked?'修改仅在当前页面保留':isAndroid?'可在“我的”配置坚果云':'修改保存在当前浏览器'}</footer></div></main>
   <button class="record-launcher" data-action="record-entry" aria-label="记一笔：请假、加班、补贴、扣款、预支或发工资"><span class="record-plus">${icon('plus')}</span><span>记一笔</span></button><nav class="bottom-nav" aria-label="底部导航">${navItems.map(([key,i,label])=>`<button class="${navActive(key)?'active':''}" data-action="nav" data-view="${key}" ${navActive(key)?'aria-current="page"':''}>${icon(i)}<span>${label}</span></button>`).join('')}</nav>`;
+  renderStable(app,markup,view,db.defaults.motion!==false);
+  if(view==='calendar')calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)));
 }
 
 function monthToolbar(withToday=false) {
@@ -188,7 +196,7 @@ function calendarView() {
   return '<div class="calendar-week">'+['一','二','三','四','五','六','日'].map(x=>'<span>'+x+'</span>').join('')+'</div><div class="calendar-days">'+cells+'</div><button class="calendar-source-note" data-action="calendar-sources">'+icon('info')+'<span>'+calendarCoverage(year)+'</span>'+icon('chevron')+'</button>';
 }
 function showCalendarSources(){
-  showModal('日历信息与来源','<div class="data-coverage"><span class="coverage-tag">2020—2040</span><h3>农历 · 节日 · 二十四节气</h3><p>农历与节气按香港天文台日期对照表收录，日历可离线查看。全年节日与具体放假调休分别标注。</p><div class="coverage-item"><strong>2020—2026</strong><span>官方放假、调休与补班已收录，包含2020年春节延长假期。</span></div><div class="coverage-item"><strong>2027—2040</strong><span>可查看农历、节日及节气。年度调休尚未收录，不预设补班日期，请以官方通知为准。</span></div><p class="field-note">法定节日按对应年份适用规定标注；日期信息不自动改变已保存的单笔请假扣款选择。</p><a class="source-link" href="https://www.hko.gov.hk/sc/gts/time/conversion1_text.htm" target="_blank" rel="noopener noreferrer">香港天文台 · 日期对照表</a><a class="source-link" href="https://www.gov.cn/" target="_blank" rel="noopener noreferrer">中国政府网 · 放假通知</a><p class="field-note">农历资料知识产权归香港特别行政区政府所有，来自香港天文台及DATA.GOV.HK。本应用并非天文台出品或推荐。</p><button class="btn btn-outline source-rights" data-action="calendar-rights">资料版权与使用说明</button></div>');
+  showModal('日历信息与来源',`<div class="notice">放假、调休和补班联网资料来自开源项目 holiday-cn，按国务院公告自动抓取，并非政府官方接口。应用自动获取并缓存，无需你逐年手动发布。上游服务或网络异常时保留离线资料。</div><p class="field-note">${esc(calendarUpdater?.summary(Number(selectedMonth.slice(0,4)))||'当前使用离线资料。')}</p><a class="source-link" href="https://github.com/NateScarlet/holiday-cn" target="_blank" rel="noopener noreferrer">联网资料与公告原文出处</a>`+'<div class="data-coverage"><span class="coverage-tag">2020—2040</span><h3>农历 · 节日 · 二十四节气</h3><p>农历与节气按香港天文台日期对照表收录，日历可离线查看。全年节日与具体放假调休分别标注。</p><div class="coverage-item"><strong>2020—2026</strong><span>官方放假、调休与补班已收录，包含2020年春节延长假期。</span></div><div class="coverage-item"><strong>2027—2040</strong><span>可查看农历、节日及节气。年度放假调休支持联网获取；未取得有效资料的年份不预设补班日期。</span></div><p class="field-note">法定节日按对应年份适用规定标注；日期信息不自动改变已保存的单笔请假扣款选择。</p><a class="source-link" href="https://www.hko.gov.hk/sc/gts/time/conversion1_text.htm" target="_blank" rel="noopener noreferrer">香港天文台 · 日期对照表</a><a class="source-link" href="https://www.gov.cn/" target="_blank" rel="noopener noreferrer">中国政府网 · 放假通知</a><p class="field-note">农历资料知识产权归香港特别行政区政府所有，来自香港天文台及DATA.GOV.HK。本应用并非天文台出品或推荐。</p><button class="btn btn-outline source-rights" data-action="calendar-rights">资料版权与使用说明</button></div>');
 }
 
 function settingsView() {
@@ -219,7 +227,18 @@ function modalPresentation(title){
   if(/记一笔|记录什么/.test(title))return {kind:'record',mark:'plus',label:'快捷记账',description:'选择记录类型，保存本次工资变动。'};
   return {kind:'detail',mark:'file',label:'工资账本',description:'清晰查看金额构成与原始记录。'};
 }
+const modalHistory=[];
+let activeModalContext=null;
+function captureModalContext(){return {modalMonth,editingTransaction:{...editingTransaction},editingLeaveId,pendingCleanupPlan};}
+function stepBackModal(){
+ if(closeChoicePicker())return true;const previous=modalHistory.pop();if(!previous)return false;
+ modalRoot.replaceChildren(previous.shell);if(previous.context){({modalMonth,editingTransaction,editingLeaveId,pendingCleanupPlan}=previous.context);}
+ activeModalContext=previous.context;syncModalViewport();previous.focus?.focus({preventScroll:true});return true;
+}
 function showModal(title,body,wide=false){
+  const prior=modalRoot.firstElementChild;
+  if(prior&&document.createDocumentFragment&&prior.querySelector('#modal-title')?.textContent!==title){modalHistory.push({shell:prior,context:activeModalContext,focus:document.activeElement});prior.remove();}
+
   previousFocus=document.activeElement;app.inert=true;document.body.style.overflow='hidden';
   const meta=modalPresentation(title),form=body.match(/<form\b[^>]*\bid="([^"]+)"/),start=body.lastIndexOf('<div class="modal-actions">');
   let content=body,footer='';
@@ -233,9 +252,12 @@ function showModal(title,body,wide=false){
     }
   }
   modalRoot.innerHTML='<div class="modal-overlay"><section class="modal modal-v2 '+(wide?'wide ':'')+'tone-'+meta.kind+'" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description"><div class="modal-header"><div class="modal-heading"><span class="modal-icon">'+icon(meta.mark)+'</span><div><span class="modal-kicker">'+meta.label+'</span><h2 id="modal-title">'+esc(title)+'</h2></div></div><button class="icon-button modal-close" data-action="close-modal" aria-label="关闭弹窗">'+icon('close')+'</button></div><p class="modal-description" id="modal-description">'+meta.description+'</p><div class="modal-body">'+content+'</div>'+footer+'</section></div>';
+  activeModalContext=captureModalContext();enhanceModalChoices(modalRoot);
+  if(modalHistory.length)modalRoot.querySelector('.modal-heading')?.insertAdjacentHTML('afterbegin','<button type="button" class="modal-back" data-action="modal-back" aria-label="返回上一级">‹</button>');
   syncModalViewport();queueMicrotask(()=>modalRoot.querySelector('[data-action="close-modal"]')?.focus({preventScroll:true}));
 }
 function closeModal(){
+  closeChoicePicker();modalHistory.length=0;activeModalContext=null;
   modalRoot.innerHTML='';pendingCleanupPlan=null;app.inert=false;document.body.style.overflow='';
   previousFocus?.isConnected&&previousFocus.focus({preventScroll:true});
 }
@@ -422,7 +444,7 @@ function confirmCleanup() {
     const parts=[];if(plan.options.target!=='cloud')parts.push(`本地${plan.local.months}个月`);if(plan.options.target!=='local')parts.push(`云端演示${plan.cloud.months}个月`);
     const message=`已清理${cleanupLabel(plan.options)}：${parts.join('，')}。`;
     next.sync.logs.unshift({text:message,icon:'trash',time:new Date().toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit'})});next.sync.logs=next.sync.logs.slice(0,20);
-    localStorage.setItem(STORAGE,JSON.stringify(next));
+    rememberDeletions(next,persistedBook,Date.now().toString(36));localStorage.setItem(STORAGE,JSON.stringify(next));persistedBook=snapshotBook(next);
     if(nativeSync)nativeSync.beforeCleanup();
     cancelDemoSync();db=next;pendingCleanupPlan=null;cleanupNotice=message;view='cleanup';closeModal();render();toast(message);
     if(plan.options.target==='both'&&db.sync.auto&&db.sync.pending&&!db.sync.offline)scheduleDemoSync();
@@ -465,7 +487,7 @@ function transactionActions(item,kind) {
 function showCash(kind,month=selectedMonth,id='',periodId='') {
   modalMonth=month;const r=record(month),advance=kind==='advance',item=(advance?r.advances||[]:wagePayments(r)).find(x=>x.id===id),ranges=cashRanges(month),chosen=ranges.find(x=>x.id===periodId)||ranges.find(x=>x.all&&x.company===(db.defaults.company||''))||ranges[0];editingTransaction={kind,id,periodId:chosen.id};
   const amount=item?.amountCents??(advance?null:chosen.remainingCents);
-  showModal(item?'修改'+(advance?'预支':'发工资记录'):advance?'记预支':'发工资',`<form id="${advance?'advance':'payment'}-form">${item?`<div class="notice gray">原结算区间：${item.periodStart||month+'-01'} 至 ${item.periodEnd||month+'-'+daysInMonth(month)}。修改实收金额后重新抵扣。</div>`:`<div class="field"><label for="cash-period">本次发放哪个区间的工资</label><select id="cash-period" name="periodId">${ranges.map(p=>`<option value="${esc(p.id)}" ${p.id===chosen.id?'selected':''}>${esc(p.company||'未命名主体')} · ${p.all?'全部累计待发':periodName(p)} · 待发¥${money(p.remainingCents)}</option>`).join('')}</select></div><div class="notice gray" id="cash-period-summary">${chosen.start} 至 ${chosen.end}<br>截至今天待发 ¥${money(chosen.remainingCents)}。未来日期的工资尚未计入。</div>`}<div class="field"><label for="cash-amount">${advance?'本次实际预支':'本次实际发到手'}金额</label><div class="money-input"><span>¥</span><input id="cash-amount" name="amount" type="number" min="0.01" max="10000000" step="0.01" inputmode="decimal" value="${amount===null||amount===0?'':(amount/100).toFixed(2)}" placeholder="0.00" required></div></div><div class="field"><label for="cash-date">实际收款日期</label><input id="cash-date" name="date" type="date" min="2020-01-01" max="${today}" value="${item?.date||today}" required></div><div class="field"><label for="cash-note">备注（选填）</label><input id="cash-note" name="note" maxlength="80" value="${esc(item?.note||'')}" placeholder="例如：银行卡实发、现金预支"></div><p class="field-note">仅按真实收到的钱登记。按原结算区间内的计薪日期先后抵扣；超出已累计部分的收款在对应区间继续抵扣，预支不必重复登记。</p>${transactionActions(item,kind)}</form>`);
+  showModal(item?'修改'+(advance?'预支':'发工资记录'):advance?'记预支':'发工资',`<form id="${advance?'advance':'payment'}-form">${item?`<div class="notice gray">原结算区间：${item.periodStart||month+'-01'} 至 ${item.periodEnd||month+'-'+daysInMonth(month)}。修改实收金额后重新抵扣。</div>`:`<div class="field"><label for="cash-period">本次发放哪个区间的工资</label><select id="cash-period" name="periodId">${ranges.map(p=>`<option data-company="${esc(p.company||'未命名主体')}" data-start="${p.start}" data-end="${p.end}" data-title="${esc(p.all?'全部累计待发':periodName(p))}" data-cents="${p.remainingCents}" data-amount="${money(p.remainingCents)}" value="${esc(p.id)}" ${p.id===chosen.id?'selected':''}>${esc(p.company||'未命名主体')} · ${p.all?'全部累计待发':periodName(p)} · 待发¥${money(p.remainingCents)}</option>`).join('')}</select></div><div class="notice gray" id="cash-period-summary">${chosen.start} 至 ${chosen.end}<br>截至今天待发 ¥${money(chosen.remainingCents)}。未来日期的工资尚未计入。</div>`}<div class="field"><label for="cash-amount">${advance?'本次实际预支':'本次实际发到手'}金额</label><div class="money-input"><span>¥</span><input id="cash-amount" name="amount" type="number" min="0.01" max="10000000" step="0.01" inputmode="decimal" value="${amount===null||amount===0?'':(amount/100).toFixed(2)}" placeholder="0.00" required></div></div><div class="field"><label for="cash-date">实际收款日期</label><input id="cash-date" name="date" type="date" min="2020-01-01" max="${today}" value="${item?.date||today}" required></div><div class="field"><label for="cash-note">备注（选填）</label><input id="cash-note" name="note" maxlength="80" value="${esc(item?.note||'')}" placeholder="例如：银行卡实发、现金预支"></div><p class="field-note">仅按真实收到的钱登记。按原结算区间内的计薪日期先后抵扣；超出已累计部分的收款在对应区间继续抵扣，预支不必重复登记。</p>${transactionActions(item,kind)}</form>`);
 }
 
 
@@ -540,7 +562,7 @@ function cashRanges(month=selectedMonth) {
 }
 
 function updateCashPeriod() {
-  const form=document.getElementById(editingTransaction.kind==='advance'?'advance-form':'payment-form');if(!form||editingTransaction.id)return;const id=new FormData(form).get('periodId'),p=cashRanges().find(x=>x.id===id);if(!p)return;editingTransaction.periodId=id;document.getElementById('cash-amount').value=editingTransaction.kind==='payment'&&p.remainingCents?(p.remainingCents/100).toFixed(2):'';document.getElementById('cash-period-summary').innerHTML=`${p.start} 至 ${p.end}<br>截至今天待发 ¥${money(p.remainingCents)}。`;
+  const form=document.getElementById(editingTransaction.kind==='advance'?'advance-form':'payment-form');if(!form||editingTransaction.id)return;const id=new FormData(form).get('periodId'),p=cashRanges().find(x=>x.id===id);if(!p)return;editingTransaction.periodId=id;const input=document.getElementById('cash-amount');if(input.dataset?.userEdited!=='true')input.value=editingTransaction.kind==='payment'&&p.remainingCents?(p.remainingCents/100).toFixed(2):'';document.getElementById('cash-period-summary').innerHTML=`${p.start} 至 ${p.end}<br>截至今天待发 ¥${money(p.remainingCents)}。`;
 }
 
 function saveSettingsForm(formId,fd,error) {
@@ -548,7 +570,7 @@ function saveSettingsForm(formId,fd,error) {
     if(formId==='company-form'){
       const company=String(fd.get('company')||'').trim(),joinDate=fd.get('joinDate');if(company.length>50)throw new Error('公司名称请控制在50字以内。');if(!validDate(joinDate))throw new Error('请选择有效的入职日期。');const previousCompany=record(modalMonth).company||'';
       for(const [m,r] of Object.entries(db.months))if(m===modalMonth||r.company===company||(!previousCompany&&!r.company))db.months[m]={...r,company,joinDate};
-      if(!db.months[modalMonth])db.months[modalMonth]={...record(modalMonth),company,joinDate};db.defaults={...db.defaults,company,joinDate};ensureAccrualMonths(db,today);closeModal();changed('工作主体和入职日期已保存，工资从入职日重新累计。');
+      if(!db.months[modalMonth])db.months[modalMonth]={...record(modalMonth),company,joinDate};db.defaults={...db.defaults,company,joinDate};rebuildAccrualFromJoin(db,today);closeModal();changed('工作主体和入职日期已保存，工资从入职日重新累计。');
     }else{
       const raw=String(fd.get('salary')),salary=Number(raw),payday=Number(fd.get('payday')),periodMode=fd.get('periodMode'),periodStartDay=periodMode==='custom'?Number(fd.get('periodStartDay')):1;
       if(!/^\d+(\.\d{1,2})?$/.test(raw)||salary<0||salary>10000000)throw new Error('月薪请输入0至1000万元以内、最多两位小数的金额。');if(!['calendar','custom'].includes(periodMode))throw new Error('请选择发薪周期。');payPeriodForDate(today,{payday,periodMode,periodStartDay});
@@ -633,7 +655,7 @@ function showDayLedger(date) {
 }
 
 document.addEventListener('click',e=>{
-  if(e.target.classList.contains('modal-overlay')){closeModal();return;}
+  if(e.target.classList.contains('modal-overlay')){if(!stepBackModal())closeModal();return;}
   const button=e.target.closest('[data-action]');if(!button||button.disabled)return;
   const action=button.dataset.action;
   if(nativeSync?.handleClick(action))return;
@@ -666,7 +688,7 @@ document.addEventListener('click',e=>{
   else if(action==='calendar-month'){selectedMonth=button.dataset.month;view='calendar';closeModal();render();window.scrollTo({top:0});}
   else if(action==='leave-details'){recordYear=selectedMonth.slice(0,4);detailTab='entries';entryFilter='leave';entryMonthScope=selectedMonth;view='records';closeModal();render();window.scrollTo({top:0});}
   else if(action==='detail-tab'){detailTab=button.dataset.tab;render();}
-  else if(action==='close-modal')closeModal();
+  else if(action==='close-modal'||action==='modal-back'){if(!stepBackModal())closeModal();}
   else if(action==='shift-month'){
     const [y,m]=selectedMonth.split('-').map(Number),d=new Date(Date.UTC(y,m-1+Number(button.dataset.delta),1));
     const next=`${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}`;if(validMonth(next)){selectedMonth=next;render();}else toast('预览支持2020至2040年。');
@@ -724,7 +746,7 @@ document.addEventListener('change',e=>{
   }
   if(e.target.closest('#leave-form'))updateLeaveEstimate();
 });
-document.addEventListener('input',e=>{if(e.target.closest('#leave-form'))updateLeaveEstimate();if(e.target.closest('#overtime-form'))updateOvertimeEstimate();});
+document.addEventListener('input',e=>{if(e.target.id==='cash-amount'&&e.target.dataset)e.target.dataset.userEdited='true';if(e.target.closest('#leave-form'))updateLeaveEstimate();if(e.target.closest('#overtime-form'))updateOvertimeEstimate();});
 document.addEventListener('submit',e=>{
  const form=e.target;if(nativeSync&&form.id==='webdav-form'){e.preventDefault();nativeSync.submit(new FormData(form));return;}if(!['company-form','salary-form','leave-form','overtime-form','payment-form','advance-form','subsidy-form','deduction-form'].includes(form.id))return;e.preventDefault();
  const fd=new FormData(form),error=document.getElementById('form-error');
@@ -734,7 +756,7 @@ document.addEventListener('submit',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(!modalRoot.firstElementChild)return;
-  if(e.key==='Escape'){closeModal();return;}
+  if(e.key==='Escape'){if(!stepBackModal())closeModal();return;}
   if(e.key==='Tab'){
     const controls=[...modalRoot.querySelectorAll('button:not(:disabled),input:not(:disabled):not([type=hidden]),select,textarea,a[href]')].filter(el=>el.getClientRects().length);
     const first=controls[0],last=controls.at(-1);
@@ -743,11 +765,15 @@ document.addEventListener('keydown',e=>{
   }
 });
 window.addEventListener('storage',e=>{if(e.key===STORAGE){toast('另一页面更新了账本，刷新可查看最新记录。');}});
-if(isAndroid){nativeSync=installNativeSync({getBook:()=>db,replaceBook:value=>{db=value;bookCache=null;},today:()=>today,defaults:defaultSettings,persist,render,toast,showModal,closeModal,esc,storageBlocked:()=>storageBlocked});globalThis.dagongrenBack=()=>{if(modalRoot.firstElementChild){closeModal();return true;}if(view!=='home'){view='home';render();return true;}return false;};}
+if(isAndroid){nativeSync=installNativeSync({getBook:()=>db,replaceBook:value=>{db=value;persistedBook=snapshotBook(db);bookCache=null;},today:()=>today,defaults:defaultSettings,persist,render,toast,showModal,closeModal,esc,storageBlocked:()=>storageBlocked,editing:()=>Boolean(modalRoot.querySelector('form'))});globalThis.dagongrenBack=()=>{if(modalRoot.firstElementChild){if(!stepBackModal())closeModal();return true;}if(view!=='home'){view='home';render();return true;}return false;};}
+calendarUpdater=createCalendarUpdater({fetchYear:nativeSync?year=>nativeSync.fetchCalendar(year):null,onChange:()=>{bookCache=null;if(view==='calendar'&&!modalRoot.firstElementChild)render();}});
 ensureAccrualMonths(db,today);persist();
+calendarUpdater.refresh(Number(today.slice(0,4)));
 render();
+playBrandIntro(db.defaults.motion!==false);
 setTimeout(refreshAccrualDay,60000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(nativeSync)nativeSync.foreground();const next=chinaDate();if(next!==today){today=next;ensureAccrualMonths(db,today);if(db.sync.demo||db.sync.connected)db.sync.pending++;persist();render();if((db.sync.demo||db.sync.connected)&&db.sync.auto&&!db.sync.offline)scheduleDemoSync();}}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(nativeSync)nativeSync.foreground();calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)));const next=chinaDate();if(next!==today){today=next;ensureAccrualMonths(db,today);if(db.sync.demo||db.sync.connected)db.sync.pending++;persist();render();if((db.sync.demo||db.sync.connected)&&db.sync.auto&&!db.sync.offline)scheduleDemoSync();}}});
+window.addEventListener('online',()=>calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)),{force:true}));
 if(bootMessage)toast(bootMessage);
 
 function leaveList(leaves,month) {

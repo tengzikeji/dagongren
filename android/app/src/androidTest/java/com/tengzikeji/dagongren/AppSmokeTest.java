@@ -118,4 +118,44 @@ public class AppSmokeTest {
             assertFalse(CredentialVault.publicConfig(vault.load()).has("password"));
         } finally { vault.clear(); }
     }
+
+    @Test public void cleanupRebuildAndCardPickerPreserveDraft() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=salary-settings]').click();document.getElementById('salary').value='6000';document.querySelector('.modal-footer button[type=submit]').click()");
+            evaluate(scenario,"document.querySelector('[data-action=company-settings]').click();document.getElementById('company-name').value='升级测试公司';const d=new Date();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-2);document.getElementById('join-date').value=d.toISOString().slice(0,10);document.querySelector('.modal-footer button[type=submit]').click()");
+            assertEquals("3",evaluate(scenario,"Object.keys(JSON.parse(localStorage.getItem('dagongren.paybook.v1')).months).length"));
+            evaluate(scenario,"document.querySelector('[data-action=open-cleanup]').click();const s=document.getElementById('cleanup-scope');s.value='all';s.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('[data-action=review-cleanup]').click();document.querySelector('[data-action=confirm-cleanup]').click()");
+            assertEquals("0",evaluate(scenario,"Object.keys(JSON.parse(localStorage.getItem('dagongren.paybook.v1')).months).length"));
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=company-settings]').click();document.querySelector('.modal-footer button[type=submit]').click()");
+            assertEquals("3",evaluate(scenario,"Object.keys(JSON.parse(localStorage.getItem('dagongren.paybook.v1')).months).length"));
+            evaluate(scenario,"document.querySelector('[data-action=record-entry]').click();document.querySelector('[data-kind=payment]').click();const a=document.getElementById('cash-amount');a.value='123.45';a.dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('cash-note').value='保留填写内容';document.querySelector('.select-trigger').click()");
+            waitTrue(scenario,"Boolean(document.querySelector('.choice-sheet .choice-card'))");
+            screenshot("payment-period-cards");
+            evaluate(scenario,"document.querySelector('.choice-card:not(.selected)').click()");
+            assertEquals("\"123.45\"",evaluate(scenario,"document.getElementById('cash-amount').value"));
+            assertEquals("\"保留填写内容\"",evaluate(scenario,"document.getElementById('cash-note').value"));
+            evaluate(scenario,"document.querySelector('.select-trigger').click()");
+            assertEquals("true",evaluate(scenario,"globalThis.dagongrenBack()"));
+            assertEquals("true",evaluate(scenario,"Boolean(document.getElementById('payment-form'))"));
+            assertEquals("false",evaluate(scenario,"Boolean(document.querySelector('.choice-sheet'))"));
+            evaluate(scenario,"globalThis.dagongrenBack();globalThis.dagongrenBack();document.querySelector('[data-view=calendar]').click()");
+            assertEquals("false",evaluate(scenario,"Boolean(document.querySelector('[aria-label=\"打开我的\"]'))"));
+            evaluate(scenario,"document.querySelector('[data-view=records]').click()");
+            assertEquals("false",evaluate(scenario,"Boolean(document.querySelector('[aria-label=\"打开我的\"]'))"));
+            evaluate(scenario,"document.querySelector('[data-view=home]').click();window.__upgradeHero=document.querySelector('.balance-hero');document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click()");
+            assertEquals("true",evaluate(scenario,"document.querySelector('.balance-hero')===window.__upgradeHero"));
+            screenshot("stable-date-query");
+        }
+    }
+    @Test public void coldStartupShowsOriginalAnimatedWordmark() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            waitTrue(scenario,"Boolean(document.querySelector('.brand-intro svg'))");
+            Thread.sleep(650);
+            screenshot("startup-wordmark");
+            waitTrue(scenario,"!document.querySelector('.brand-intro')");
+            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.bottom-nav'))"));
+        }
+    }
+
 }

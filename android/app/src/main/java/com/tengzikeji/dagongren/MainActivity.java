@@ -34,15 +34,17 @@ public final class MainActivity extends Activity {
     private WebView webView;
     private CredentialVault vault;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private final ExecutorService calendarWorker=Executors.newSingleThreadExecutor();
     private byte[] pendingFile;
     private Boolean reportedKeyboard;
+    private boolean launchIntro=true;
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
-        super.onCreate(state); vault=new CredentialVault(this);
+        super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(Color.rgb(243,246,251));
+        getWindow().getDecorView().setSystemUiVisibility(launchIntro?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(launchIntro?Color.rgb(8,20,38):Color.rgb(243,246,251));
         if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
         root.setOnApplyWindowInsetsListener((v,insets)->{
             if(Build.VERSION.SDK_INT>=30){
@@ -65,7 +67,7 @@ public final class MainActivity extends Activity {
             }
         });
         webView=new WebView(this);webView.setId(R.id.web_view);
-        webView.setBackgroundColor(Color.rgb(243,246,251));
+        webView.setBackgroundColor(launchIntro?Color.rgb(8,20,38):Color.rgb(243,246,251));
         WebSettings settings=webView.getSettings();
         settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
@@ -122,6 +124,14 @@ public final class MainActivity extends Activity {
         runOnUiThread(()->{if(!isDestroyed())webView.evaluateJavascript("globalThis.dagongrenNativeResult && globalThis.dagongrenNativeResult("+JSONObject.quote(id)+","+result+");",null);});
     }
     public final class NativeFiles {
+        @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
+        @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{
+            int color=active?Color.rgb(8,20,38):Color.rgb(243,246,251);
+            getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
+            getWindow().getDecorView().setSystemUiVisibility(active?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+            if(webView!=null){webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
+            if(!active)launchIntro=false;
+        });}
         @JavascriptInterface public String status(){
             try{return CredentialVault.publicConfig(vault.load()).toString();}
             catch(Exception ignored){return "{\"configured\":false,\"error\":\"原连接配置无法读取，请重新配置。\"}";}
@@ -136,11 +146,12 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void openLink(String link){runOnUiThread(()->openExternal(Uri.parse(link)));}
         @JavascriptInterface public void request(String id,String action,String payload){
             if(id==null||id.length()>100)return;
-            worker.execute(()->{
+            ("calendar-read".equals(action)?calendarWorker:worker).execute(()->{
                 JSONObject result=new JSONObject();
                 try{
                     JSONObject input=new JSONObject(payload),output;
                     switch(action){
+                        case "calendar-read": output=new HolidayClient().readYear(input.getInt("year"));break;
                         case "configure":
                             JSONObject old=vault.load();
                             String url=input.getString("url").trim();if(!url.endsWith("/"))url+="/";
@@ -161,7 +172,7 @@ public final class MainActivity extends Activity {
                 }catch(Exception error){
                     String message=error.getMessage();
                     if(message==null||!message.chars().anyMatch(c->c>127))message="网络连接未完成，请检查网络或服务地址后重试。本机记录保留。";
-                    try{result.put("ok",false).put("error",message);}catch(Exception ignored){}
+                    try{result.put("ok",false).put("error",message);if(error instanceof WebDavClient.DavException)result.put("code",((WebDavClient.DavException)error).status);}catch(Exception ignored){}
                 }
                 respond(id,result);
             });
@@ -194,6 +205,6 @@ public final class MainActivity extends Activity {
     @Override protected void onResume(){super.onResume();if(webView!=null)webView.onResume();}
     @Override protected void onPause(){if(webView!=null)webView.onPause();super.onPause();}
     @Override protected void onDestroy(){
-        worker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
+        worker.shutdownNow();calendarWorker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
     }
 }

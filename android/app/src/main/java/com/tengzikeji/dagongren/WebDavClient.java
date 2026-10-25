@@ -52,7 +52,7 @@ final class WebDavClient {
         return parts;
     }
     private HttpUrl fileUrl() { HttpUrl.Builder value=base.newBuilder();for(String part:parts)value.addPathSegment(part);return value.build(); }
-    private Request.Builder request(HttpUrl url) { return new Request.Builder().url(url).header("Authorization",authorization).header("User-Agent","Dagongren/0.9.0").header("Cache-Control","no-cache"); }
+    private Request.Builder request(HttpUrl url) { return new Request.Builder().url(url).header("Authorization",authorization).header("User-Agent","Dagongren/1.1.0").header("Cache-Control","no-cache"); }
     void testConnection() throws Exception {
         String xml="<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>";
         try(Response response=client.newCall(request(base).header("Depth","0").method("PROPFIND",RequestBody.create(xml,MediaType.get("application/xml; charset=utf-8"))).build()).execute()) {
@@ -89,7 +89,7 @@ final class WebDavClient {
         if(exists && (etag.isEmpty() || etag.startsWith("W/")))throw new IOException("缺少有效的网盘版本标识，未覆盖账本。");
         if(!exists)ensureFolders();
         SimpleDateFormat format=new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",Locale.US);format.setTimeZone(TimeZone.getTimeZone("UTC"));
-        JSONObject envelope=new JSONObject().put("format","dagongren.webdav.v1").put("updatedAt",format.format(new Date())).put("book",book);
+        JSONObject envelope=new JSONObject().put("format","dagongren.webdav.v2").put("updatedAt",format.format(new Date())).put("book",book);
         Request.Builder target=request(fileUrl()).put(RequestBody.create(envelope.toString(),JSON));
         target.header(exists?"If-Match":"If-None-Match",exists?etag:"*");
         try(Response response=client.newCall(target.build()).execute()) {
@@ -104,6 +104,9 @@ final class WebDavClient {
             return out.toString(StandardCharsets.UTF_8.name());
         }
     }
+    static final class DavException extends IOException {
+        final int status;DavException(int status,String message){super(message);this.status=status;}
+    }
     static IOException failure(int code) {
         String message = switch(code) {
             case 401,403 -> "账号、应用密码或访问权限不正确，请检查连接配置。";
@@ -113,6 +116,6 @@ final class WebDavClient {
             case 507 -> "网盘存储空间不足，请清理空间后重试。";
             default -> "网盘连接未完成（状态码 "+code+"），本机记录保留。";
         };
-        return new IOException(message);
+        return new DavException(code,message);
     }
 }
