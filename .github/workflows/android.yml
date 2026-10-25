@@ -147,14 +147,15 @@ jobs:
         if: always()
         run: |
           python3 - <<'PY'
-          import base64, io, shutil, subprocess
+          import base64, io, re, shutil, subprocess
           from pathlib import Path
           from PIL import Image, ImageDraw
           root=Path('android/app/build/reports')
           videos=list(root.rglob('startup-transition.mp4'))
           ffmpeg=shutil.which('ffmpeg')
-          offsets=list(root.rglob('startup-playing-second.txt'))
-          center=float(offsets[0].read_text().strip()) if offsets else 10.0
+          logs=list(Path('android/app/build/outputs/androidTest-results').rglob('*coldStartup*.txt'))
+          marker=next((m for log in logs if (m:=re.search(r'PLAYING_SECOND=([0-9.]+)',log.read_text(errors='replace')))),None)
+          center=float(marker.group(1)) if marker else 10.0
           seconds=[max(0,center+offset) for offset in [-2,-1,-.5,0,.3,.6,.9,1.2,1.5,2,3,4]]
           tiles=[]
           print('LAUNCH_REVIEW:',len(videos),'videos; playback at',center,'seconds; ffmpeg:',bool(ffmpeg))

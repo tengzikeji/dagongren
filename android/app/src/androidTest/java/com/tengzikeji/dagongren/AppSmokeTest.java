@@ -177,6 +177,10 @@ public class AppSmokeTest {
         device.executeShellCommand("settings put global window_animation_scale 1");
         device.executeShellCommand("settings put global transition_animation_scale 1");
         device.executeShellCommand("settings put global animator_duration_scale 1");
+        try(ActivityScenario<MainActivity> prepared=ActivityScenario.launch(MainActivity.class)){
+            resetBook(prepared);
+            waitTrue(prepared,"!matchMedia('(prefers-reduced-motion: reduce)').matches");
+        }
         device.executeShellCommand("mkdir -p /sdcard/Download/dagongren-test");
         long recordingStarted=System.currentTimeMillis();
         Thread recording=new Thread(()->{try{device.executeShellCommand("screenrecord --size 720x1280 --bit-rate 2000000 --time-limit 30 /sdcard/Download/dagongren-test/startup-transition.mp4");}catch(Exception ignored){}},"startup-recording");recording.setDaemon(true);recording.start();
@@ -184,13 +188,13 @@ public class AppSmokeTest {
         android.content.Context target=InstrumentationRegistry.getInstrumentation().getTargetContext();
         target.startActivity(new android.content.Intent(target,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK));
         try{
-            waitTrue(scenario,"(()=>{if(!document.querySelector('.launch-page[data-phase=playing]'))return false;window.__launchObserved={at:Date.now(),surfaces:document.querySelectorAll('.launch-page').length,oldBrand:Boolean(document.querySelector('.brand-intro')),inert:document.getElementById('app').inert,animated:getComputedStyle(document.querySelector('.launch-ledger')).animationName==='launch-card-in'};return true})()");
+            waitTrue(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1);if(!entry)return false;window.__launchObserved=entry.detail;return true})()");
             assertEquals("1",evaluate(scenario,"window.__launchObserved.surfaces"));
             assertEquals("false",evaluate(scenario,"window.__launchObserved.oldBrand"));
             assertEquals("true",evaluate(scenario,"window.__launchObserved.inert"));
             assertEquals("true",evaluate(scenario,"window.__launchObserved.animated"));
             double playingSecond=(Double.parseDouble(evaluate(scenario,"window.__launchObserved.at"))-recordingStarted)/1000.0;
-            device.executeShellCommand("sh -c 'echo "+playingSecond+" > /sdcard/Download/dagongren-test/startup-playing-second.txt'");
+            android.util.Log.i("DagongrenLaunchReview","PLAYING_SECOND="+playingSecond);
             paintedScreenshot(scenario,"startup-interface");
             waitTrue(scenario,"!document.querySelector('.launch-page')");
             assertEquals("false",evaluate(scenario,"document.getElementById('app').inert"));
