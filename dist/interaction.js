@@ -129,7 +129,7 @@ export function playBrandIntro(enabled=true){
   if(to&&to.width&&card.animate){card.animate([{transform:'translate(0,0) scale(1,1)',borderRadius:'24px'},{transform:'translate('+(to.left-from.left)+'px,'+(to.top-from.top)+'px) scale('+(to.width/from.width)+','+(to.height/from.height)+')',borderRadius:'24px'}],{duration:650,easing:'cubic-bezier(.22,.8,.24,1)',fill:'forwards'});}
   timer=setTimeout(done,680);
  };
- const start=()=>{if(started||finished)return;started=true;clearTimeout(fallback);page.dataset.phase='playing';timer=setTimeout(open,1450);};
+ const start=()=>{if(started||finished)return;started=true;clearTimeout(fallback);page.dataset.phase='playing';requestAnimationFrame(()=>requestAnimationFrame(()=>{if(!finished)timer=setTimeout(open,1450);}));};
  const hidden=()=>{if(document.visibilityState==='hidden')done();};document.addEventListener('visibilitychange',hidden);
  globalThis.dagongrenLaunchReady=start;
  requestAnimationFrame(()=>requestAnimationFrame(()=>{releaseNative();if(!bridge?.introReady)start();else fallback=setTimeout(start,600);}));
