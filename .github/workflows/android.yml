@@ -70,12 +70,12 @@ jobs:
       - name: Prepare installable APK
         run: |
           mkdir -p artifacts
-          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/dagongren-1.0.0-upgrade.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/dagongren-1.1.0-upgrade.apk
           cd artifacts
-          sha256sum dagongren-1.0.0-upgrade.apk > SHA256SUMS.txt
+          sha256sum dagongren-1.1.0-upgrade.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: dagongren-1.0.0-upgrade-apk
+          name: dagongren-1.1.0-upgrade-apk
           path: artifacts/
           retention-days: 14
           if-no-files-found: error
@@ -93,6 +93,45 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: bash .github/scripts/run-device-tests.sh
+      - name: Render emulator preview for review
+        if: always()
+        run: |
+          python3 -m pip install --quiet Pillow
+          python3 - <<'PY'
+          import base64, io
+          from pathlib import Path
+          from PIL import Image, ImageOps, ImageDraw
+          import xml.etree.ElementTree as ET
+          for xml in Path('android/app/build/outputs/androidTest-results').rglob('*.xml'):
+              try:
+                  report=ET.parse(xml)
+                  for case in report.iter('testcase'):
+                      for failure in list(case.findall('failure'))+list(case.findall('error')):
+                          print('DEVICE_FAILURE_DETAIL:'+case.get('name',''))
+                          print((failure.text or '')[:12000])
+              except Exception:
+                  pass
+          wanted = ['startup-wordmark', 'payment-period-cards', 'keyboard-centered', 'stable-date-query']
+          root = Path('android/app/build/reports')
+          found = []
+          for name in wanted:
+              matches = list(root.rglob(name + '.png'))
+              if matches:
+                  im = Image.open(matches[0]).convert('RGB')
+                  im.thumbnail((300, 620))
+                  tile = Image.new('RGB', (320, 660), '#e8edf5')
+                  tile.paste(im, ((320-im.width)//2, 10))
+                  ImageDraw.Draw(tile).text((10, 635), name, fill='#233954')
+                  found.append(tile)
+          if found:
+              sheet = Image.new('RGB', (320*len(found), 660), '#e8edf5')
+              for i, im in enumerate(found):
+                  sheet.paste(im, (320*i, 0))
+              sheet.save(root/'upgrade-preview.jpg', quality=78)
+              b = io.BytesIO()
+              sheet.save(b, format='JPEG', quality=65)
+              print('UPGRADE_PREVIEW_BASE64:' + base64.b64encode(b.getvalue()).decode())
+          PY
       - name: Save test reports
         if: always()
         uses: actions/upload-artifact@v4

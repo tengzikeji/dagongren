@@ -33,9 +33,9 @@ function yearRows(year){
  }
  cache.set(year,rows);return rows;
 }
-export function hasOfficialSchedule(year){return !!arrangements[Number(year)];}
-export function holidayName(date){return ranges.find(([start,end])=>date>=start&&date<=end)?.[2]||'';}
-export function isMakeupDate(date){return workdays.has(date);}
+export function hasOfficialSchedule(year){return !!arrangements[Number(year)]||onlineSchedules.has(Number(year));}
+export function holidayName(date){const row=onlineScheduleDay(date);if(row)return row.isOffDay?row.name:'';if(onlineSchedules.has(Number(date.slice(0,4))))return '';return ranges.find(([start,end])=>date>=start&&date<=end)?.[2]||'';}
+export function isMakeupDate(date){const row=onlineScheduleDay(date);if(row)return !row.isOffDay&&[0,6].includes(new Date(date+'T12:00:00Z').getUTCDay());if(onlineSchedules.has(Number(date.slice(0,4))))return false;return workdays.has(date);}
 export function statutoryYearDates(year){
  year=Number(year);if(legalCache.has(year))return legalCache.get(year);
  const dates=new Set([year+'-01-01',year+'-05-01',year+'-10-01',year+'-10-02',year+'-10-03']);
@@ -56,3 +56,7 @@ export function calendarDay(date){
 export function calendarCoverage(year){
  return hasOfficialSchedule(year)?year+'年放假调休已按官方通知收录':year+'年调休未收录，节日日期可查，补班以官方通知为准';
 }
+
+const onlineSchedules=new Map();
+export function applyOfficialSchedule(payload){onlineSchedules.set(payload.year,{...payload,byDate:new Map(payload.days.map(day=>[day.date,day]))});}
+function onlineScheduleDay(date){const year=Number(date.slice(0,4));return onlineSchedules.get(year+1)?.byDate.get(date)||onlineSchedules.get(year)?.byDate.get(date);}

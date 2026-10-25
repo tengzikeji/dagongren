@@ -130,4 +130,10 @@ export function ensureAccrualMonths(book,asOf=chinaDate()) {
   let changed=false;for(let month=join.slice(0,7);month<=asOf.slice(0,7);month=shiftMonth(month,1)){if(!book.months[month]&&!(book.excludedMonths||[]).includes(month)){book.months[month]={...book.defaults,leaves:[],overtime:[],advances:[],payments:[],payment:null};changed=true;}}
   return changed;
 }
+export function rebuildAccrualFromJoin(book,asOf=chinaDate()){
+ const join=book.defaults.joinDate;if(!validDate(join)||join>asOf)return false;
+ const start=join.slice(0,7),end=asOf.slice(0,7);
+ book.excludedMonths=(book.excludedMonths||[]).filter(month=>month<start||month>end);
+ return ensureAccrualMonths(book,asOf);
+}
 export function formatMoney(value,grouping=true) { return (value/100).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:grouping}); }
