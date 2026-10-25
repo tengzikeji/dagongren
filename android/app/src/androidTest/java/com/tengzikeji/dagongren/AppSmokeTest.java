@@ -18,9 +18,18 @@ import org.junit.runner.RunWith;
 
 @RunWith(AndroidJUnit4.class)
 public class AppSmokeTest {
+    private boolean withActivity(java.util.function.Consumer<MainActivity> action) {
+        java.util.concurrent.atomic.AtomicBoolean found=new java.util.concurrent.atomic.AtomicBoolean(false);
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+            for(android.app.Activity activity:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED)){
+                if(activity instanceof MainActivity){found.set(true);action.accept((MainActivity)activity);break;}
+            }
+        });
+        return found.get();
+    }
     private String evaluate(ActivityScenario<MainActivity> scenario,String script) throws Exception {
         CountDownLatch latch=new CountDownLatch(1);AtomicReference<String> result=new AtomicReference<>();
-        scenario.onActivity(activity->((WebView)activity.findViewById(R.id.web_view)).evaluateJavascript(script,value->{result.set(value);latch.countDown();}));
+        if(!withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);if(web.getProgress()<100){result.set("null");latch.countDown();return;}web.evaluateJavascript(script,value->{result.set(value);latch.countDown();});}))return "null";
         assertTrue("WebView evaluation timed out: "+script,latch.await(25,TimeUnit.SECONDS));return result.get();
     }
     private void waitTrue(ActivityScenario<MainActivity> scenario,String script) throws Exception {
@@ -41,7 +50,7 @@ public class AppSmokeTest {
     }
     private boolean keyboardVisible(ActivityScenario<MainActivity> scenario) {
         AtomicReference<Boolean> result=new AtomicReference<>(false);
-        scenario.onActivity(activity->{WindowInsets insets=activity.getWindow().getDecorView().getRootWindowInsets();result.set(insets!=null&&insets.isVisible(WindowInsets.Type.ime()));});
+        withActivity(activity->{WindowInsets insets=activity.getWindow().getDecorView().getRootWindowInsets();result.set(insets!=null&&insets.isVisible(WindowInsets.Type.ime()));});
         return result.get();
     }
     private void screenshot(String name) throws Exception {
@@ -53,14 +62,14 @@ public class AppSmokeTest {
         evaluate(scenario,"window.__upgradePaintReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>{window.__upgradePaintReady=true;}))");
         waitTrue(scenario,"window.__upgradePaintReady===true");
         CountDownLatch frame=new CountDownLatch(1);
-        scenario.onActivity(activity->((WebView)activity.findViewById(R.id.web_view)).postVisualStateCallback(1,new WebView.VisualStateCallback(){@Override public void onComplete(long requestId){frame.countDown();}}));
+        withActivity(activity->((WebView)activity.findViewById(R.id.web_view)).postVisualStateCallback(1,new WebView.VisualStateCallback(){@Override public void onComplete(long requestId){frame.countDown();}}));
         assertTrue("WebView frame was not committed",frame.await(10,TimeUnit.SECONDS));
         Thread.sleep(100);
         screenshot(name);
     }
     @Test public void appLoadsSavesWagesAndOffersEditableConnection() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
-            scenario.onActivity(activity->{assertEquals("打工人",activity.getString(R.string.app_name));assertEquals(0,activity.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE);});
+            withActivity(activity->{assertEquals("打工人",activity.getString(R.string.app_name));assertEquals(0,activity.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE);});
             resetBook(scenario);
             assertEquals("4",evaluate(scenario,"document.querySelectorAll('.bottom-nav button').length"));
             assertEquals("0",evaluate(scenario,"JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.salaryCents"));
@@ -101,7 +110,7 @@ public class AppSmokeTest {
             evaluate(scenario,"document.querySelector('[data-action=company-settings]').click()");
             JSONObject position=new JSONObject(new org.json.JSONTokener(evaluate(scenario,"JSON.stringify((()=>{const r=document.getElementById('company-name').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})())")).nextValue().toString());
             int[] location=new int[2];float[] scale=new float[1];
-            scenario.onActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(location);scale[0]=activity.getResources().getDisplayMetrics().density;});
+            withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(location);scale[0]=activity.getResources().getDisplayMetrics().density;});
             UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
             assertTrue(device.click(location[0]+Math.round((float)position.getDouble("x")*scale[0]),location[1]+Math.round((float)position.getDouble("y")*scale[0])));
             long deadline=System.currentTimeMillis()+15000;
@@ -169,8 +178,11 @@ public class AppSmokeTest {
         device.executeShellCommand("settings put global transition_animation_scale 1");
         device.executeShellCommand("settings put global animator_duration_scale 1");
         device.executeShellCommand("mkdir -p /sdcard/Download/dagongren-test");
-        device.executeShellCommand("screenrecord --time-limit 8 /sdcard/Download/dagongren-test/startup-transition.mp4 >/dev/null 2>&1 &");
-        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+        Thread recording=new Thread(()->{try{device.executeShellCommand("screenrecord --size 720x1280 --bit-rate 2000000 --time-limit 10 /sdcard/Download/dagongren-test/startup-transition.mp4");}catch(Exception ignored){}},"startup-recording");recording.setDaemon(true);recording.start();
+        ActivityScenario<MainActivity> scenario=null;
+        android.content.Context target=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        target.startActivity(new android.content.Intent(target,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK));
+        try{
             waitTrue(scenario,"Boolean(document.querySelector('.launch-page[data-phase=playing]'))");
             assertEquals("1",evaluate(scenario,"document.querySelectorAll('.launch-page').length"));
             assertEquals("false",evaluate(scenario,"Boolean(document.querySelector('.brand-intro'))"));
@@ -182,6 +194,8 @@ public class AppSmokeTest {
             assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.bottom-nav'))"));
             paintedScreenshot(scenario,"startup-home");
         } finally {
+            withActivity(activity->activity.finish());
+            recording.join(12000);
             device.executeShellCommand("settings put global window_animation_scale 0");
             device.executeShellCommand("settings put global transition_animation_scale 0");
             device.executeShellCommand("settings put global animator_duration_scale 0");
@@ -193,7 +207,7 @@ public class AppSmokeTest {
     private void swipeRegion(ActivityScenario<MainActivity> scenario,String selector,int direction) throws Exception {
         JSONObject rect=new JSONObject(new org.json.JSONTokener(evaluate(scenario,"JSON.stringify((()=>{const r=document.querySelector('"+selector+"').getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,y:Math.min(r.top+Math.min(100,r.height*.5),visualViewport.height-120)}})())")).nextValue().toString());
         int[] origin=new int[2];float[] density=new float[1];
-        scenario.onActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(origin);density[0]=activity.getResources().getDisplayMetrics().density;});
+        withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(origin);density[0]=activity.getResources().getDisplayMetrics().density;});
         double left=rect.getDouble("left"),width=rect.getDouble("width"),y=rect.getDouble("y");
         double from=left+width*(direction==0?.5:direction>0?.8:.2),to=left+width*(direction==0?.5:direction>0?.2:.8);
         int x1=origin[0]+Math.round((float)from*density[0]),x2=origin[0]+Math.round((float)to*density[0]),y1=origin[1]+Math.round((float)y*density[0]),y2=origin[1]+Math.round((float)(direction==0?y-80:y)*density[0]);
@@ -208,9 +222,7 @@ public class AppSmokeTest {
             resetBook(scenario);
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=salary-settings]').click();document.getElementById('salary').value='6000';document.querySelector('.modal-footer button[type=submit]').click()");
             evaluate(scenario,"document.querySelector('[data-action=company-settings]').click();const d=new Date();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-2);document.getElementById('join-date').value=d.toISOString().slice(0,10);document.querySelector('.modal-footer button[type=submit]').click();document.querySelector('[data-view=home]').click()");
-            evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click()");
-            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.number-roll-strip'))"));
-            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.number-roll-strip')].every(e=>Number(e.style.getPropertyValue('--roll-steps'))>=30)"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();Boolean(document.querySelector('.number-roll-strip')) && [...document.querySelectorAll('.number-roll-strip')].every(e=>Number(e.style.getPropertyValue('--roll-steps'))>=30)"));
             evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
             waitTrue(scenario,"!document.querySelector('.number-roll-strip')");
             evaluate(scenario,"document.querySelector('[data-view=calendar]').click();window.__calendarHeight=document.querySelector('.calendar-days').getBoundingClientRect().height;for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");

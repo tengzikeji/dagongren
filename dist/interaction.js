@@ -137,7 +137,7 @@ export function playBrandIntro(enabled=true){
 }
 
 export function calendarSwipeDelta(dx,dy,duration=0){
- if(!Number.isFinite(dx)||!Number.isFinite(dy)||duration>2500||Math.abs(dx)<48||Math.abs(dx)<Math.abs(dy)*1.35)return 0;
+ if(!Number.isFinite(dx)||!Number.isFinite(dy)||duration>30000||Math.abs(dx)<48||Math.abs(dx)<Math.abs(dy)*1.35)return 0;
  return dx<0?1:-1;
 }
 export function installCalendarSwipe(root,onShift){
@@ -147,7 +147,7 @@ export function installCalendarSwipe(root,onShift){
  root.addEventListener('pointerdown',event=>{
   if(event.isPrimary===false||event.button>0){reset();return;}
   const panel=event.target.closest?.('[data-calendar-swipe]');if(!panel)return;
-  gesture={panel,id:event.pointerId,x:event.clientX,y:event.clientY,lastX:event.clientX,lastY:event.clientY,time:Date.now(),drag:false};
+  gesture={panel,id:event.pointerId,x:event.clientX,y:event.clientY,lastX:event.clientX,lastY:event.clientY,time:event.timeStamp,drag:false};
  },{passive:true});
  root.addEventListener('pointermove',event=>{
   if(!gesture||event.pointerId!==gesture.id)return;
@@ -162,7 +162,7 @@ export function installCalendarSwipe(root,onShift){
  root.addEventListener('pointerup',event=>{
   if(!gesture||event.pointerId!==gesture.id)return;
   const current=gesture,dx=event.clientX-current.x,dy=event.clientY-current.y;
-  const delta=current.drag?calendarSwipeDelta(dx,dy,Date.now()-current.time):0;
+  const delta=current.drag?calendarSwipeDelta(dx,dy,event.timeStamp-current.time):0;
   if(current.drag){blockedUntil=Date.now()+250;if(event.cancelable)event.preventDefault();}
   reset();if(delta)onShift(delta);
  },{passive:false});
@@ -196,7 +196,7 @@ export function installPageSwipe(root,api){
   if(busy||event.isPrimary===false||event.button>0||api.blocked?.()||!['home','calendar','records','settings'].includes(api.current()))return;
   if(event.target.closest?.('[data-calendar-swipe],.profile-name-viewport,.entry-filters,.month-control,input,textarea,select,.select-trigger,[role=dialog]'))return;
   const width=document.documentElement.clientWidth;if(event.clientX<18||event.clientX>width-18)return;
-  gesture={id:event.pointerId,x:event.clientX,y:event.clientY,dx:0,time:Date.now(),drag:false,view:api.current()};
+  gesture={id:event.pointerId,x:event.clientX,y:event.clientY,dx:0,time:event.timeStamp,drag:false,view:api.current()};
  },{passive:true});
  root.addEventListener('pointermove',event=>{
   if(!gesture||event.pointerId!==gesture.id)return;
@@ -209,7 +209,7 @@ export function installPageSwipe(root,api){
  root.addEventListener('pointerup',event=>{
   if(!gesture||event.pointerId!==gesture.id)return;
   const from=gesture.view,dx=event.clientX-gesture.x,dy=event.clientY-gesture.y,drag=gesture.drag;
-  const delta=drag?calendarSwipeDelta(dx,dy,Date.now()-gesture.time):0,target=pageSwipeTarget(from,delta),offset=Math.max(-44,Math.min(44,dx*.18));
+  const delta=drag?calendarSwipeDelta(dx,dy,event.timeStamp-gesture.time):0,target=pageSwipeTarget(from,delta),offset=Math.max(-44,Math.min(44,dx*.18));
   if(drag){blockedUntil=Date.now()+250;if(event.cancelable)event.preventDefault();}
   reset();if(target)change(from,target,delta,offset);
  },{passive:false});
