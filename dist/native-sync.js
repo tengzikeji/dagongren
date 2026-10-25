@@ -31,7 +31,20 @@ export function installNativeSync(api){
  function schedule(delay=2500){clearTimeout(timer);if(canAuto()){timer=setTimeout(()=>run('normal',true),delay);timer.unref?.();}}
  function conflictDialog(remoteHash,localHash,items=[],merge=false){
   conflict={remoteHash,localHash,merge};
-  const e=api.esc,details=items.length?'<div class="sync-conflicts">'+items.slice(0,5).map(x=>'<div>'+e(x.label)+'</div>').join('')+'</div>':'';
+  const e=api.esc;
+  const describe=(value,path)=>{
+   if(value===undefined)return '已删除';if(value===null)return '无记录';
+   const money=n=>'¥'+(n/100).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+   if(typeof value==='object'){
+    if(Number.isSafeInteger(value.amountCents))return (value.date?value.date+' · ':'')+money(value.amountCents);
+    if(typeof value.days==='number')return (value.date||'')+' · 请假'+value.days+'天 · '+(value.deduct?'扣款':'不扣款');
+    if(Number.isSafeInteger(value.salaryCents))return '月薪 '+money(value.salaryCents);
+    return '有不同设置';
+   }
+   if(path?.at(-1)==='salaryCents'&&typeof value==='number')return money(value);
+   if(typeof value==='boolean')return value?'开启':'关闭';return String(value);
+  };
+  const details=items.length?'<div class="sync-conflicts">'+items.slice(0,5).map(x=>'<div><strong>'+e(x.label)+'</strong><div class="sync-conflict-comparison"><span><small>本机</small>'+e(describe(x.local,x.path))+'</span><span><small>网盘</small>'+e(describe(x.remote,x.path))+'</span></div></div>').join('')+'</div>':'';
   api.showModal(remoteHash?(merge?'同一条记录有不同修改':'请确认要保留的账本'):'网盘账本已不存在',
    '<div class="notice">'+(merge?'不同的新记录已准备合并。以下相同记录存在不同修改，请决定冲突部分采用哪一端，其余记录会保留。':'尚未覆盖任何一端。首次同步、清理后重新同步或缺少共同版本时，请先确认账本。')+'</div>'+details+
    '<div class="modal-actions"><button class="btn btn-plain" data-action="export">导出本机账本</button>'+
