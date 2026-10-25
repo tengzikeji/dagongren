@@ -120,6 +120,8 @@ public final class MainActivity extends Activity {
         }
     }
 
+    public boolean isLaunchSurfaceReady(){return launchNotified;}
+
     private void reportKeyboard(boolean visible){
         if(webView==null||Boolean.valueOf(visible).equals(reportedKeyboard))return;
         reportedKeyboard=visible;

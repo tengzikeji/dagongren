@@ -39,11 +39,19 @@ public class AppSmokeTest {
             Thread.sleep(150);
         }
         screenshot("condition-failed");
-        String details=evaluate(scenario,"JSON.stringify({view:document.querySelector('.bottom-nav [aria-current=page]')?.dataset.view,classes:document.getElementById('app').className,viewport:[innerWidth,innerHeight,visualViewport.height],keyboard:document.body.classList.contains('keyboard-open'),focused:document.activeElement.id,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,motion:JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion,introAllowed:AndroidFiles.shouldPlayIntro(),rects:['.modal','.modal-body','.modal-footer','#company-name'].map(s=>{const e=document.querySelector(s);return e?{s,top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom}:null})})");
+        String details=evaluate(scenario,"JSON.stringify({view:document.querySelector('.bottom-nav [aria-current=page]')?.dataset.view,classes:document.getElementById('app').className,pointers:window.__pointerEvents,viewport:[innerWidth,innerHeight,visualViewport.height],keyboard:document.body.classList.contains('keyboard-open'),focused:document.activeElement.id,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,motion:JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion,introAllowed:AndroidFiles.shouldPlayIntro(),rects:['.modal','.modal-body','.modal-footer','#company-name'].map(s=>{const e=document.querySelector(s);return e?{s,top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom}:null})})");
         fail("Condition did not become true: "+script+"; last result: "+last+"; "+details);
     }
     private void waitReady(ActivityScenario<MainActivity> scenario) throws Exception {
-        waitTrue(scenario,"Boolean(document.querySelector('.bottom-nav'))");
+        waitTrue(scenario,"Boolean(document.querySelector('.bottom-nav'))&&!document.querySelector('.launch-page')&&!document.getElementById('app').inert");
+        long deadline=System.currentTimeMillis()+20000;
+        while(System.currentTimeMillis()<deadline){
+            AtomicReference<Boolean> ready=new AtomicReference<>(false);
+            withActivity(activity->ready.set(activity.isLaunchSurfaceReady()));
+            if(ready.get())return;
+            Thread.sleep(100);
+        }
+        fail("Native launch surface did not become interactive");
     }
     private void resetBook(ActivityScenario<MainActivity> scenario) throws Exception {
         waitReady(scenario);evaluate(scenario,"localStorage.clear()");scenario.recreate();waitReady(scenario);
@@ -212,6 +220,7 @@ public class AppSmokeTest {
         swipeRegion(scenario,".calendar-days",direction);
     }
     private void swipeRegion(ActivityScenario<MainActivity> scenario,String selector,int direction) throws Exception {
+        evaluate(scenario,"window.__pointerEvents=[];if(!window.__pointerEventsInstalled){window.__pointerEventsInstalled=true;for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])document.addEventListener(type,e=>{if(window.__pointerEvents.length<80)window.__pointerEvents.push({type:e.type,x:e.clientX,y:e.clientY,t:e.timeStamp,target:e.target.tagName});},true);}");
         JSONObject rect=new JSONObject(new org.json.JSONTokener(evaluate(scenario,"JSON.stringify((()=>{const r=document.querySelector('"+selector+"').getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,y:Math.min(r.top+Math.min(100,r.height*.5),visualViewport.height-120)}})())")).nextValue().toString());
         int[] origin=new int[2];float[] density=new float[1];
         withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(origin);density[0]=activity.getResources().getDisplayMetrics().density;});
@@ -268,6 +277,7 @@ public class AppSmokeTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
             waitTrue(scenario,"!matchMedia('(prefers-reduced-motion: reduce)').matches");
+            paintedScreenshot(scenario,"page-swipe-ready");
             for(String next:new String[]{"calendar","records","settings"}){
                 swipeRegion(scenario,".topbar",1);
                 waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='"+next+"'&&!document.getElementById('app').classList.contains('page-transitioning')");
