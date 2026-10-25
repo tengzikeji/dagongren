@@ -69,4 +69,35 @@ public class WebDavClientTest {
     @Test public void quotaAndRateErrorsExplainFailure() {
         assertTrue(WebDavClient.failure(429).getMessage().contains("频繁"));assertTrue(WebDavClient.failure(507).getMessage().contains("空间不足"));
     }
+    @Test public void missingParentReadConflictCreatesFolderThenRetries() throws Exception {
+        server.enqueue(new MockResponse().setResponseCode(409));server.enqueue(new MockResponse().setResponseCode(201));server.enqueue(new MockResponse().setResponseCode(404));
+        assertFalse(client().read().getBoolean("exists"));
+        assertEquals("GET",server.takeRequest().getMethod());RecordedRequest folder=server.takeRequest();assertEquals("MKCOL",folder.getMethod());assertEquals("/dav/dagongren/",folder.getPath());assertEquals("GET",server.takeRequest().getMethod());
+    }
+    @Test public void existingParentIsAcceptedWhenRecoveringRead() throws Exception {
+        server.enqueue(new MockResponse().setResponseCode(409));server.enqueue(new MockResponse().setResponseCode(405));server.enqueue(new MockResponse().setResponseCode(404));
+        assertFalse(client().read().getBoolean("exists"));assertEquals(3,server.getRequestCount());
+    }
+    @Test public void preparationCreatesNestedUnicodeFoldersInOrder() throws Exception {
+        JSONObject data=config().put("path","打工人/账本/工资账本.json");
+        server.enqueue(new MockResponse().setResponseCode(201));server.enqueue(new MockResponse().setResponseCode(201));
+        new WebDavClient(data,new OkHttpClient.Builder().build(),true).prepareBookLocation();
+        RecordedRequest first=server.takeRequest(),second=server.takeRequest();assertEquals("MKCOL",first.getMethod());assertEquals("打工人",first.getRequestUrl().pathSegments().get(1));assertEquals("账本",second.getRequestUrl().pathSegments().get(2));assertTrue(first.getPath().endsWith("/"));assertTrue(second.getPath().endsWith("/"));
+    }
+    @Test public void folderConflictDoesNotPretendAnotherDeviceUpdated() throws Exception {
+        server.enqueue(new MockResponse().setResponseCode(409));
+        try{client().prepareBookLocation();fail();}catch(WebDavClient.DavException expected){assertEquals(409,expected.status);assertTrue(expected.getMessage().contains("创建账本文件夹"));assertTrue(expected.getMessage().contains("父目录"));assertFalse(expected.getMessage().contains("另一设备"));}
+        assertEquals(1,server.getRequestCount());
+    }
+    @Test public void failedDirectoryRepairDoesNotAttemptAnUpload() throws Exception {
+        server.enqueue(new MockResponse().setResponseCode(409));server.enqueue(new MockResponse().setResponseCode(403));
+        try{client().read();fail();}catch(WebDavClient.DavException expected){assertEquals(403,expected.status);assertTrue(expected.getMessage().contains("创建账本文件夹"));}
+        assertEquals(2,server.getRequestCount());
+    }
+    @Test public void persistentPathConflictStopsAfterOneRepair() throws Exception {
+        server.enqueue(new MockResponse().setResponseCode(409));server.enqueue(new MockResponse().setResponseCode(201));server.enqueue(new MockResponse().setResponseCode(409));
+        try{client().read();fail();}catch(WebDavClient.DavException expected){assertEquals(409,expected.status);assertTrue(expected.getMessage().contains("读取网盘账本"));assertFalse(expected.getMessage().contains("另一设备"));}
+        assertEquals(3,server.getRequestCount());
+    }
+
 }

@@ -52,31 +52,40 @@ final class WebDavClient {
         return parts;
     }
     private HttpUrl fileUrl() { HttpUrl.Builder value=base.newBuilder();for(String part:parts)value.addPathSegment(part);return value.build(); }
-    private Request.Builder request(HttpUrl url) { return new Request.Builder().url(url).header("Authorization",authorization).header("User-Agent","Dagongren/1.1.0").header("Cache-Control","no-cache"); }
+    private Request.Builder request(HttpUrl url) { return new Request.Builder().url(url).header("Authorization",authorization).header("User-Agent","Dagongren/1.2.1").header("Cache-Control","no-cache"); }
     void testConnection() throws Exception {
         String xml="<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>";
         try(Response response=client.newCall(request(base).header("Depth","0").method("PROPFIND",RequestBody.create(xml,MediaType.get("application/xml; charset=utf-8"))).build()).execute()) {
-            if(response.code()!=207)throw failure(response.code());
+            if(response.code()!=207)throw failure(response.code(),"验证服务连接");
         }
     }
     JSONObject read() throws Exception {
-        try(Response response=client.newCall(request(fileUrl()).get().build()).execute()) {
-            if(response.code()==404)return new JSONObject().put("exists",false);
-            if(response.code()!=200)throw failure(response.code());
-            if(response.body()==null || response.body().contentLength()>MAX_BYTES)throw new IOException("网盘账本为空或过大，未替换本机数据。");
-            String body=readLimited(response.body().byteStream());
-            JSONObject envelope;
-            try { envelope=new JSONObject(body); } catch(Exception ignored) { throw new IOException("网盘文件不是有效账本，未替换本机数据。"); }
-            return new JSONObject().put("exists",true).put("etag",response.header("ETag","")).put("envelope",envelope);
+        for(int attempt=0;attempt<2;attempt++) {
+            boolean prepareFolders=false;
+            try(Response response=client.newCall(request(fileUrl()).get().build()).execute()) {
+                if(response.code()==409 && attempt==0)prepareFolders=true;
+                else {
+                    if(response.code()==404)return new JSONObject().put("exists",false);
+                    if(response.code()!=200)throw failure(response.code(),"读取网盘账本");
+                    if(response.body()==null || response.body().contentLength()>MAX_BYTES)throw new IOException("网盘账本为空或过大，未替换本机数据。");
+                    String body=readLimited(response.body().byteStream());
+                    JSONObject envelope;
+                    try { envelope=new JSONObject(body); } catch(Exception ignored) { throw new IOException("网盘文件不是有效账本，未替换本机数据。"); }
+                    return new JSONObject().put("exists",true).put("etag",response.header("ETag","")).put("envelope",envelope);
+                }
+            }
+            if(prepareFolders)ensureFolders();
         }
+        throw new IOException("暂时无法读取网盘账本，本机记录保留。");
     }
+    void prepareBookLocation() throws Exception { ensureFolders(); }
     private void ensureFolders() throws Exception {
         HttpUrl.Builder value=base.newBuilder();
         for(int i=0;i<parts.length-1;i++) {
             value.addPathSegment(parts[i]);
             HttpUrl folder=value.build().newBuilder().addPathSegment("").build();
             try(Response response=client.newCall(request(folder).method("MKCOL",RequestBody.create(new byte[0],null)).build()).execute()) {
-                if(response.code()!=201 && response.code()!=405)throw failure(response.code());
+                if(response.code()!=201 && response.code()!=405)throw failure(response.code(),"创建账本文件夹");
             }
         }
     }
@@ -93,7 +102,7 @@ final class WebDavClient {
         Request.Builder target=request(fileUrl()).put(RequestBody.create(envelope.toString(),JSON));
         target.header(exists?"If-Match":"If-None-Match",exists?etag:"*");
         try(Response response=client.newCall(target.build()).execute()) {
-            if(response.code()!=200&&response.code()!=201&&response.code()!=204)throw failure(response.code());
+            if(response.code()!=200&&response.code()!=201&&response.code()!=204)throw failure(response.code(),"写入网盘账本");
             return new JSONObject().put("saved",true);
         }
     }
@@ -107,15 +116,17 @@ final class WebDavClient {
     static final class DavException extends IOException {
         final int status;DavException(int status,String message){super(message);this.status=status;}
     }
-    static IOException failure(int code) {
+    static IOException failure(int code) { return failure(code,"连接网盘"); }
+    static IOException failure(int code,String operation) {
         String message = switch(code) {
             case 401,403 -> "账号、应用密码或访问权限不正确，请检查连接配置。";
-            case 409,412 -> "网盘账本已被另一设备更新，本次未覆盖，请重新同步。";
+            case 409 -> operation.equals("创建账本文件夹")?"父目录不存在、不可写或与同名文件冲突，请核对账本路径（409）。":"账本所在文件夹或路径存在冲突，请核对连接地址与账本路径（409）。";
+            case 412 -> "网盘账本版本已变化，本次未覆盖，请重新同步。";
             case 429 -> "坚果云请求过于频繁，请稍后再同步。";
             case 301,302,307,308 -> "服务地址发生跳转，请核对坚果云提供的 HTTPS 地址。";
             case 507 -> "网盘存储空间不足，请清理空间后重试。";
             default -> "网盘连接未完成（状态码 "+code+"），本机记录保留。";
         };
-        return new DavException(code,message);
+        return new DavException(code,operation+"未完成："+message);
     }
 }

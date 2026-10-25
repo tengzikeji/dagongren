@@ -39,7 +39,7 @@ test('错误格式不能覆盖本机',()=>{
  assert.equal(validateRemoteEnvelope({format:'dagongren.webdav.v1',book:wages()}).version,2);
 });
 function fixture(initial,readResponse,writeResponse={}){
- let current=initial,modal='',messages=[],calls=[],writes=0,onRead=null;
+ let current=initial,modal='',messages=[],calls=[],writes=0,renders=0,onRead=null;
  const stored=new Map(),elements={};
  globalThis.localStorage={getItem:key=>stored.get(key)||null,setItem:(key,value)=>stored.set(key,value)};
  globalThis.document={getElementById:id=>elements[id]??={textContent:'',disabled:false}};
@@ -52,9 +52,9 @@ function fixture(initial,readResponse,writeResponse={}){
    else globalThis.dagongrenNativeResult(id,{ok:true,data:{}});
   });}
  };
- const api={getBook:()=>current,replaceBook:next=>{current=next},defaults,today:()=> '2026-10-24',storageBlocked:()=>false,persist:()=>{},render:()=>{},toast:message=>messages.push(message),showModal:(title,body)=>{modal=title+body},closeModal:()=>{modal=''},esc:x=>String(x)};
+ const api={getBook:()=>current,replaceBook:next=>{current=next},defaults,today:()=> '2026-10-24',storageBlocked:()=>false,persist:()=>{},render:()=>{renders++},toast:message=>messages.push(message),showModal:(title,body)=>{modal=title+body},closeModal:()=>{modal=''},esc:x=>String(x)};
  const sync=installNativeSync(api);
- return {sync,get:()=>current,messages,calls,stored,writes:()=>writes,modal:()=>modal,onRead:fn=>{onRead=fn}};
+ return {sync,get:()=>current,messages,calls,stored,writes:()=>writes,renders:()=>renders,modal:()=>modal,onRead:fn=>{onRead=fn}};
 }
 test('上传失败不清除待同步状态',async()=>{
  const f=fixture(wages(),{exists:false},{error:'离线'});f.get().sync.pending=2;await f.sync.run();
@@ -95,4 +95,19 @@ test('选择后远端再次变化仍阻止覆盖',async()=>{
 test('远端删除后不提供采用不存在账本的按钮',async()=>{
  const f=fixture(wages(),{exists:false});f.get().sync.baseline='previous';
  await f.sync.run();assert.match(f.modal(),/已不存在/);assert.doesNotMatch(f.modal(),/native-use-remote/);assert.equal(f.writes(),0);
+});
+
+test('清理后自动同步开关立即更新，并可再次关闭',async()=>{
+ const initial=wages();initial.sync={nativeVersion:1,auto:false,pausedByCleanup:true,pending:0};
+ const f=fixture(initial,{exists:true,etag:'"one"',envelope:{format:'dagongren.webdav.v2',book:wages(700000)}});
+ try{
+  const before=f.renders();f.sync.handleClick('toggle-auto');assert.equal(f.get().sync.auto,true);assert.ok(f.renders()>before);assert.match(f.sync.view(),/aria-checked="true"/);
+  f.sync.handleClick('toggle-auto');assert.equal(f.get().sync.auto,false);assert.match(f.sync.view(),/aria-checked="false"/);
+  await new Promise(r=>setImmediate(r));assert.equal(f.writes(),0);assert.equal(f.modal(),'');assert.equal(f.get().sync.pausedByCleanup,true);
+ }finally{f.sync.dispose();}
+});
+test('关闭自动同步后，在途读取不再上传或弹出冲突框',async()=>{
+ const initial=wages();initial.sync={nativeVersion:1,auto:true,pending:2};const f=fixture(initial,{exists:false});
+ try{f.onRead(()=>f.sync.handleClick('toggle-auto'));await f.sync.run('normal',true);assert.equal(f.get().sync.auto,false);assert.equal(f.writes(),0);assert.equal(f.get().sync.pending,2);assert.equal(f.modal(),'');}
+ finally{f.sync.dispose();}
 });

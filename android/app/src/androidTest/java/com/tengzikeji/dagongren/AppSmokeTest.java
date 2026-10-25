@@ -75,6 +75,9 @@ public class AppSmokeTest {
         Thread.sleep(100);
         screenshot(name);
     }
+    private String rollingLayoutCheck(String selector) {
+        return "(()=>{const numbers=[...document.querySelectorAll('"+selector+"')];return numbers.length===2&&numbers.some(n=>n.querySelectorAll('.number-roll-slot').length>1)&&numbers.every(n=>{const slots=[...n.querySelectorAll('.number-roll-slot')];return slots.length>0&&slots.every(s=>getComputedStyle(s).display==='inline-block'&&getComputedStyle(s).fontSize===getComputedStyle(n).fontSize&&Math.abs(s.getBoundingClientRect().top-slots[0].getBoundingClientRect().top)<1)})})()";
+    }
     @Test public void appLoadsSavesWagesAndOffersEditableConnection() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             withActivity(activity->{assertEquals("打工人",activity.getString(R.string.app_name));assertEquals(0,activity.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE);});
@@ -145,6 +148,20 @@ public class AppSmokeTest {
             assertEquals("instrumentation-test-only",vault.load().getString("password"));
             assertFalse(context.getSharedPreferences("webdav-vault",Context.MODE_PRIVATE).getAll().toString().contains("instrumentation-test-only"));
             assertFalse(CredentialVault.publicConfig(vault.load()).has("password"));
+            vault.clear();
+            try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+                resetBook(scenario);
+                evaluate(scenario,"const b=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));b.sync.auto=false;localStorage.setItem('dagongren.paybook.v1',JSON.stringify(b))");
+                vault.save(config.put("url","https://example.invalid/dav/"));scenario.recreate();waitReady(scenario);
+                evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=open-cleanup]').click()");
+                assertEquals("true",evaluate(scenario,"!document.getElementById('cleanup-include-cloud').checked&&!document.getElementById('cleanup-include-cloud').disabled"));
+                evaluate(scenario,"document.getElementById('cleanup-include-cloud').click()");
+                assertEquals("true",evaluate(scenario,"document.getElementById('cleanup-include-cloud').checked&&document.querySelector('.cleanup-page-title h2').textContent==='清理本机及云端'"));
+                paintedScreenshot(scenario,"cleanup-cloud-option");
+                evaluate(scenario,"document.getElementById('cleanup-include-cloud').click()");
+                assertEquals("false",evaluate(scenario,"document.getElementById('cleanup-include-cloud').checked"));
+                assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=export]').textContent.trim()==='导出账本'"));
+            }
         } finally { vault.clear(); }
     }
 
@@ -156,6 +173,7 @@ public class AppSmokeTest {
             assertEquals("3",evaluate(scenario,"Object.keys(JSON.parse(localStorage.getItem('dagongren.paybook.v1')).months).length"));
             evaluate(scenario,"document.querySelector('[data-action=open-cleanup]').click();document.querySelector('[data-action=cleanup-scope][data-scope=year]').click();document.querySelector('[data-action=cleanup-scope][data-scope=all]').click()");
             assertEquals("3",evaluate(scenario,"document.querySelectorAll('.cleanup-scope-card').length"));
+            assertEquals("true",evaluate(scenario,"!document.getElementById('cleanup-include-cloud').checked&&document.getElementById('cleanup-include-cloud').disabled"));
             paintedScreenshot(scenario,"cleanup-range-cards");
             evaluate(scenario,"document.querySelector('[data-action=review-cleanup]').click();document.querySelector('[data-action=confirm-cleanup]').click()");
             assertEquals("0",evaluate(scenario,"Object.keys(JSON.parse(localStorage.getItem('dagongren.paybook.v1')).months).length"));
@@ -205,6 +223,7 @@ public class AppSmokeTest {
             android.util.Log.i("DagongrenLaunchReview","PLAYING_SECOND="+playingSecond);
             paintedScreenshot(scenario,"startup-interface");
             waitTrue(scenario,"!document.querySelector('.launch-page')");
+            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.launch.absorbing').at(-1)?.detail;return !!d&&d.corner==='bottom-left'&&d.duration===720&&d.surfaces===1&&parseFloat(d.origin)===0&&Math.abs(parseFloat(d.origin.split(' ')[1])-innerHeight)<1})()"));
             assertEquals("false",evaluate(scenario,"document.getElementById('app').inert"));
             assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.bottom-nav'))"));
             paintedScreenshot(scenario,"startup-home");
@@ -238,7 +257,7 @@ public class AppSmokeTest {
             resetBook(scenario);
             waitTrue(scenario,"!matchMedia('(prefers-reduced-motion: reduce)').matches");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=salary-settings]').click();document.getElementById('salary').value='6000';document.querySelector('.modal-footer button[type=submit]').click()");
-            evaluate(scenario,"document.querySelector('[data-action=company-settings]').click();const d=new Date();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-2);document.getElementById('join-date').value=d.toISOString().slice(0,10);document.querySelector('.modal-footer button[type=submit]').click();document.querySelector('[data-view=home]').click()");
+            evaluate(scenario,"document.querySelector('[data-action=company-settings]').click();const d=new Date();d.setUTCMonth(0,1);d.setUTCFullYear(d.getUTCFullYear()-1);document.getElementById('join-date').value=d.toISOString().slice(0,10);document.querySelector('.modal-footer button[type=submit]').click();document.querySelector('[data-view=home]').click()");
             assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();Boolean(document.querySelector('.number-roll-strip')) && [...document.querySelectorAll('.number-roll-strip')].every(e=>Number(e.style.getPropertyValue('--roll-steps'))>=30)"));
             evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
             waitTrue(scenario,"!document.querySelector('.number-roll-strip')");
@@ -247,16 +266,23 @@ public class AppSmokeTest {
             assertEquals("true",evaluate(scenario,"Math.abs(document.querySelector('.calendar-days').getBoundingClientRect().height-window.__calendarHeight)<1"));
             assertEquals("0",evaluate(scenario,"document.querySelectorAll('.calendar-day .number-roll-strip').length"));
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.calendar-day[data-date]')].every(e=>Number(e.dataset.date.slice(8))===Number(e.querySelector('.day-number').childNodes[0].nodeValue))"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=calendar-today]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();"+rollingLayoutCheck(".calendar-summary .number")));
+            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.calendar-panel-header .month-display'))"));
             evaluate(scenario,"window.__beforeSwipe=document.querySelector('.month-display').textContent");
             swipeCalendar(scenario,1);
             waitTrue(scenario,"document.querySelector('.month-display').textContent!==window.__beforeSwipe");
             assertEquals("false",evaluate(scenario,"Boolean(document.getElementById('modal-root').firstElementChild)"));
+            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.calendar.slide').at(-1)?.detail;return !!d&&d.direction===1&&d.duration===320&&d.to===document.querySelector('[data-calendar-month]').dataset.calendarMonth})()"));
             swipeCalendar(scenario,-1);
             waitTrue(scenario,"document.querySelector('.month-display').textContent===window.__beforeSwipe");
             swipeCalendar(scenario,0);
             assertEquals("true",evaluate(scenario,"document.querySelector('.month-display').textContent===window.__beforeSwipe"));
             paintedScreenshot(scenario,"calendar-stable");
-            evaluate(scenario,"document.querySelector('[data-view=records]').click();document.querySelector('[data-action=detail-tab][data-tab=entries]').click()");
+            evaluate(scenario,"document.querySelector('[data-view=records]').click();document.querySelector('[data-action=record-year-picker]').click()");
+            waitTrue(scenario,"Boolean(document.querySelector('.record-year-options'))");
+            paintedScreenshot(scenario,"record-year-picker");
+            assertEquals("true",evaluate(scenario,"document.querySelector('.record-year-option[aria-pressed=false]').click();"+rollingLayoutCheck(".ledger-secondary .number")));
+            evaluate(scenario,"document.querySelector('[data-action=detail-tab][data-tab=entries]').click()");
             for(String kind:new String[]{"all","leave","overtime","subsidy","deduction","advance","payment"}){
                 evaluate(scenario,"document.querySelector('[data-action=entry-filter][data-filter="+kind+"]').click()");
                 assertEquals("true",evaluate(scenario,"(()=>{const el=document.querySelector('.entry-filters [aria-pressed=true]'),s=getComputedStyle(el),rgb=v=>v.match(/[\\d.]+/g).slice(0,3).map(Number).map(c=>{c/=255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4}),lum=v=>{const a=rgb(v);return .2126*a[0]+.7152*a[1]+.0722*a[2]},a=lum(s.color),b=lum(s.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5})()"));
@@ -282,6 +308,7 @@ public class AppSmokeTest {
                 swipeRegion(scenario,".topbar",1);
                 waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='"+next+"'&&!document.getElementById('app').classList.contains('page-transitioning')");
             }
+            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.page.slide').at(-1)?.detail;return !!d&&d.to==='settings'&&d.direction===1&&d.duration===360})()"));
             evaluate(scenario,"document.querySelector('[data-action=company-settings]').click();document.getElementById('company-name').value='页面滑动保留草稿'");
             swipeRegion(scenario,".modal-body",1);
             assertEquals("true",evaluate(scenario,"Boolean(document.getElementById('company-form'))"));
@@ -293,6 +320,7 @@ public class AppSmokeTest {
                 swipeRegion(scenario,".topbar",-1);
                 waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='"+previous+"'&&!document.getElementById('app').classList.contains('page-transitioning')");
             }
+            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.page.slide').at(-1)?.detail;return !!d&&d.to==='home'&&d.direction===-1&&d.duration===360})()"));
             swipeRegion(scenario,".topbar",-1);
             assertEquals("\"home\"",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view"));
         } finally {
