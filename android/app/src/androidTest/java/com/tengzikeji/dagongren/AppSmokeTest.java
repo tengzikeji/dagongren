@@ -384,13 +384,9 @@ public class AppSmokeTest {
             assertEquals("false",evaluate(scenario,"document.getElementById('app').inert"));
             assertEquals("\"none\"",evaluate(scenario,"getComputedStyle(document.getElementById('view-content')).animationName"));
             assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.bottom-nav'))"));
-            waitTrue(scenario,"performance.getEntriesByName('dagongren.home.self-check').length===1");
-            assertEquals("true",evaluate(scenario,"(()=>{const e=performance.getEntriesByName('dagongren.home.self-check')[0],launch=performance.getEntriesByName('dagongren.launch.absorbing').at(-1);return e.detail.runs===1&&e.detail.afterLaunch&&e.detail.numbers>0&&e.detail.numberWheels>0&&e.detail.charts>0&&e.startTime>=launch.startTime+launch.detail.duration})()"));
-            evaluate(scenario,"window.__selfCheckValues=[...document.querySelectorAll('.view-home .number')].map(e=>e.getAttribute('aria-label')||e.textContent);window.__selfCheckBook=localStorage.getItem('dagongren.paybook.v1')");
-            waitTrue(scenario,"!document.querySelector('.view-home .number-roll-strip')");
-            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.view-home .number')].every((e,i)=>e.textContent===window.__selfCheckValues[i])"));
-            waitTrue(scenario,"performance.getEntriesByName('dagongren.home.self-check.complete').length===1&&performance.getEntriesByName('dagongren.home.glare').length===1");
-            assertEquals("true",evaluate(scenario,"(()=>{const complete=performance.getEntriesByName('dagongren.home.self-check.complete')[0],glare=performance.getEntriesByName('dagongren.home.glare')[0];return complete.detail.rolling===0&&glare.startTime>=complete.startTime&&glare.detail.afterSelfCheck&&glare.detail.rolling===0&&glare.detail.runs===1&&glare.detail.direction==='top-left-to-bottom-right'&&glare.detail.from==='translate3d(-105%,-105%,0)'&&glare.detail.to==='translate3d(105%,105%,0)'&&glare.detail.duration===1000})()"));
+            waitTrue(scenario,"performance.getEntriesByName('dagongren.home.glare').length===1");
+            assertEquals("true",evaluate(scenario,"(()=>{const glare=performance.getEntriesByName('dagongren.home.glare')[0],launch=performance.getEntriesByName('dagongren.launch.absorbing').at(-1);return performance.getEntriesByName('dagongren.home.self-check').length===0&&glare.detail.afterLaunch&&glare.detail.rolling===0&&glare.detail.runs===1&&glare.detail.direction==='left-to-right'&&glare.detail.duration===680&&glare.detail.from.includes('skewX(-25deg)')&&glare.startTime>=launch.startTime+launch.detail.duration&&glare.startTime<launch.startTime+launch.detail.duration+250})()"));
+            evaluate(scenario,"window.__selfCheckBook=localStorage.getItem('dagongren.paybook.v1')");
             double glareSecond=(Double.parseDouble(evaluate(scenario,"performance.getEntriesByName('dagongren.home.glare')[0].detail.at"))-recordingStarted)/1000.0;
             android.util.Log.i("DagongrenLaunchReview","GLARE_SECOND="+glareSecond);
             waitTrue(scenario,"performance.getEntriesByName('dagongren.home.glare.complete').length===1&&!document.querySelector('.hero-startup-glare')");
@@ -399,7 +395,7 @@ public class AppSmokeTest {
             target.startActivity(new android.content.Intent(target,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
             waitTrue(scenario,"Boolean(document.querySelector('.view-home'))&&!document.querySelector('.launch-page')&&!document.getElementById('app').inert");
             awaitInputWindow(scenario);dismissEmulatorLauncherAnr();
-            assertEquals("true",evaluate(scenario,"performance.getEntriesByName('dagongren.home.self-check').length===1&&performance.getEntriesByName('dagongren.home.glare').length===1&&performance.getEntriesByName('dagongren.home.glare.complete').length===1&&localStorage.getItem('dagongren.paybook.v1')===window.__selfCheckBook"));
+            assertEquals("true",evaluate(scenario,"performance.getEntriesByName('dagongren.home.self-check').length===0&&performance.getEntriesByName('dagongren.home.glare').length===1&&performance.getEntriesByName('dagongren.home.glare.complete').length===1&&localStorage.getItem('dagongren.paybook.v1')===window.__selfCheckBook"));
         } finally {
             withActivity(activity->activity.finish());
             recording.join(35000);
@@ -461,7 +457,7 @@ public class AppSmokeTest {
             waitTrue(scenario,"!matchMedia('(prefers-reduced-motion: reduce)').matches");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=salary-settings]').click();document.getElementById('salary').value='6000';document.querySelector('.modal-footer button[type=submit]').click()");
             evaluate(scenario,"document.querySelector('[data-action=company-settings]').click();const d=new Date();d.setUTCMonth(0,1);d.setUTCFullYear(d.getUTCFullYear()-1);document.getElementById('join-date').value=d.toISOString().slice(0,10);document.querySelector('.modal-footer button[type=submit]').click();document.querySelector('[data-view=home]').click()");
-            assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();Boolean(document.querySelector('.number-roll-strip')) && [...document.querySelectorAll('.number-roll-strip')].every(e=>Number(e.style.getPropertyValue('--roll-steps'))>=30)"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();Boolean(document.querySelector('.number-roll-strip')) && [...document.querySelectorAll('.number-roll-strip')].every(e=>Number(e.style.getPropertyValue('--roll-steps'))>0&&Number(e.style.getPropertyValue('--roll-steps'))<=19)"));
             evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
             waitTrue(scenario,"!document.querySelector('.number-roll-strip')");
             evaluate(scenario,"document.querySelector('[data-view=calendar]').click();window.__calendarHeight=document.querySelector('.calendar-days').getBoundingClientRect().height;for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
@@ -476,7 +472,7 @@ public class AppSmokeTest {
             swipeCalendar(scenario,1);
             waitTrue(scenario,"document.querySelector('.month-display').textContent!==window.__beforeSwipe");
             assertEquals("false",evaluate(scenario,"Boolean(document.getElementById('modal-root').firstElementChild)"));
-            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.calendar.slide').at(-1)?.detail;return !!d&&d.direction===1&&d.duration===320&&d.to===document.querySelector('[data-calendar-month]').dataset.calendarMonth})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.calendar.slide').at(-1)?.detail;return !!d&&d.direction===1&&d.duration===300&&d.to===document.querySelector('[data-calendar-month]').dataset.calendarMonth})()"));
             swipeCalendar(scenario,-1);
             waitTrue(scenario,"document.querySelector('.month-display').textContent===window.__beforeSwipe");
             swipeCalendar(scenario,0);
@@ -507,12 +503,13 @@ public class AppSmokeTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
             waitTrue(scenario,"!matchMedia('(prefers-reduced-motion: reduce)').matches");
+            evaluate(scenario,"window.__persistentNav=document.querySelector('.bottom-nav');window.__persistentLauncher=document.querySelector('.record-launcher')");
             paintedScreenshot(scenario,"page-swipe-ready");
             for(String next:new String[]{"calendar","records","settings"}){
                 swipeRegion(scenario,".topbar",1);
                 waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='"+next+"'&&!document.getElementById('app').classList.contains('page-transitioning')");
             }
-            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.page.slide').at(-1)?.detail;return !!d&&d.to==='settings'&&d.direction===1&&d.duration===360})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.page.slide').at(-1)?.detail;return !!d&&d.to==='settings'&&d.direction===1&&d.duration===300})()"));
             evaluate(scenario,"document.querySelector('[data-action=company-settings]').click();document.getElementById('company-name').value='页面滑动保留草稿'");
             swipeRegion(scenario,".modal-body",1);
             assertEquals("true",evaluate(scenario,"Boolean(document.getElementById('company-form'))"));
@@ -524,7 +521,8 @@ public class AppSmokeTest {
                 swipeRegion(scenario,".topbar",-1);
                 waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='"+previous+"'&&!document.getElementById('app').classList.contains('page-transitioning')");
             }
-            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.page.slide').at(-1)?.detail;return !!d&&d.to==='home'&&d.direction===-1&&d.duration===360})()"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('.bottom-nav')===window.__persistentNav&&document.querySelector('.record-launcher')===window.__persistentLauncher"));
+            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.page.slide').at(-1)?.detail;return !!d&&d.to==='home'&&d.direction===-1&&d.duration===300})()"));
             swipeRegion(scenario,".topbar",-1);
             assertEquals("\"home\"",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view"));
         } finally {
@@ -541,12 +539,12 @@ public class AppSmokeTest {
             evaluate(scenario,"var themeNow=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),themeMonth=themeNow.slice(0,7),themeDefaults={salaryCents:600000,company:'主题验收 · 工资账本',joinDate:themeMonth.slice(0,4)+'-01-01',periodMode:'calendar',periodStartDay:1,payday:15,motion:true};var themeRecord={...themeDefaults,leaves:[],overtime:[],subsidies:[{id:'s',date:themeMonth+'-01',amountCents:20000,category:'餐补'}],deductions:[],advances:[],payments:[{id:'p',date:themeMonth+'-01',amountCents:100000}],payment:null};localStorage.setItem('dagongren.paybook.v1',JSON.stringify({version:2,defaults:themeDefaults,months:{[themeMonth]:themeRecord},excludedMonths:[],sync:{auto:false,nativeVersion:1,pending:0,logs:[]}}))");
             scenario.recreate();waitReady(scenario);
             String expectedThemeBook=evaluate(scenario,"localStorage.getItem('dagongren.paybook.v1')");
-            for(String theme:new String[]{"classic","neon","paper","forest"}){
+            for(String theme:new String[]{"system","light","dark"}){
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=theme-settings]').click()");
-            assertEquals("true",evaluate(scenario,"document.querySelectorAll('.theme-option').length===4"));
-                if(theme.equals("classic"))paintedScreenshot(scenario,"theme-picker");
+            assertEquals("true",evaluate(scenario,"document.querySelectorAll('.theme-option').length===3"));
+                if(theme.equals("system"))paintedScreenshot(scenario,"theme-picker");
                 evaluate(scenario,"document.querySelector('[data-action=choose-theme][data-theme="+theme+"]').click()");
-                assertEquals("\""+theme+"\"",evaluate(scenario,"document.body.dataset.theme"));
+                assertEquals("\""+theme+"\"",evaluate(scenario,"document.body.dataset.themePreference"));
             assertEquals(expectedThemeBook,evaluate(scenario,"localStorage.getItem('dagongren.paybook.v1')"));
             assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('.view-settings')).touchAction.includes('pan-y')"));
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.theme-gauge>svg,.theme-orbit>svg,.mix-orbit>svg')].every(e=>e.getBoundingClientRect().height>=70)"));
@@ -578,25 +576,21 @@ public class AppSmokeTest {
             evaluate(scenario,"document.querySelector('[data-action=toggle-motion]').click()");
                 expectedThemeBook=evaluate(scenario,"localStorage.getItem('dagongren.paybook.v1')");
                 scenario.recreate();waitReady(scenario);
-                assertEquals("\""+theme+"\"",evaluate(scenario,"document.body.dataset.theme"));
+                assertEquals("\""+theme+"\"",evaluate(scenario,"document.body.dataset.themePreference"));
             assertEquals(expectedThemeBook,evaluate(scenario,"localStorage.getItem('dagongren.paybook.v1')"));
             }
-            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme=classic]').click()");
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme=system]').click()");
         }
     }
 
 
-    @Test public void calendarDayAmountsRollAndLandWithoutMovingDates() throws Exception {
+    @Test public void calendarDayAmountsStayStaticAndDatesRemainAligned() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
-            evaluate(scenario,"document.querySelector('[data-action=salary-settings]').click();document.getElementById('salary').value='6000';document.querySelector('.modal-footer button[type=submit]').click();document.querySelector('[data-view=calendar]').click();window.__dayRollCheck=(()=>{const cells=[...document.querySelectorAll('.calendar-day[data-date]')],rolling=cells.filter(e=>e.querySelector('.number-roll-strip'));return {rolling:rolling.length,stable:cells.every(e=>!e.querySelector('.day-number .number-roll')&&!e.querySelector('.lunar-label .number-roll')),wheels:rolling.every(e=>[...e.querySelectorAll('.number-roll-strip')].every(s=>Number(s.style.getPropertyValue('--roll-steps'))>=30)),rows:rolling.every(e=>{const slots=[...e.querySelectorAll('.number-roll-slot')],base=slots[0]?.getBoundingClientRect().top;return slots.every(s=>getComputedStyle(s).display==='inline-block'&&Math.abs(s.getBoundingClientRect().top-base)<1)}),values:rolling.map(e=>({date:e.dataset.date,amount:e.querySelector('.day-wage').getAttribute('aria-label')}))}})()");
-            assertEquals("true",evaluate(scenario,"window.__dayRollCheck.rolling>0&&window.__dayRollCheck.stable&&window.__dayRollCheck.wheels&&window.__dayRollCheck.rows"));
-            waitTrue(scenario,"!document.querySelector('.calendar-day .number-roll-strip')");
-            assertEquals("true",evaluate(scenario,"window.__dayRollCheck.values.every(x=>document.querySelector('.calendar-day[data-date=\"'+x.date+'\"] .day-wage').textContent===x.amount)"));
-            evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click();window.__rapidCalendarRoll=Boolean(document.querySelector('.calendar-day .number-roll-strip'))");
-            assertEquals("true",evaluate(scenario,"window.__rapidCalendarRoll"));
-            waitTrue(scenario,"!document.querySelector('.calendar-day .number-roll-strip')");
-            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.calendar-day[data-date]')].every(e=>Number(e.querySelector('.day-number').childNodes[0].nodeValue)===Number(e.dataset.date.slice(8)))"));
+            evaluate(scenario,"document.querySelector('[data-action=salary-settings]').click();document.getElementById('salary').value='6000';document.querySelector('.modal-footer button[type=submit]').click();document.querySelector('[data-view=calendar]').click()");
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.calendar-day .day-wage')].every(e=>e.hasAttribute('data-static-number')&&!e.classList.contains('number')&&!e.querySelector('.number-roll'))"));
+            evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
+            assertEquals("true",evaluate(scenario,"!document.querySelector('.calendar-day .number-roll-strip')&&[...document.querySelectorAll('.calendar-day[data-date]')].every(e=>Number(e.querySelector('.day-number').childNodes[0].nodeValue)===Number(e.dataset.date.slice(8)))"));
             paintedScreenshot(scenario,"calendar-rolling-settled");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('[data-view=calendar]').click()");
             assertEquals("true",evaluate(scenario,"!document.querySelector('.calendar-day .number-roll-strip')"));
@@ -609,23 +603,59 @@ public class AppSmokeTest {
             resetBook(scenario);
             evaluate(scenario,"var chartMonth=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit'}).format(new Date()),chartDefaults={salaryCents:600000,company:'图表数字动效验收',joinDate:chartMonth.slice(0,4)+'-01-01',periodMode:'calendar',periodStartDay:1,payday:15,motion:true},chartRecord={...chartDefaults,leaves:[],overtime:[],subsidies:[{id:'s',date:chartMonth+'-01',amountCents:20000,category:'餐补'}],deductions:[],advances:[],payments:[{id:'p',date:chartMonth+'-01',amountCents:100000}],payment:null};localStorage.setItem('dagongren.paybook.v1',JSON.stringify({version:2,defaults:chartDefaults,months:{[chartMonth]:chartRecord},excludedMonths:[],sync:{auto:false,nativeVersion:1,pending:0,logs:[]}}))");
             scenario.recreate();waitReady(scenario);
-            for(String theme:new String[]{"classic","neon","paper","forest"}){
+            for(String theme:new String[]{"system","light","dark"}){
                 evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme="+theme+"]').click()");
                 for(String page:new String[]{"home","calendar","records","settings"}){
-                    evaluate(scenario,"document.querySelector('[data-view="+page+"]').click();window.__chartRoll=(()=>{const numbers=[...document.querySelectorAll('.data-chart [data-chart-number]')],rolling=numbers.filter(e=>e.querySelector('.number-roll-strip'));return {count:rolling.length,values:numbers.map(e=>e.getAttribute('aria-label')||e.textContent),style:rolling.every(e=>getComputedStyle(e).fontSize===getComputedStyle(e.parentElement).fontSize&&[...e.querySelectorAll('.number-roll-slot')].every(s=>getComputedStyle(s).fontSize===getComputedStyle(e).fontSize)),steps:rolling.every(e=>[...e.querySelectorAll('.number-roll-strip')].every(s=>Number(s.style.getPropertyValue('--roll-steps'))>=30)),static:!document.querySelector('.chart-axis .number-roll, time .number-roll')}})()");
+                    evaluate(scenario,"document.querySelector('[data-view="+page+"]').click();window.__chartRoll=(()=>{const numbers=[...document.querySelectorAll('.data-chart [data-chart-number]')],rolling=numbers.filter(e=>e.querySelector('.number-roll-strip'));return {count:rolling.length,values:numbers.map(e=>e.getAttribute('aria-label')||e.textContent),style:rolling.every(e=>getComputedStyle(e).fontSize===getComputedStyle(e.parentElement).fontSize&&[...e.querySelectorAll('.number-roll-slot')].every(s=>getComputedStyle(s).fontSize===getComputedStyle(e).fontSize)),steps:rolling.every(e=>[...e.querySelectorAll('.number-roll-strip')].every(s=>Number(s.style.getPropertyValue('--roll-steps'))>0&&Number(s.style.getPropertyValue('--roll-steps'))<=19)),static:!document.querySelector('.chart-axis .number-roll, time .number-roll')}})()");
             assertEquals("true",evaluate(scenario,"window.__chartRoll.count>0&&window.__chartRoll.style&&window.__chartRoll.steps&&window.__chartRoll.static"));
                     waitTrue(scenario,"!document.querySelector('.data-chart .number-roll-strip')");
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.data-chart [data-chart-number]')].every((e,i)=>e.textContent===window.__chartRoll.values[i])"));
                 }
-            evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();window.__mixRoll=(()=>{const n=[...document.querySelectorAll('.record-type-row strong .chart-number')];return n.length===12&&n.every(e=>e.querySelector('.number-roll-strip'))})()");
+            evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();window.__mixRoll=(()=>{const n=[...document.querySelectorAll('.record-type-row strong .chart-number')];return n.length===12&&JSON.stringify(n.map(e=>e.getAttribute('aria-label')||e.textContent))===JSON.stringify(['0','0.0','0','0.0','1','50.0','0','0.0','0','0.0','1','50.0'])})()");
             assertEquals("true",evaluate(scenario,"window.__mixRoll"));
                 waitTrue(scenario,"!document.querySelector('.data-chart .number-roll-strip')");
             evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('[data-view=home]').click()");
             assertEquals("true",evaluate(scenario,"!document.querySelector('.data-chart .number-roll-strip')"));
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click()");
             }
-            evaluate(scenario,"document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme=classic]').click()");
+            evaluate(scenario,"document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme=system]').click()");
         }
     }
 
+    @Test public void everyRecordKindKeepsAnimationsBoundedAndUnchangedRollsAlive() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            evaluate(scenario,"var now=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),m=now.slice(0,7),d={salaryCents:600000,company:'动效回归',joinDate:m+'-01',periodMode:'calendar',periodStartDay:1,payday:15,motion:true},r={...d,leaves:[],overtime:[],subsidies:[],deductions:[],advances:[],payments:[],payment:null};localStorage.setItem('dagongren.paybook.v1',JSON.stringify({version:2,defaults:d,months:{[m]:r},excludedMonths:[],sync:{auto:false,nativeVersion:1,pending:0,logs:[]}}))");
+            scenario.recreate();waitReady(scenario);
+            for(String kind:new String[]{"leave","overtime","subsidy","deduction","advance","payment"}){
+            evaluate(scenario,"document.querySelector('[data-view=home]').click();document.querySelector('[data-action=record-entry]').click();");
+                evaluate(scenario,"document.querySelector('[data-action=record-kind][data-kind="+kind+"]').click()");
+            evaluate(scenario,"window.__recordNav=document.querySelector('.bottom-nav');var f=document.querySelector('#modal-root form');if(f.id==='leave-form')f.elements.deductMode.value='yes';else if(f.id==='overtime-form'){f.elements.quantity.value='2';f.elements.rate.value='25';}else f.elements.amount.value='25';window.__frames=[];window.__lastFrame=performance.now();var probe=t=>{window.__frames.push(t-window.__lastFrame);window.__lastFrame=t;if(window.__frames.length<40)requestAnimationFrame(probe)};requestAnimationFrame(probe);window.__submitStart=performance.now();f.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));window.__submitMs=performance.now()-window.__submitStart;window.__savedRolls=[...document.querySelectorAll('.view-home .number')].map(e=>({e,text:e.getAttribute('aria-label')||e.textContent}));window.__numberAnimations=[...document.querySelectorAll('.number-roll-strip')];document.querySelector('[data-action=nav][data-view=home]').click();window.__recordAnimationCheck={formClosed:!document.querySelector('#modal-root form'),sameNav:document.querySelector('.bottom-nav')===window.__recordNav,count:window.__numberAnimations.length,kept:window.__numberAnimations.every(e=>e.isConnected),bounded:[...document.querySelectorAll('.number-roll-strip')].every(e=>e.children.length<=20&&parseFloat(e.style.animationDuration)<=440)};window.__recordAnimationCheck.ok=window.__recordAnimationCheck.formClosed&&window.__recordAnimationCheck.sameNav&&window.__recordAnimationCheck.count>0&&window.__recordAnimationCheck.kept&&window.__recordAnimationCheck.bounded");
+            assertEquals(evaluate(scenario,"JSON.stringify(window.__recordAnimationCheck)"),"true",evaluate(scenario,"window.__recordAnimationCheck.ok"));
+            waitTrue(scenario,"!document.querySelector('.number-roll-strip')&&window.__frames.length>=20");
+            assertEquals("true",evaluate(scenario,"window.__savedRolls.every(x=>x.e.textContent===x.text)"));
+                android.util.Log.i("DagongrenMotion","RECORD_"+kind+"="+evaluate(scenario,"JSON.stringify({submitMs:window.__submitMs,frames:window.__frames,rowsMax:20})"));
+            }
+            assertEquals("true",evaluate(scenario,"(()=>{const b=JSON.parse(localStorage.getItem('dagongren.paybook.v1')),rows=Object.values(b.months);return ['leaves','overtime','subsidies','deductions','advances','payments'].every(k=>rows.reduce((n,r)=>n+(r[k]?.length||0),0)===1)})()"));
+        }
+    }
+
+    @Test public void systemAppearanceChangesPreserveDraftAndManualOverride() throws Exception {
+        UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            assertEquals("true",evaluate(scenario,"document.body.dataset.themePreference==='system'&&document.body.dataset.theme===(AndroidFiles.systemDark()?'dark':'light')"));
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=company-settings]').click();document.getElementById('company-name').value='切换外观保留草稿';window.__themeSentinel=true");
+            device.executeShellCommand("cmd uimode night yes");
+            waitTrue(scenario,"document.body.dataset.theme==='dark'&&window.__themeSentinel&&document.getElementById('company-name').value==='切换外观保留草稿'");
+            paintedScreenshot(scenario,"system-dark-draft");
+            evaluate(scenario,"document.querySelector('.modal-close').click();document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme=light]').click()");
+            device.executeShellCommand("cmd uimode night no");
+            waitTrue(scenario,"!AndroidFiles.systemDark()&&document.body.dataset.theme==='light'");
+            device.executeShellCommand("cmd uimode night yes");
+            waitTrue(scenario,"AndroidFiles.systemDark()&&document.body.dataset.theme==='light'");
+            evaluate(scenario,"document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme=system]').click()");
+            waitTrue(scenario,"document.body.dataset.theme==='dark'");
+        }finally{device.executeShellCommand("cmd uimode night no");}
+    }
 }

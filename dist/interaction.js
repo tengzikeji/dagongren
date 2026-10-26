@@ -1,13 +1,19 @@
-let uiHomeSelfCheckDone=false,uiHomeGlareDone=false;
+let uiHomeGlareDone=false;
+const uiRollingNodes=new Map();
 let uiRenderedView='',uiRenderedTheme='',uiRollCleanups=[],uiActiveChoice=null,uiResizeObserver=null,uiObservedWidth=0,uiCalendarSlideCleanup=null,uiPageSlideCleanup=null;
 const uiEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function uiKey(node,root){
+ const metric=node.closest?.('[data-metric]');
+ if(metric){const group=node.closest?.('.balance-hero,.calendar-summary,.ledger-overview,.month-account,.annual-board,.settlement-chart,.today-insight');return ['metric',group?.classList?.[0]||metric.dataset.ref||'',metric.dataset.metric,metric.dataset.scope||'all'].join(':');}
  const date=node.closest?.('.calendar-day[data-date]')?.dataset.date;
  if(date)return 'day-wage:'+date;
  const parts=[];for(let n=node;n&&n!==root;n=n.parentElement)parts.unshift(n.tagName+':'+[...n.parentElement.children].indexOf(n));return parts.join('/');
 }
 function uiPatch(oldNode,newNode){
  if(oldNode.nodeType!==newNode.nodeType||oldNode.nodeName!==newNode.nodeName){oldNode.replaceWith(newNode.cloneNode(true));return;}
+ const rolling=uiRollingNodes.get(oldNode);
+ if(rolling){if(rolling.text===newNode.textContent&&oldNode.className===newNode.className)return;rolling.finish();}
+ if(oldNode.isEqualNode?.(newNode))return;
  if(oldNode.nodeType===3){if(oldNode.nodeValue!==newNode.nodeValue)oldNode.nodeValue=newNode.nodeValue;return;}if(oldNode.nodeType!==1)return;
  for(const attr of [...oldNode.attributes])if(!newNode.hasAttribute(attr.name))oldNode.removeAttribute(attr.name);
  for(const attr of [...newNode.attributes])if(oldNode.getAttribute(attr.name)!==attr.value)oldNode.setAttribute(attr.name,attr.value);
@@ -26,8 +32,8 @@ export function numberRollPlan(previous,target){
  const oldDigits=String(previous).replace(/\D/g,''),digits=String(target).replace(/\D/g,'');
  if(!digits||oldDigits===digits)return [];
  return [...digits].map((digit,index)=>{
-  const from=Number(oldDigits[index+oldDigits.length-digits.length]||0),to=Number(digit),steps=30+(to-from+10)%10;
-  return {from,to,steps,digits:Array.from({length:steps+1},(_,i)=>(from+i)%10),delay:Math.min(index,10)*35,duration:900};
+  const from=Number(oldDigits[index+oldDigits.length-digits.length]||0),to=Number(digit),steps=oldDigits?(to-from+10)%10:10+to;
+  return {from,to,steps,digits:Array.from({length:steps+1},(_,i)=>(from+i)%10),delay:Math.min(index,10)*16,duration:440};
  });
 }
 export function fitCompanyNames(root){
@@ -53,27 +59,29 @@ export function renderStable(root,markup,view,motion=true,replayNumbers=false){
  markup=chartNumberMarkup(markup);
  uiCalendarSlideCleanup?.();if(uiRenderedView!==view)uiPageSlideCleanup?.();
  const template=document.createElement?.('template');if(!template?.content){root.innerHTML=markup;return;}
- for(const finish of uiRollCleanups)finish();uiRollCleanups=[];const same=uiRenderedView===view,renderedTheme=document.body.getAttribute?.('data-theme')||'',themeChanged=renderedTheme!==uiRenderedTheme,oldNumbers=new Map();
- if(same)for(const node of root.querySelectorAll('.number')){const numeric=uiNumericText(node);if(numeric)oldNumbers.set(uiKey(node,root),numeric.match[0]);}
+ const same=uiRenderedView===view,renderedTheme=document.body.getAttribute?.('data-theme')||'',themeChanged=renderedTheme!==uiRenderedTheme,oldNumbers=new Map();
+ if(same)for(const node of root.querySelectorAll('.number')){const value=uiRollingNodes.get(node)?.number||uiNumericText(node)?.match[0];if(value)oldNumbers.set(uiKey(node,root),value);}
  const scrollX=window.scrollX||0,scrollY=window.scrollY||0,scrolls=[...root.querySelectorAll('.profile-name-viewport')].map(e=>({key:uiKey(e,root),left:e.scrollLeft}));
  template.innerHTML=markup;
- if(same){const existing=[...root.childNodes],incoming=[...template.content.childNodes];for(let i=0;i<Math.max(existing.length,incoming.length);i++){if(!incoming[i])existing[i].remove();else if(!existing[i])root.appendChild(incoming[i].cloneNode(true));else uiPatch(existing[i],incoming[i]);}}
- else root.replaceChildren(template.content);
- root.classList.toggle('stable-query',same);uiRenderedView=view;uiRenderedTheme=renderedTheme;
+ {const existing=[...root.childNodes],incoming=[...template.content.childNodes];for(let i=0;i<Math.max(existing.length,incoming.length);i++){if(!incoming[i])existing[i].remove();else if(!existing[i])root.appendChild(incoming[i].cloneNode(true));else uiPatch(existing[i],incoming[i]);}}
+ for(const [node,state] of uiRollingNodes)if(!node.isConnected||!motion)state.finish();
+ root.classList.add('stable-query');uiRenderedView=view;uiRenderedTheme=renderedTheme;
  fitCompanyNames(root);
  if(!uiResizeObserver&&typeof ResizeObserver==='function'){uiResizeObserver=new ResizeObserver(entries=>{const width=entries[0]?.contentRect.width;if(width&&width!==uiObservedWidth){uiObservedWidth=width;fitCompanyNames(root);}});uiResizeObserver.observe(root);}
  if(same){window.scrollTo({left:scrollX,top:scrollY,behavior:'instant'});for(const el of root.querySelectorAll('.profile-name-viewport')){const prior=scrolls.find(s=>s.key===uiKey(el,root));if(prior)el.scrollLeft=prior.left;}}
- if(!motion||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+ if(!motion||root.classList.contains('page-transitioning')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
  for(const node of root.querySelectorAll('.number')){
   const calendarAmount=Boolean(node.closest?.('.calendar-day')&&node.classList.contains('day-wage'));
   const chartAmount=node.hasAttribute?.('data-chart-number');
-  if(!same&&!calendarAmount&&!chartAmount)continue;
-  const old=replayNumbers||chartAmount&&themeChanged?'':oldNumbers.get(uiKey(node,root))??(calendarAmount||chartAmount?'':null),numeric=uiNumericText(node);if(old===null||!numeric)continue;
+  if(calendarAmount||node.closest?.('[data-static-number]')||uiRollingNodes.has(node))continue;
+  if(!same&&!chartAmount)continue;
+  const old=replayNumbers||chartAmount&&themeChanged?'':oldNumbers.get(uiKey(node,root))??(chartAmount?'':null),numeric=uiNumericText(node);if(old===null||!numeric)continue;
   const {text,match}=numeric,original=text.nodeValue,target=match[0],plan=numberRollPlan(old,target);if(!plan.length)continue;
   const finalText=node.textContent,fragment=document.createDocumentFragment(),wrapper=document.createElement('span');wrapper.className='number-roll';wrapper.setAttribute('aria-hidden','true');const tracking=getComputedStyle(node).letterSpacing;wrapper.style.setProperty('--number-tracking',tracking==='normal'?'0px':tracking);let digitIndex=0;
   for(const char of target){
    if(!/\d/.test(char)){wrapper.appendChild(document.createTextNode(char));continue;}
-   const wheel=plan[digitIndex++],slot=document.createElement('span'),strip=document.createElement('span');
+   const wheel=plan[digitIndex++];if(!wheel.steps){wrapper.appendChild(document.createTextNode(char));continue;}
+   const slot=document.createElement('span'),strip=document.createElement('span');
    slot.className='number-roll-slot';strip.className='number-roll-strip';strip.style.setProperty('--roll-steps',wheel.steps);strip.style.animationDelay=wheel.delay+'ms';strip.style.animationDuration=wheel.duration+'ms';
    for(const value of wheel.digits){const row=document.createElement('span');row.textContent=String(value);strip.appendChild(row);}
    slot.appendChild(strip);wrapper.appendChild(slot);
@@ -81,42 +89,21 @@ export function renderStable(root,markup,view,motion=true,replayNumbers=false){
   fragment.append(document.createTextNode(original.slice(0,match.index)),wrapper,document.createTextNode(original.slice(match.index+target.length)));
   const anchor=document.createElement('span');anchor.className='number-roll-anchor';anchor.appendChild(fragment);text.replaceWith(anchor);
   const priorLabel=node.getAttribute('aria-label');node.setAttribute('aria-label',finalText);let done=false,timeout;
-  const finish=()=>{if(done)return;done=true;clearTimeout(timeout);if(anchor.isConnected)anchor.replaceWith(document.createTextNode(original));if(priorLabel===null)node.removeAttribute('aria-label');else node.setAttribute('aria-label',priorLabel);};
+  const finish=()=>{if(done)return;done=true;clearTimeout(timeout);uiRollingNodes.delete(node);uiRollCleanups=uiRollCleanups.filter(cleanup=>cleanup!==finish);if(anchor.isConnected)anchor.replaceWith(document.createTextNode(original));if(priorLabel===null)node.removeAttribute('aria-label');else node.setAttribute('aria-label',priorLabel);};
+  uiRollingNodes.set(node,{text:finalText,number:target,finish});
   timeout=setTimeout(finish,Math.max(...plan.map(x=>x.delay+x.duration))+60);uiRollCleanups.push(finish);
  }
 }
-function playHomeStartupGlare(root,motion=true){
+export function playHomeStartupGlare(root,motion=true){
  if(uiHomeGlareDone||!motion||document.body.classList.contains('motion-off')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.querySelector('.launch-page')||root.inert||document.visibilityState==='hidden')return false;
  const hero=root.querySelector('.view-home .balance-hero');if(!hero?.animate)return false;
  uiHomeGlareDone=true;
  const glare=document.createElement('span');glare.className='hero-startup-glare';glare.setAttribute('aria-hidden','true');hero.appendChild(glare);
- const duration=1000,frames=[{offset:0,transform:'translate3d(-105%,-105%,0)',opacity:0},{offset:.22,opacity:1},{offset:.78,opacity:1},{offset:1,transform:'translate3d(105%,105%,0)',opacity:0}];
- const sweep=glare.animate(frames,{duration,easing:'cubic-bezier(.25,.1,.35,1)',fill:'both'});let finished=false,timer;
- const done=()=>{if(finished)return;finished=true;clearTimeout(timer);glare.remove();sweep.cancel();try{performance.mark('dagongren.home.glare.complete');}catch{}};
+ const duration=680,from='translate3d(0,0,0) skewX(-25deg)',to='translate3d('+Math.round(hero.clientWidth*1.6)+'px,0,0) skewX(-25deg)';
+ const sweep=glare.animate([{offset:0,transform:from,opacity:0},{offset:.18,opacity:.65},{offset:.82,opacity:.65},{offset:1,transform:to,opacity:0}],{duration,easing:'cubic-bezier(.2,.55,.35,1)',fill:'both'});
+ let finished=false,timer;const done=()=>{if(finished)return;finished=true;clearTimeout(timer);glare.remove();sweep.cancel();try{performance.mark('dagongren.home.glare.complete');}catch{}};
  timer=setTimeout(done,duration+100);sweep.finished.then(done,done);
- try{performance.mark('dagongren.home.glare',{detail:{runs:1,afterSelfCheck:performance.getEntriesByName('dagongren.home.self-check.complete').length===1,direction:'top-left-to-bottom-right',from:frames[0].transform,to:frames.at(-1).transform,duration,at:Date.now(),rolling:hero.querySelectorAll('.number-roll-strip').length}});}catch{}
- return true;
-}
-export function replayHomeData(root,motion=true){
- if(uiHomeSelfCheckDone||!motion||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.querySelector('.launch-page')||root.inert||!root.querySelector('.view-home'))return false;
- uiHomeSelfCheckDone=true;
- for(const finish of uiRollCleanups)finish();uiRollCleanups=[];
- renderStable(root,root.innerHTML,'home',true,true);
- const home=root.querySelector('.view-home'),numbers=[...home.querySelectorAll('.number')],charts=[...home.querySelectorAll('.data-chart')];
- for(const chart of charts){
-  for(const animation of chart.getAnimations?.({subtree:true})||[]){const target=animation.effect?.target;if(target?.closest?.('.number-roll')||animation.effect?.getTiming().iterations===Infinity)continue;animation.cancel();animation.play();}
-  chart.animate?.([{transform:'translateY(0)'},{transform:'translateY(-3px)',offset:.4},{transform:'translateY(0)'}],{duration:460,easing:'ease-out'});
- }
- for(const number of numbers)number.animate?.([{opacity:1},{opacity:.65,offset:.35},{opacity:1}],{duration:420,easing:'ease-out'});
- try{performance.mark('dagongren.home.self-check',{detail:{runs:1,afterLaunch:!document.querySelector('.launch-page')&&!root.inert,numbers:numbers.length,numberWheels:home.querySelectorAll('.number-roll-strip').length,charts:charts.length,duration:1400}});}catch{}
- const ownedRolls=[...uiRollCleanups],finite=(home.getAnimations?.({subtree:true})||[]).filter(animation=>animation.effect?.getTiming().iterations!==Infinity);
- const finished=finite.length?Promise.allSettled(finite.map(animation=>animation.finished)):new Promise(resolve=>setTimeout(resolve,1400));
- finished.then(()=>{
-  for(const finish of ownedRolls)finish();
-  if(root.querySelector('.view-home')!==home||root.inert)return;
-  try{performance.mark('dagongren.home.self-check.complete',{detail:{rolling:home.querySelectorAll('.number-roll-strip').length}});}catch{}
-  playHomeStartupGlare(root,motion);
- });
+ try{performance.mark('dagongren.home.glare',{detail:{runs:1,afterLaunch:!document.querySelector('.launch-page'),direction:'left-to-right',from,to,duration,at:Date.now(),rolling:hero.querySelectorAll('.number-roll-strip').length}});}catch{}
  return true;
 }
 export function closeChoicePicker(){
@@ -171,7 +158,7 @@ export function playBrandIntro(enabled=true,onComplete=null){
  page.innerHTML='<div class="launch-grid" aria-hidden="true"></div><header class="launch-header"><span class="launch-app-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="18" height="14" rx="4"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12a22 22 0 0 0 18 0M12 11v5"/></svg></span><div><strong>打工人</strong><span>工作有迹 · 收入有数</span></div><span class="launch-edition">工资账本</span></header><div class="launch-copy"><span class="launch-eyebrow"><i></i> 认真工作，从容生活</span><h2>每一份努力<br>都有清晰的记录<span>。</span></h2><p>把工作的付出，记成生活的底气。</p></div><div class="launch-art" aria-hidden="true"><div class="launch-orbit orbit-one"><i></i></div><div class="launch-orbit orbit-two"><i></i></div><div class="launch-ledger"><div class="launch-ledger-top"><span><i></i> 我的工资账本</span><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="4"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></div><div class="launch-value"><span>¥</span><div class="launch-value-line"></div><span class="launch-value-dot"></span></div><div class="launch-ledger-divider"></div><div class="launch-ledger-bottom"><div><span>每一天的付出</span><b>都清清楚楚</b></div><div class="launch-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><span class="launch-card-sheen"></span></div><div class="launch-chip"><svg viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"/></svg><span>属于你的每一笔</span></div></div><footer class="launch-status"><span class="launch-status-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="6" y="10" width="12" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></span><span>本机账本已就绪<small>安心记录每一天</small></span><span class="launch-ready"><i></i><i></i><i></i></span></footer>';
  document.body.classList.add('intro-playing');document.body.appendChild(page);if(app)app.inert=true;
  const transitions=[];let started=false,finished=false,opening=false,timer,fallback;const priorOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
- const done=()=>{if(finished)return;finished=true;clearTimeout(timer);clearTimeout(fallback);for(const transition of transitions)transition.cancel();if(app)app.classList.add('stable-query');page.remove();document.body.classList.remove('intro-playing','intro-opening');document.body.style.overflow=priorOverflow;if(app)app.inert=false;bridge?.introStyle?.(false);if(globalThis.dagongrenLaunchReady===start)delete globalThis.dagongrenLaunchReady;document.removeEventListener('visibilitychange',hidden);if(started&&opening&&document.visibilityState!=='hidden')requestAnimationFrame(()=>requestAnimationFrame(()=>onComplete?.()));};
+ const done=()=>{if(finished)return;finished=true;clearTimeout(timer);clearTimeout(fallback);for(const transition of transitions)transition.cancel();if(app)app.classList.add('stable-query');page.remove();document.body.classList.remove('intro-playing','intro-opening');document.body.style.overflow=priorOverflow;if(app)app.inert=false;bridge?.introStyle?.(false);if(globalThis.dagongrenLaunchReady===start)delete globalThis.dagongrenLaunchReady;document.removeEventListener('visibilitychange',hidden);if(started&&opening&&document.visibilityState!=='hidden')onComplete?.();};
  const open=()=>{if(opening||finished)return;opening=true;
   const targets=[...document.querySelectorAll('.bottom-nav [data-view="home"],.side-nav [data-view="home"]')],home=targets.find(node=>{const r=node.getBoundingClientRect();return r.width>0&&r.height>0;}),bounds=home?.getBoundingClientRect(),width=window.innerWidth,height=window.innerHeight;
   const target={x:bounds?bounds.left+bounds.width/2:width/8,y:bounds?bounds.top+bounds.height/2:height-28};
@@ -201,6 +188,18 @@ export function playBrandIntro(enabled=true,onComplete=null){
  return done;
 }
 
+// Coalesce pointer events into one transform update per display frame.
+const uiDragFrames=new Map();
+function uiDrag(style,key,value){
+ if(typeof requestAnimationFrame!=='function'){style.setProperty(key,value);return;}
+ const pending=uiDragFrames.get(style);if(pending){pending.value=value;return;}
+ const frame={value,id:0};uiDragFrames.set(style,frame);
+ frame.id=requestAnimationFrame(()=>{uiDragFrames.delete(style);style.setProperty(key,frame.value);});
+}
+function uiClearDrag(style,key){
+ const frame=uiDragFrames.get(style);if(frame){cancelAnimationFrame(frame.id);uiDragFrames.delete(style);}style.removeProperty(key);
+}
+function uiSwipeOffset(dx){return Math.max(-((globalThis.document?.documentElement?.clientWidth||400)*.92),Math.min((globalThis.document?.documentElement?.clientWidth||400)*.92,dx*.92));}
 export function calendarSwipeDelta(dx,dy,duration=0){
  if(!Number.isFinite(dx)||!Number.isFinite(dy)||duration>30000||Math.abs(dx)<48||Math.abs(dx)<Math.abs(dy)*1.35)return 0;
  return dx<0?1:-1;
@@ -208,19 +207,21 @@ export function calendarSwipeDelta(dx,dy,duration=0){
 export function installCalendarSwipe(root,onShift){
  if(!root.addEventListener)return;
  let gesture=null,blockedUntil=0;
- const reset=()=>{if(gesture){gesture.panel.classList.remove('is-swiping');gesture.panel.style.removeProperty('--calendar-drag');}gesture=null;};
+ const reset=()=>{if(gesture){gesture.panel.classList.remove('is-swiping');uiClearDrag(gesture.panel.style,'--calendar-drag');}gesture=null;};
  const shift=(current,delta,offset)=>{
-  const oldGrid=current.panel.querySelector?.('.calendar-days'),outgoing=oldGrid?.cloneNode(true),oldMonth=current.panel.dataset?.calendarMonth;
+  const oldGrid=current.panel.querySelector?.('.calendar-days'),outgoing=oldGrid?.cloneNode(true),oldMonth=current.panel.dataset?.calendarMonth,oldHeight=oldGrid?.getBoundingClientRect().height;
   onShift(delta);
   const panel=root.querySelector?.('[data-calendar-swipe]'),viewport=panel?.querySelector('.calendar-grid-viewport'),incoming=viewport?.querySelector('.calendar-days');
   if(!outgoing||!incoming?.animate||!viewport||panel.dataset.calendarMonth===oldMonth||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.body.classList.contains('motion-off'))return;
   const width=viewport.getBoundingClientRect().width;if(!width)return;
+  const nextHeight=incoming.getBoundingClientRect().height;
+  const resizing=oldHeight&&oldHeight!==nextHeight?viewport.animate([{height:oldHeight+'px'},{height:nextHeight+'px'}],{duration:300,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'}):null;
   outgoing.classList.add('calendar-leaving');outgoing.setAttribute('aria-hidden','true');outgoing.inert=true;viewport.appendChild(outgoing);viewport.classList.add('calendar-month-switching');
-  const options={duration:320,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'};
+  const options={duration:300,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'};
   const leaving=outgoing.animate([{transform:'translate3d('+offset+'px,0,0)'},{transform:'translate3d('+(-delta*width)+'px,0,0)'}],options);
   const entering=incoming.animate([{transform:'translate3d('+(delta*width+offset)+'px,0,0)'},{transform:'translate3d(0,0,0)'}],options);
-  let done=false;const finish=()=>{if(done)return;done=true;outgoing.remove();viewport.classList.remove('calendar-month-switching');leaving.cancel();entering.cancel();if(uiCalendarSlideCleanup===finish)uiCalendarSlideCleanup=null;};uiCalendarSlideCleanup=finish;
-  try{performance.mark('dagongren.calendar.slide',{detail:{from:oldMonth,to:panel.dataset.calendarMonth,direction:delta,duration:320}});}catch{}
+  let done=false;const finish=()=>{if(done)return;done=true;outgoing.remove();viewport.classList.remove('calendar-month-switching');leaving.cancel();entering.cancel();resizing?.cancel();if(uiCalendarSlideCleanup===finish)uiCalendarSlideCleanup=null;};uiCalendarSlideCleanup=finish;
+  try{performance.mark('dagongren.calendar.slide',{detail:{from:oldMonth,to:panel.dataset.calendarMonth,direction:delta,duration:300}});}catch{}
   Promise.all([leaving.finished,entering.finished]).catch(()=>{}).then(finish);
  };
 
@@ -236,7 +237,8 @@ export function installCalendarSwipe(root,onShift){
   if(Math.abs(dx)>14&&Math.abs(dx)>Math.abs(dy)*1.35)gesture.drag=true;
   if(gesture.drag){
    if(event.cancelable)event.preventDefault();
-   gesture.panel.classList.add('is-swiping');gesture.panel.style.setProperty('--calendar-drag',Math.max(-72,Math.min(72,dx*.36))+'px');
+   if(!root.hasPointerCapture?.(event.pointerId))root.setPointerCapture?.(event.pointerId);
+    gesture.panel.classList.add('is-swiping');uiDrag(gesture.panel.style,'--calendar-drag',uiSwipeOffset(dx)+'px');
   }
  },{passive:false});
  root.addEventListener('pointerup',event=>{
@@ -244,7 +246,7 @@ export function installCalendarSwipe(root,onShift){
   const current=gesture,dx=event.clientX-current.x,dy=event.clientY-current.y;
   const delta=calendarSwipeDelta(dx,dy,event.timeStamp-current.time);
   if(current.drag||delta){blockedUntil=Date.now()+250;if(event.cancelable)event.preventDefault();}
-  reset();if(delta)shift(current,delta,Math.max(-72,Math.min(72,dx*.36)));
+  reset();if(delta)shift(current,delta,uiSwipeOffset(dx));
  },{passive:false});
  root.addEventListener('pointercancel',reset,{passive:true});
  root.addEventListener('click',event=>{if(event.isTrusted&&Date.now()<blockedUntil&&event.target.closest?.('[data-calendar-swipe]')){event.preventDefault();event.stopImmediatePropagation();}},true);
@@ -258,7 +260,7 @@ export function pageSwipeTarget(view,delta){
 export function installPageSwipe(root,api){
  if(!root.addEventListener)return;
  let gesture=null,busy=false,blockedUntil=0;
- const reset=()=>{root.classList.remove('is-paging');root.style.removeProperty('--page-drag');gesture=null;};
+ const reset=()=>{root.classList.remove('is-paging');uiClearDrag(root.style,'--page-drag');gesture=null;};
  const change=(from,to,delta,offset)=>{
   if(api.current()!==from||api.blocked?.())return;uiPageSlideCleanup?.();uiCalendarSlideCleanup?.();for(const finish of uiRollCleanups)finish();uiRollCleanups=[];
   const content=root.querySelector('.workspace .content'),rect=content?.getBoundingClientRect(),outgoing=content?.cloneNode(true),stickyRect=content?.querySelector('.calendar-panel-header')?.getBoundingClientRect();
@@ -270,11 +272,11 @@ export function installPageSwipe(root,api){
   outgoing.classList.add('page-swipe-outgoing');outgoing.removeAttribute('id');for(const element of outgoing.querySelectorAll('[id]'))element.removeAttribute('id');
   Object.assign(outgoing.style,{position:'absolute',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px',margin:'0'});layer.appendChild(outgoing);document.body.appendChild(layer);
   const sticky=outgoing.querySelector('.calendar-panel-header');if(sticky&&stickyRect){sticky.style.position='relative';sticky.style.top='auto';sticky.style.transform='translateY('+(stickyRect.top-sticky.getBoundingClientRect().top)+'px)';}
-  const width=document.documentElement.clientWidth,options={duration:360,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'};
+  const width=rect.width,options={duration:300,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'};
   const leaving=outgoing.animate([{transform:'translate3d('+offset+'px,0,0)'},{transform:'translate3d('+(-delta*width)+'px,0,0)'}],options);
   const entering=incoming.animate([{transform:'translate3d('+(delta*width+offset)+'px,0,0)'},{transform:'translate3d(0,0,0)'}],options);
   let done=false;const finish=()=>{if(done)return;done=true;layer.remove();leaving.cancel();entering.cancel();busy=false;root.classList.remove('page-transitioning');if(uiPageSlideCleanup===finish)uiPageSlideCleanup=null;};uiPageSlideCleanup=finish;
-  try{performance.mark('dagongren.page.slide',{detail:{from,to,direction:delta,duration:360}});}catch{}
+  try{performance.mark('dagongren.page.slide',{detail:{from,to,direction:delta,duration:300}});}catch{}
   Promise.all([leaving.finished,entering.finished]).catch(()=>{}).then(finish);
  };
  root.addEventListener('pointerdown',event=>{
@@ -291,12 +293,12 @@ export function installPageSwipe(root,api){
   if(!gesture.drag&&Math.abs(dy)>14&&Math.abs(dy)>Math.abs(dx)*1.1){reset();return;}
   if(Math.abs(dx)>16&&Math.abs(dx)>Math.abs(dy)*1.35)gesture.drag=true;
   gesture.dx=dx;
-  if(gesture.drag){if(event.cancelable)event.preventDefault();if(!root.hasPointerCapture?.(event.pointerId))root.setPointerCapture?.(event.pointerId);root.classList.add('is-paging');root.style.setProperty('--page-drag',Math.max(-110,Math.min(110,dx*.45))+'px');}
+  if(gesture.drag){if(event.cancelable)event.preventDefault();if(!root.hasPointerCapture?.(event.pointerId))root.setPointerCapture?.(event.pointerId);root.classList.add('is-paging');uiDrag(root.style,'--page-drag',uiSwipeOffset(dx)+'px');}
  },{passive:false});
  root.addEventListener('pointerup',event=>{
   if(!gesture||gesture.touch||event.pointerId!==gesture.id)return;
   const from=gesture.view,dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
-  const delta=calendarSwipeDelta(dx,dy,event.timeStamp-gesture.time),drag=gesture.drag||Boolean(delta),target=pageSwipeTarget(from,delta),offset=Math.max(-110,Math.min(110,dx*.45));
+  const delta=calendarSwipeDelta(dx,dy,event.timeStamp-gesture.time),drag=gesture.drag||Boolean(delta),target=pageSwipeTarget(from,delta),offset=uiSwipeOffset(dx);
   if(drag){blockedUntil=Date.now()+250;if(event.cancelable)event.preventDefault();}
   reset();if(target)change(from,target,delta,offset);
  },{passive:false});
@@ -313,11 +315,11 @@ export function installPageSwipe(root,api){
   const dx=touch.clientX-gesture.x,dy=touch.clientY-gesture.y;
   if(!gesture.drag&&Math.abs(dy)>14&&Math.abs(dy)>Math.abs(dx)*1.1){reset();return;}
   if(Math.abs(dx)>16&&Math.abs(dx)>Math.abs(dy)*1.35)gesture.drag=true;
-  gesture.dx=dx;if(gesture.drag){if(event.cancelable)event.preventDefault();root.classList.add('is-paging');root.style.setProperty('--page-drag',Math.max(-110,Math.min(110,dx*.45))+'px');}
+  gesture.dx=dx;if(gesture.drag){if(event.cancelable)event.preventDefault();root.classList.add('is-paging');uiDrag(root.style,'--page-drag',uiSwipeOffset(dx)+'px');}
  },{passive:false});
  root.addEventListener('touchend',event=>{
   if(!gesture?.touch)return;const touch=[...event.changedTouches].find(item=>item.identifier===gesture.id);if(!touch)return;
-  const from=gesture.view,dx=touch.clientX-gesture.x,dy=touch.clientY-gesture.y,delta=calendarSwipeDelta(dx,dy,event.timeStamp-gesture.time),target=pageSwipeTarget(from,delta),offset=Math.max(-110,Math.min(110,dx*.45));
+  const from=gesture.view,dx=touch.clientX-gesture.x,dy=touch.clientY-gesture.y,delta=calendarSwipeDelta(dx,dy,event.timeStamp-gesture.time),target=pageSwipeTarget(from,delta),offset=uiSwipeOffset(dx);
   if(gesture.drag||delta){blockedUntil=Date.now()+250;if(event.cancelable)event.preventDefault();}
   reset();if(target)change(from,target,delta,offset);
  },{passive:false});

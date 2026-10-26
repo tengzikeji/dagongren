@@ -1,17 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {numberRollPlan} from '../dist/interaction.js';
-test('数码轮从最高位依次启动，每位至少滚动三圈并精确落位',()=>{
+test('数码轮从高位依次启动，短路径滚动并精确落位',()=>{
  const plan=numberRollPlan('1,234.56','9,876.54');
  assert.equal(plan.length,6);
- plan.forEach((wheel,i)=>{assert.equal(wheel.delay,i*35);assert.ok(wheel.steps>=30);assert.equal(wheel.digits[0],wheel.from);assert.equal(wheel.digits.at(-1),Number('987654'[i]));assert.equal(wheel.digits.length,wheel.steps+1);assert.ok(wheel.digits.every(x=>Number.isInteger(x)&&x>=0&&x<=9));});
+ plan.forEach((wheel,i)=>{assert.equal(wheel.delay,i*16);assert.ok(wheel.steps>=0&&wheel.steps<=19);assert.equal(wheel.digits[0],wheel.from);assert.equal(wheel.digits.at(-1),Number('987654'[i]));assert.equal(wheel.digits.length,wheel.steps+1);assert.ok(wheel.digits.every(x=>Number.isInteger(x)&&x>=0&&x<=9));});
  assert.ok(plan.every((x,i)=>i===0||x.delay>plan[i-1].delay));
 });
 test('金额跨位、负数及零保留小数的目标数字',()=>{
  for(const [old,next] of [['999.99','1,000.00'],['-120.50','13.09'],['1,000.00','0.00'],['0.00','123,456.78']]){
   const plan=numberRollPlan(old,next);
   assert.equal(plan.map(x=>x.digits.at(-1)).join(''),next.replace(/\D/g,''));
-  assert.ok(plan.every(x=>x.delay+x.duration<=1650));
+  assert.ok(plan.every(x=>x.delay+x.duration<=600));
  }
  assert.deepEqual(numberRollPlan('1,234.00','1234.00'),[]);
  assert.deepEqual(numberRollPlan('0.00','—'),[]);
@@ -103,4 +103,24 @@ test('安卓图表横滑在指针被取消后仍按完整触摸序列切页，�
   view='settings';handlers.touchstart(touch(80,200,2000));handlers.touchmove(touch(82,280,2100));handlers.touchend(touch(82,330,2200,true));assert.equal(view,'settings');
   blocked=true;handlers.touchstart(touch(80,200,3000));handlers.touchmove(touch(300,200,3100));handlers.touchend(touch(300,200,3200,true));assert.equal(view,'settings');
  }finally{if(beforeWindow===undefined)delete globalThis.window;else globalThis.window=beforeWindow;if(beforeDocument===undefined)delete globalThis.document;else globalThis.document=beforeDocument;}
+});
+
+test('连续触摸移动每帧只更新一次，取消手势后不留下延迟位移',()=>{
+ const beforeRAF=globalThis.requestAnimationFrame,beforeCancel=globalThis.cancelAnimationFrame;
+ const pending=new Map();let next=0,writes=0;
+ try{
+  globalThis.requestAnimationFrame=fn=>{pending.set(++next,fn);return next;};
+  globalThis.cancelAnimationFrame=id=>pending.delete(id);
+  const f=swipeFixture('calendar');f.panel.style.setProperty=()=>writes++;
+  installCalendarSwipe(f.root,()=>{});
+  f.handlers.pointerdown(f.event(1000,300,100));
+  for(let i=0;i<50;i++)f.handlers.pointermove(f.event(1001+i,280-i,100));
+  assert.equal(pending.size,1);assert.equal(writes,0);
+  const frame=[...pending.values()][0];pending.clear();frame();assert.equal(writes,1);
+  f.handlers.pointermove(f.event(1100,180,100));assert.equal(pending.size,1);
+  f.handlers.pointercancel();assert.equal(pending.size,0);assert.equal(f.classes.has('is-swiping'),false);
+ }finally{
+  if(beforeRAF===undefined)delete globalThis.requestAnimationFrame;else globalThis.requestAnimationFrame=beforeRAF;
+  if(beforeCancel===undefined)delete globalThis.cancelAnimationFrame;else globalThis.cancelAnimationFrame=beforeCancel;
+ }
 });

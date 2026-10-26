@@ -1,15 +1,14 @@
-import {themedSettlement,themedDaily,themedAnnual,themedEmployment,themedMix} from './theme-charts.js';
 import {formatMoney,daysInMonth,wagePayments,validDate} from './payroll.js';
 const chartMoney=value=>formatMoney(value);
 const chartEscape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const chartLegend=(tone,label)=>'<span><i class="'+tone+'"></i>'+label+'</span>';
 export function settlementChart(book,theme='classic'){
- if(theme!=='classic')return themedSettlement(book,theme);
+
  const applied=Math.max(0,book.receivedCents-book.unappliedCents),pending=Math.max(0,book.remainingCents),total=applied+pending,progress=total?applied/total*100:0;
  return '<section class="panel data-chart settlement-chart" aria-label="全部主体收款抵扣进度"><div class="section-header"><h2>收款进度</h2><span class="muted small">全部主体 · 全部账期</span></div><div class="settlement-content"><div class="chart-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="chart-ring-track" cx="60" cy="60" r="49"/><circle class="chart-ring-fill" cx="60" cy="60" r="49" pathLength="100" stroke-dasharray="'+progress.toFixed(3)+' 100" style="--chart-progress:'+progress.toFixed(3)+'"/></svg><div class="ring-label"><strong>'+progress.toFixed(1)+'<small>%</small></strong><span>已抵扣</span></div></div><div class="chart-key-values"><button data-action="metric" data-metric="applied" data-scope="all"><span><i class="chart-blue"></i>已抵扣收款</span><strong>¥ '+chartMoney(applied)+'</strong></button><button data-action="metric" data-metric="pending" data-scope="all"><span><i class="chart-pale"></i>待发工资</span><strong>¥ '+chartMoney(pending)+'</strong></button></div></div><p class="chart-caption">'+(total?'比例按已抵扣收款与待发合计计算；未抵扣预支另列。':'暂无可结算工资，记账后自动展示进度。')+'</p></section>';
 }
 export function dailyWageChart(month,daily,total,theme='classic'){
- if(theme!=='classic')return themedDaily(month,daily,total,theme);
+
  const days=daysInMonth(month),max=Math.max(1,...daily.map(x=>Math.abs(x.amountCents))),negative=daily.some(x=>x.amountCents<0),baseline=negative?88:122,scale=(negative?62:94)/max,step=552/days;
  const bars=daily.map((item,index)=>{const n=Number(item.date.slice(8)),amount=item.amountCents,height=Math.abs(amount)*scale;return '<rect class="chart-bar '+(amount<0?'chart-bar-negative':'chart-bar-earned')+'" x="'+(26+(n-1)*step+step*.15).toFixed(2)+'" y="'+(amount<0?baseline:baseline-height).toFixed(2)+'" width="'+(step*.7).toFixed(2)+'" height="'+height.toFixed(2)+'" rx="2" data-date="'+item.date+'" data-amount="'+amount+'" style="--bar-delay:'+Math.min(index*12,250)+'ms"><title>'+item.date+' 净计薪 '+chartMoney(amount)+'元</title></rect>';}).join('');
  const ticks=[1,8,15,22,days].filter((x,i,all)=>all.indexOf(x)===i).map(n=>'<text x="'+(26+(n-.5)*step).toFixed(2)+'" y="164" text-anchor="middle">'+n+'日</text>').join('');
@@ -17,7 +16,7 @@ export function dailyWageChart(month,daily,total,theme='classic'){
 }
 export function annualWageChart(year,book,theme='classic'){
  const earnedTotal=Object.entries(book.byMonth).filter(([month])=>month.startsWith(year+'-')).reduce((n,[,row])=>n+row.expectedCents,0),receivedTotal=book.receipts.filter(row=>row.date.startsWith(year+'-')).reduce((n,row)=>n+row.amountCents,0),totals='<div class="chart-topline annual-totals"><div><span>年度净计薪</span><strong>¥ '+chartMoney(earnedTotal)+'</strong></div><div><span>年度实收</span><strong>¥ '+chartMoney(receivedTotal)+'</strong></div></div>';
- if(theme!=='classic')return themedAnnual(year,book,theme).replace('</div>','</div>'+totals);
+
  const points=Array.from({length:12},(_,i)=>{const month=year+'-'+String(i+1).padStart(2,'0');return {month,earned:book.byMonth[month]?.expectedCents||0,received:book.receipts.filter(x=>x.date.startsWith(month+'-')).reduce((n,x)=>n+x.amountCents,0)};});
  const max=Math.max(1,...points.flatMap(x=>[Math.abs(x.earned),x.received])),negative=points.some(x=>x.earned<0),baseline=negative?88:132,scale=(negative?62:102)/max;
  const bars=points.map((point,i)=>{const x=28+i*46;return [['earned',point.earned,0],['received',point.received,17]].map(([kind,value,offset])=>'<rect class="chart-bar chart-bar-'+(value<0?'negative':kind)+'" x="'+(x+offset)+'" y="'+(value<0?baseline:baseline-Math.abs(value)*scale).toFixed(2)+'" width="13" height="'+(Math.abs(value)*scale).toFixed(2)+'" rx="3" data-month="'+point.month+'" data-kind="'+kind+'" data-amount="'+value+'" style="--bar-delay:'+i*22+'ms"><title>'+point.month+' '+(kind==='earned'?'净计薪':'实收')+' '+chartMoney(value)+'元</title></rect>').join('')+'<text class="chart-axis" x="'+(x+15)+'" y="169" text-anchor="middle">'+(i+1)+'月</text>';}).join('');
@@ -25,7 +24,7 @@ export function annualWageChart(year,book,theme='classic'){
 }
 
 export function recordMixChart(months,theme='classic'){
- if(theme!=='classic')return themedMix(months,theme);
+
  const groups=[['leave','请假','leaves','#6386db'],['overtime','加班','overtime','#6fbaaa'],['subsidy','补贴','subsidies','#8c91d7'],['deduction','扣款','deductions','#d7a067'],['advance','预支','advances','#7babc7'],['payment','发工资','payments','#79a179']].map(([kind,label,key,color])=>({kind,label,color,count:Object.values(months).reduce((n,r)=>n+(key==='payments'?wagePayments(r).length:(r[key]||[]).length),0)}));
  const total=groups.reduce((n,x)=>n+x.count,0);
  return '<section class="panel data-chart record-mix-chart"><div class="section-header"><h2>记账类型分布</h2><span class="muted small">全账本记录</span></div><div class="chart-topline"><strong>'+total+'<small> 笔</small></strong><span>已记 '+Object.keys(months).length+' 个月 · '+groups.filter(x=>x.count).length+' 类记录</span></div>'+(total?'<div class="record-mix-bar" role="img" aria-label="'+groups.map(x=>x.label+x.count+'笔').join('，')+'">'+groups.filter(x=>x.count).map(x=>'<span class="mix-segment" data-kind="'+x.kind+'" data-count="'+x.count+'" style="width:'+(x.count/total*100).toFixed(5)+'%;background:'+x.color+'"></span>').join('')+'</div>':'<div class="chart-empty">暂无逐笔记录，记一笔后自动展示</div>')+'<div class="record-mix-legend">'+groups.map(x=>'<div class="record-type-row"><div><span><i style="background:'+x.color+'"></i>'+x.label+'</span><strong>'+x.count+'笔 <small>'+(total?(x.count/total*100).toFixed(1):'0.0')+'%</small></strong></div><div class="record-type-track"><i class="record-type-fill" style="width:'+((total?x.count/total*100:0)).toFixed(3)+'%;background:'+x.color+'"></i></div></div>').join('')+'</div><p class="chart-caption">按各类逐笔记录数量统计，新增、修改或清理后自动更新。</p></section>';
@@ -42,7 +41,7 @@ export function employmentStats(joinDate,asOf){
  return {valid:true,future:false,days:daysApart(joinDate,asOf)+1,months,years,lastAnniversary:last,nextAnniversary:next,yearDays,elapsed,remaining:daysApart(asOf,next),progress:elapsed/yearDays*100};
 }
 export function employmentChart(joinDate,asOf,theme='classic'){
- if(theme!=='classic')return themedEmployment(employmentStats(joinDate,asOf),joinDate,asOf,theme);
+
  const stats=employmentStats(joinDate,asOf),percent=stats.progress.toFixed(1),metrics=[['days','入职天数',stats.days,'天'],['months','已满月数',stats.months,'个月'],['years','已满年数',stats.years,'年']];
  return '<section class="panel data-chart employment-chart" data-as-of="'+chartEscape(asOf)+'"><div class="section-header"><h2>入职时长</h2><span class="muted small">当前工作档案 · 截至今天</span></div><div class="employment-metrics">'+metrics.map(([key,label,value,unit])=>'<div><span>'+label+'</span><strong data-stat="'+key+'">'+value+'<small>'+unit+'</small></strong></div>').join('')+'</div>'+(stats.valid&&!stats.future?'<div class="employment-progress"><div class="chart-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="chart-ring-track" cx="60" cy="60" r="49"/><circle class="chart-ring-fill" cx="60" cy="60" r="49" pathLength="100" stroke-dasharray="'+percent+' 100" style="--chart-progress:'+percent+'"/></svg><div class="ring-label"><strong>'+percent+'<small>%</small></strong><span>本入职年进度</span></div></div><div class="employment-year"><strong>第'+(stats.years+1)+'个入职年</strong><span>已过 '+stats.elapsed+' / '+stats.yearDays+' 天</span><p>距下次周年还有 <b>'+stats.remaining+'</b> 天</p><small>下次周年 '+stats.nextAnniversary+'</small></div></div>':'<div class="chart-empty">'+(stats.future?'距入职还有 '+stats.untilJoin+' 天':'请先设置有效的入职日期')+'</div>')+'<p class="chart-caption">入职当天计1天；满月、满年按入职日期计算，短月周年日取月末。</p></section>';
 }

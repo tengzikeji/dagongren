@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {themeCatalog,resolveTheme,themePicker} from '../dist/themes.js';
+import {themeCatalog,resolveTheme,effectiveTheme,themePicker} from '../dist/themes.js';
 import {settlementChart,dailyWageChart,annualWageChart,employmentChart,profileChart,recordMixChart} from '../dist/charts.js';
-test('四套主题各有独立布局及图表描述，非法旧设置安全回退',()=>{
- const themes=themeCatalog();assert.deepEqual(themes.map(x=>x.id),['classic','neon','paper','forest']);
- assert.equal(new Set(themes.map(x=>x.layout)).size,4);assert.equal(new Set(themes.map(x=>x.chart)).size,4);
- themes[0].name='不能污染目录';assert.equal(resolveTheme(null).name,'雾蓝经典');assert.equal(resolveTheme('<script>').id,'classic');
- const picker=themePicker('forest');assert.equal((picker.match(/data-action="choose-theme"/g)||[]).length,4);assert.equal((picker.match(/aria-pressed="true"/g)||[]).length,1);
+test('默认跟随系统，旧主题安全迁移，浅深色选择互斥且目录不可外部修改',()=>{
+ const themes=themeCatalog();assert.deepEqual(themes.map(x=>x.id),['system','light','dark']);
+ themes[0].name='污染';assert.equal(resolveTheme(null).name,'跟随系统');
+ for(const old of ['classic','neon','paper','forest','<script>',null])assert.equal(resolveTheme(old).id,'system');
+ assert.equal(effectiveTheme('system',false),'light');assert.equal(effectiveTheme('system',true),'dark');
+ assert.equal(effectiveTheme('light',true),'light');assert.equal(effectiveTheme('dark',false),'dark');
+ const picker=themePicker('dark');assert.equal((picker.match(/data-action="choose-theme"/g)||[]).length,3);assert.equal((picker.match(/aria-pressed="true"/g)||[]).length,1);
 });
 test('全部主题每日图表保留正负和零金额，与日历账本同源',()=>{
  const daily=[{date:'2026-10-01',amountCents:10001},{date:'2026-10-02',amountCents:-20203},{date:'2026-10-03',amountCents:0}],total=-10202;
@@ -34,7 +36,7 @@ test('所有主题收款进度不计待抵扣预支，未计薪与清空不伪�
  }
 });
 test('工龄按真实周年显示，不同主题分别呈现环形、仪表、时间轴与轨道',()=>{
- const styles=['chart-ring','theme-gauge','paper-timeline','theme-orbit'];
+ const styles=['chart-ring','chart-ring','chart-ring'];
  for(const [i,{id}] of themeCatalog().entries()){
   const html=employmentChart('2024-02-29','2026-03-01',id);
   assert.match(html,new RegExp(styles[i]));assert.match(html,/data-stat="years">2/);assert.match(html,/data-stat="months">24/);

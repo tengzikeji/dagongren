@@ -1,7 +1,7 @@
-import {themeCatalog,resolveTheme,themePicker} from './themes.js';
+import {themeCatalog,resolveTheme,effectiveTheme,themePicker} from './themes.js';
 import {settlementChart,dailyWageChart,annualWageChart,profileChart} from './charts.js';
 import {createCalendarUpdater} from './holiday-updates.js';
-import {renderStable,enhanceModalChoices,closeChoicePicker,playBrandIntro,replayHomeData,installCalendarSwipe,installPageSwipe} from './interaction.js';
+import {renderStable,enhanceModalChoices,closeChoicePicker,playBrandIntro,playHomeStartupGlare,installCalendarSwipe,installPageSwipe} from './interaction.js';
 import {calendarRights} from './calendar-rights.js';
 import {calendarDay,calendarCoverage} from './calendar.js';
 import { daysInMonth, validMonth, validDate, holiday, makeupWorkday, datesBetween, calculate, formatMoney, statutoryDates, isStatutory, isAdjustedDay, overtimeAmount, wagePayments, chinaDate, shiftDay, leaveDeducts, calculateBook, migrateBook, ensureAccrualMonths, payPeriodForDate, rebuildAccrualFromJoin, salaryRateForDate } from './payroll.js';
@@ -80,7 +80,9 @@ function loadData() {
 
 let db = loadData();
 const THEME_STORAGE='dagongren.theme.v1';
-let activeTheme='classic';
+const systemTheme=window.matchMedia?.('(prefers-color-scheme: dark)');
+let systemDark=globalThis.AndroidFiles?.systemDark?.()??systemTheme?.matches??false;
+let activeTheme='system';
 try{activeTheme=resolveTheme(localStorage.getItem(THEME_STORAGE)).id;}catch{}
 let persistedBook=snapshotBook(db);
 let bookCache = null;
@@ -165,8 +167,11 @@ function syncStatus() {
 }
 function render() {
   bookCache=null;
-  document.body.setAttribute?.('data-theme',activeTheme);
-  document.querySelector?.('meta[name="theme-color"]')?.setAttribute('content',activeTheme==='neon'?'#091820':activeTheme==='paper'?'#f3ecdf':activeTheme==='forest'?'#edf3e9':'#f3f5f9');
+  const appearance=effectiveTheme(activeTheme,systemDark);
+  document.body.setAttribute?.('data-theme',appearance);
+  document.body.setAttribute?.('data-theme-preference',activeTheme);
+  document.querySelector?.('meta[name="theme-color"]')?.setAttribute('content',appearance==='dark'?'#101827':'#f3f5f9');
+  globalThis.AndroidFiles?.themeStyle?.(activeTheme);
   document.body.classList?.toggle('motion-off',db.defaults.motion===false);
   app.classList.toggle('motion-off',db.defaults.motion===false);
   const home=view==='home',mine=view==='settings';
@@ -239,7 +244,7 @@ function calendarView() {
     const n=i-first+1;if(n<1||n>dayCount){cells+='<span class="calendar-day empty" aria-hidden="true"></span>';continue;}
     const date=selectedMonth+'-'+pad(n),info=calendarDay(date),leave=rec.leaves.find(x=>x.date===date),isToday=date===today,day=daily.find(x=>x.date===date),hasRecord=entries.some(x=>x.date===date),badge=leave?'假':info.work?'班':info.statutory?'法':info.holiday?'休':'',caption=info.festival||info.term||info.lunar;
     const classes=[info.holiday?'holiday':'',info.statutory?'statutory':'',leave?'leave':'',isToday?'today':'',i%7>4?'weekend':'',info.work?'makeup':'',hasRecord?'has-entry':''].join(' ');
-    cells+='<button class="calendar-day '+classes+'" data-action="day-ledger" data-date="'+date+'" '+(isToday?'aria-current="date"':'')+' aria-label="'+date+'，'+esc(info.lunarFull)+'，'+esc(info.festival||info.term||'')+'，'+(badge||'普通日期')+'，当日净计薪'+money(day?.amountCents||0)+'元"><span class="day-number">'+n+(badge?'<i class="day-badge">'+badge+'</i>':'')+'</span><small class="lunar-label">'+esc(caption)+'</small><b class="day-wage number '+(day?.amountCents>0?'wage-income':day?.amountCents<0?'wage-loss':'wage-neutral')+'">'+(day?money(day.amountCents):'—')+'</b>'+(hasRecord?'<i class="record-dot"></i>':'')+'</button>';
+    cells+='<button class="calendar-day '+classes+'" data-action="day-ledger" data-date="'+date+'" '+(isToday?'aria-current="date"':'')+' aria-label="'+date+'，'+esc(info.lunarFull)+'，'+esc(info.festival||info.term||'')+'，'+(badge||'普通日期')+'，当日净计薪'+money(day?.amountCents||0)+'元"><span class="day-number">'+n+(badge?'<i class="day-badge">'+badge+'</i>':'')+'</span><small class="lunar-label">'+esc(caption)+'</small><b class="day-wage '+(day?.amountCents>0?'wage-income':day?.amountCents<0?'wage-loss':'wage-neutral')+'" data-static-number>'+(day?money(day.amountCents):'—')+'</b>'+(hasRecord?'<i class="record-dot"></i>':'')+'</button>';
   }
   return '<div class="calendar-week">'+['一','二','三','四','五','六','日'].map(x=>'<span>'+x+'</span>').join('')+'</div><div class="calendar-grid-viewport"><div class="calendar-days" data-weeks="'+(count/7)+'">'+cells+'</div></div><button class="calendar-source-note" data-action="calendar-sources">'+icon('info')+'<span><strong>日历使用说明</strong><small>'+calendarCoverage(year)+'</small></span>'+icon('chevron')+'</button>';
 }
@@ -862,7 +867,10 @@ calendarUpdater=createCalendarUpdater({fetchYear:nativeSync?year=>nativeSync.fet
 ensureAccrualMonths(db,today);persist();
 calendarUpdater.refresh(Number(today.slice(0,4)));
 render();
-playBrandIntro(db.defaults.motion!==false,()=>{if(view==='home'){render();replayHomeData(app,db.defaults.motion!==false);}});
+playBrandIntro(db.defaults.motion!==false,()=>{if(view==='home')playHomeStartupGlare(app,db.defaults.motion!==false);});
+const systemThemeChanged=dark=>{systemDark=Boolean(dark);if(activeTheme==='system')render();};
+systemTheme?.addEventListener?.('change',event=>{if(!isAndroid)systemThemeChanged(event.matches);});
+globalThis.dagongrenSystemTheme=systemThemeChanged;
 installPageSwipe(app,{current:()=>view,blocked:()=>Boolean(modalRoot.firstElementChild),navigate:next=>app.querySelector('.bottom-nav [data-view="'+next+'"]')?.click()});
 installCalendarSwipe(app,delta=>app.querySelector('[data-action=shift-month][data-delta="'+delta+'"]')?.click());
 setTimeout(refreshAccrualDay,60000);

@@ -8,11 +8,11 @@ const tools=dirs.map(d=>path.join(sdk,'build-tools',d)).find(d=>fs.existsSync(pa
 if(!tools)throw Error('Android release verification tools are missing.');
 const apk='android/app/build/outputs/apk/release/app-release.apk';
 const badging=execFileSync(path.join(tools,'aapt'),['dump','badging',apk],{encoding:'utf8'});
-if(!/package: name='com\.tengzikeji\.dagongren\.upgrade' versionCode='16' versionName='1\.3\.0'/.test(badging))throw Error('Release version or package does not match.');
+if(!/package: name='com\.tengzikeji\.dagongren\.upgrade' versionCode='17' versionName='1\.3\.1'/.test(badging))throw Error('Release version or package does not match.');
 if(!badging.includes("application-label:'打工人'"))throw Error('Release app name does not match.');
 if(badging.includes('application-debuggable'))throw Error('Release must not be debuggable.');
 const signatures=execFileSync(path.join(tools,'apksigner'),['verify','--print-certs',apk],{encoding:'utf8'});
 const actual=signatures.match(/certificate SHA-256 digest:\s*([a-f\d]+)/i)?.[1].toLowerCase();
 const expected=JSON.parse(fs.readFileSync('.github/signing-identity.json','utf8')).certificateSha256;
 if(actual!==expected)throw Error('Release certificate would break installed-app upgrades.');
-console.log('Release verified: 打工人 1.3.0; debugging disabled; fixed upgrade certificate matches.');
+console.log('Release verified: 打工人 1.3.1; debugging disabled; fixed upgrade certificate matches.');
