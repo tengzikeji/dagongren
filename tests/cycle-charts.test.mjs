@@ -63,3 +63,10 @@ test('未来入职不显示负工龄，工龄和记录数量分别展示',()=>{
  const value=employmentStats('2026-10-28','2026-10-26');assert.equal(value.days,0);assert.equal(value.months,0);assert.equal(value.years,0);assert.equal(value.untilJoin,2);
  const html=employmentChart('2026-09-21','2026-10-26');for(const word of ['入职天数','已满月数','已满年数','本入职年进度','下次周年'])assert.ok(html.includes(word));assert.doesNotMatch(html,/NaN|Infinity|undefined/);assert.match(employmentChart('2026-10-28','2026-10-26'),/距入职还有 2 天/);
 });
+
+import {profileChart} from '../dist/charts.js';
+test('我的图表共用一个位置，默认工龄并可切换六类记录分布',()=>{
+ const months={'2026-10':{leaves:[{id:'a'}],subsidies:[{id:'b'}],payments:[],payment:null}};
+ const initial=profileChart(months,'2024-02-29','2026-10-26');assert.equal((initial.match(/<section/g)||[]).length,1);assert.match(initial,/employment-chart/);assert.doesNotMatch(initial,/record-mix-chart/);assert.match(initial,/切换到记录分布图表/);
+ const records=profileChart(months,'2024-02-29','2026-10-26','records');assert.equal((records.match(/<section/g)||[]).length,1);assert.match(records,/record-mix-chart/);assert.doesNotMatch(records,/employment-chart/);assert.match(records,/切换到入职时长图表/);assert.match(records,/2<small> 笔/);assert.match(profileChart({},'2030-01-01','2026-10-26'),/距入职还有/);
+});

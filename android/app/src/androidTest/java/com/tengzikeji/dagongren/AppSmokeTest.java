@@ -96,6 +96,12 @@ public class AppSmokeTest {
             assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth"));
             waitTrue(scenario,"[...document.querySelectorAll('.data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
             paintedScreenshot(scenario,"charts-home");
+            evaluate(scenario,"document.querySelector('[data-action=home-period-picker]').click();document.querySelector('[data-action=choose-home-period][data-month=\"2026-09\"]').click();document.querySelector('.month-account-head [data-metric=earned]').click()");
+            assertEquals("600001",evaluate(scenario,"Number(document.querySelector('.metric-total').dataset.total)"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('.metric-scope').textContent.includes('2026/09/21 — 2026/10/20')"));
+            evaluate(scenario,"document.querySelector('.modal-close').click()");
+            assertEquals("true",evaluate(scenario,"document.querySelector('.month-account').dataset.start==='2026-09-21'&&!document.querySelector('.modal')"));
+
             evaluate(scenario,"document.querySelector('[data-view=records]').click();document.querySelector('.month-pay-card[data-period^=\"2026-09-21|\"]').click();document.querySelector('.period-component-list .sum').click()");
             assertEquals("600001",evaluate(scenario,"Number(document.querySelector('.metric-total').dataset.total)"));
             evaluate(scenario,"globalThis.dagongrenBack();document.querySelector('[data-view=records]').click()");
@@ -103,12 +109,14 @@ public class AppSmokeTest {
             waitTrue(scenario,"[...document.querySelectorAll('.data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
             paintedScreenshot(scenario,"charts-records");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click()");
-            waitTrue(scenario,"document.querySelectorAll('.record-mix-bar .mix-segment').length===6");
-            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.mix-segment')].reduce((n,e)=>n+Number(e.dataset.count),0)===6"));
+            waitTrue(scenario,"Boolean(document.querySelector('.employment-chart'))&&!document.querySelector('.record-mix-chart')");
             assertEquals("true",evaluate(scenario,"document.querySelectorAll('.employment-metrics [data-stat]').length===3"));
             assertEquals("true",evaluate(scenario,"(()=>{const e=document.querySelector('.employment-chart'),days=Math.round((Date.parse(e.dataset.asOf)-Date.parse('2026-09-21'))/86400000)+1;return parseInt(e.querySelector('[data-stat=days]').textContent)===days})()"));
             waitTrue(scenario,"[...document.querySelectorAll('.data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
             paintedScreenshot(scenario,"charts-profile");
+            evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click()");
+            waitTrue(scenario,"document.querySelectorAll('.record-mix-bar .mix-segment').length===6&&!document.querySelector('.employment-chart')");
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.mix-segment')].reduce((n,e)=>n+Number(e.dataset.count),0)===6&&document.querySelectorAll('.profile-chart-panel').length===1"));
             evaluate(scenario,"document.querySelector('.record-mix-chart').scrollIntoView({block:'start'})");
             paintedScreenshot(scenario,"charts-profile-records");
             evaluate(scenario,"document.querySelector('[data-view=calendar]').click()");
@@ -134,6 +142,40 @@ public class AppSmokeTest {
             paintedScreenshot(scenario,"charts-calendar");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('[data-view=home]').click()");
             assertEquals("\"none\"",evaluate(scenario,"getComputedStyle(document.querySelector('.chart-ring-fill')).animationName"));
+        }
+    }
+
+    @Test public void everyMainPageReturnsOneLevelOrClosesAllMenus() throws Exception {
+        UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            evaluate(scenario,"document.querySelector('[data-action=salary-settings]').click();document.getElementById('salary').value='6000';document.querySelector('.modal-footer button[type=submit]').click()");
+            for(String main:new String[]{"home","calendar","records","settings"}){
+                evaluate(scenario,"document.querySelector('[data-view="+main+"]').click();document.querySelector('[data-action=record-entry]').click();document.querySelector('[data-kind=subsidy]').click();document.getElementById('adjustment-note').value='保留上层草稿';document.querySelector('.select-trigger').click()");
+                waitTrue(scenario,"Boolean(document.querySelector('.choice-sheet'))");
+                device.pressBack();
+                waitTrue(scenario,"!document.querySelector('.choice-sheet')&&Boolean(document.getElementById('subsidy-form'))");
+                assertEquals("\"保留上层草稿\"",evaluate(scenario,"document.getElementById('adjustment-note').value"));
+                evaluate(scenario,"document.querySelector('.modal-back').click()");
+                waitTrue(scenario,"document.getElementById('modal-title').textContent==='记一笔'");
+                device.pressBack();
+                waitTrue(scenario,"!document.querySelector('.modal')&&!document.getElementById('app').inert");
+                assertEquals("\""+main+"\"",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view"));
+                evaluate(scenario,"document.querySelector('[data-action=record-entry]').click();document.querySelector('[data-kind=subsidy]').click();document.querySelector('.select-trigger').click();document.querySelector('.choice-close').click()");
+                waitTrue(scenario,"!document.querySelector('.modal')&&!document.querySelector('.choice-sheet')&&!document.getElementById('app').inert");
+                assertEquals("\""+main+"\"",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view"));
+            }
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-view=sync]').click();document.querySelector('[data-action=connection-settings]').click()");
+            device.pressBack();waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.sync-hero'))");
+            device.pressBack();waitTrue(scenario,"Boolean(document.querySelector('.profile-card'))");
+            evaluate(scenario,"document.querySelector('[data-view=sync]').click();document.querySelector('[data-action=connection-settings]').click();document.querySelector('.modal-close').click()");
+            waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.profile-card'))");
+            evaluate(scenario,"document.querySelector('[data-action=open-cleanup]').click();document.querySelector('[data-action=review-cleanup]').click()");
+            assertEquals("\"确认清理\"",evaluate(scenario,"document.querySelector('[data-action=confirm-cleanup]').textContent"));
+            device.pressBack();waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.cleanup-panel'))");
+            evaluate(scenario,"document.querySelector('[data-action=review-cleanup]').click();document.querySelector('.modal-close').click()");
+            waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.profile-card'))");
+            paintedScreenshot(scenario,"menus-return-profile");
         }
     }
 
@@ -283,9 +325,10 @@ public class AppSmokeTest {
             assertEquals("true",evaluate(scenario,"window.__launchObserved.animated"));
             double playingSecond=(Double.parseDouble(evaluate(scenario,"window.__launchObserved.at"))-recordingStarted)/1000.0;
             android.util.Log.i("DagongrenLaunchReview","PLAYING_SECOND="+playingSecond);
+            waitTrue(scenario,"(()=>{const p=document.querySelector('.launch-page');if(p?.dataset.phase!=='absorbing')return false;const opacity=Number(getComputedStyle(document.getElementById('app')).opacity);return opacity>0&&opacity<1})()");
             paintedScreenshot(scenario,"startup-interface");
             waitTrue(scenario,"!document.querySelector('.launch-page')");
-            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.launch.absorbing').at(-1)?.detail;return !!d&&d.corner==='bottom-left'&&d.duration===720&&d.surfaces===1&&parseFloat(d.origin)===0&&Math.abs(parseFloat(d.origin.split(' ')[1])-innerHeight)<1})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.launch.absorbing').at(-1)?.detail;return !!d&&d.duration===980&&d.surfaces===1&&d.button&&Math.abs(d.target.x-(d.button.left+d.button.width/2))<1&&Math.abs(d.target.y-(d.button.top+d.button.height/2))<1&&Math.abs(parseFloat(d.origin)-d.target.x)<1&&Math.abs(parseFloat(d.origin.split(' ')[1])-d.target.y)<1&&d.target.x<innerWidth/3&&d.target.y>innerHeight*.8})()"));
             assertEquals("false",evaluate(scenario,"document.getElementById('app').inert"));
             assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.bottom-nav'))"));
             paintedScreenshot(scenario,"startup-home");
