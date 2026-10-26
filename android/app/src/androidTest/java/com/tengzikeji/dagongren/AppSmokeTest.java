@@ -21,6 +21,7 @@ import org.junit.runner.RunWith;
 
 @RunWith(AndroidJUnit4.class)
 public class AppSmokeTest {
+    @org.junit.Rule public final org.junit.rules.Timeout perTestTimeout=org.junit.rules.Timeout.seconds(300);
     @Before public void enableAnimationTestEnvironment() throws Exception {
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         device.wakeUp();
