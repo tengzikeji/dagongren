@@ -91,3 +91,16 @@ test('浏览器合并移动帧时，按下与抬起坐标仍能识别有效横�
   page.handlers.pointerdown(page.event(4000,200,100));page.handlers.pointerup(page.event(4120,204,200));assert.equal(view,'home');
  }finally{if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;}
 });
+
+test('安卓图表横滑在指针被取消后仍按完整触摸序列切页，竖滑和弹窗不误切',()=>{
+ const beforeWindow=globalThis.window,beforeDocument=globalThis.document;let view='settings',blocked=false;
+ try{
+  globalThis.window={matchMedia:()=>({matches:true})};globalThis.document={documentElement:{clientWidth:400},body:{classList:{contains:()=>false}}};
+  const handlers={},root={style:{setProperty(){},removeProperty(){}},classList:{add(){},remove(){}},addEventListener:(k,fn)=>handlers[k]=fn,querySelector:()=>null},panel={},target={closest:s=>s.includes('.profile-chart-panel')?panel:null};
+  installPageSwipe(root,{current:()=>view,blocked:()=>blocked,navigate:next=>view=next});
+  const touch=(x,y,time,end=false)=>({timeStamp:time,target,cancelable:true,preventDefault(){this.prevented=true},touches:end?[]:[{identifier:9,clientX:x,clientY:y}],changedTouches:[{identifier:9,clientX:x,clientY:y}]});
+  handlers.touchstart(touch(80,200,1000));const move=touch(160,200,1100);handlers.touchmove(move);assert.equal(move.prevented,true);handlers.pointercancel({pointerType:'touch'});handlers.touchend(touch(310,202,1300,true));assert.equal(view,'records');
+  view='settings';handlers.touchstart(touch(80,200,2000));handlers.touchmove(touch(82,280,2100));handlers.touchend(touch(82,330,2200,true));assert.equal(view,'settings');
+  blocked=true;handlers.touchstart(touch(80,200,3000));handlers.touchmove(touch(300,200,3100));handlers.touchend(touch(300,200,3200,true));assert.equal(view,'settings');
+ }finally{if(beforeWindow===undefined)delete globalThis.window;else globalThis.window=beforeWindow;if(beforeDocument===undefined)delete globalThis.document;else globalThis.document=beforeDocument;}
+});

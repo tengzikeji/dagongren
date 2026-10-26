@@ -1,0 +1,234 @@
+/* 1.3 · theme surfaces, independent layouts and data-driven motion. */
+.view-settings,.profile-chart-panel{touch-action:pan-y pinch-zoom}
+.calendar-day.today{background:#edf3ff;color:#2454ae;border-color:#8aa9e5;box-shadow:inset 0 0 0 1px #8aa9e5}
+.calendar-day.today .day-number{font-weight:750}
+.calendar-day.today small{color:#536987}
+.calendar-day.today .day-wage{background:none;border-radius:0;padding:0;box-shadow:none}
+.calendar-day.today .day-wage.wage-income{color:#11734c}.calendar-day.today .day-wage.wage-loss{color:#b52b3b}.calendar-day.today .day-wage.wage-neutral{color:#657387}
+.calendar-day.today .day-badge{background:#d7e4ff;color:#214991}
+.theme-intro{font-size:13px;line-height:1.8;color:var(--muted);margin-bottom:18px}
+.theme-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.theme-option{display:flex;flex-direction:column;align-items:stretch;text-align:left;padding:12px;border:1px solid #dce4ef;border-radius:16px;background:#fff;min-width:0;color:#223b58}
+.theme-option[aria-pressed=true]{border:2px solid var(--orange);padding:11px;box-shadow:0 0 0 3px var(--orange-light)}
+.theme-option-heading{display:flex;justify-content:space-between;align-items:center;gap:4px;margin-top:11px}.theme-option-heading strong{font-size:14px}.theme-selected{font-size:10px;color:#4569a0;white-space:nowrap}
+.theme-tag{font-size:10px;margin:5px 0;color:#526985}.theme-description{font-size:11px;line-height:1.8;color:#5e7085}.theme-features{font-size:10px;margin-top:auto;padding-top:9px;color:#4b6382}
+.theme-miniature{display:block;position:relative;height:115px;border-radius:9px;background:#edf2fa;overflow:hidden}
+.theme-miniature i{position:absolute;display:block;background:#fff;border-radius:5px}
+.mini-hero{left:9%;top:10%;width:82%;height:32%;background:linear-gradient(120deg,#6b91da,#335db1)!important}
+.mini-chart{left:9%;top:49%;width:35%;height:30%;border:7px solid #84a4d7;border-radius:50%!important;background:transparent!important}
+.mini-row{left:52%;top:49%;width:39%;height:12%}.mini-row.second{top:68%}.mini-nav{left:9%;bottom:7%;height:6%;width:82%}
+.theme-preview-neon .theme-miniature{background:repeating-linear-gradient(0deg,#1b344030 0 1px,transparent 1px 12px),#091821}
+.theme-preview-neon .mini-hero{left:9%;width:50%;height:43%;background:linear-gradient(135deg,#124d53,#102e39)!important;border:1px solid #5ce5cd}
+.theme-preview-neon .mini-chart{left:66%;top:12%;width:25%;height:28%;border-color:#7eecd7;border-bottom-color:transparent;border-radius:50% 50% 0 0!important}
+.theme-preview-neon .mini-row{left:9%;top:62%;width:38%;height:19%;background:#193a44}.theme-preview-neon .mini-row.second{left:53%;top:62%}.theme-preview-neon .mini-nav{background:#23505b}
+.theme-preview-paper .theme-miniature{background:repeating-linear-gradient(0deg,#a38c6c18 0 1px,transparent 1px 13px),#f3e9d9}
+.theme-preview-paper .mini-hero{left:10%;width:80%;height:25%;background:#b56d4a!important;border-radius:1px!important}
+.theme-preview-paper .mini-chart{left:10%;top:43%;width:3%;height:39%;border:0;border-radius:0!important;background:#ad6948!important}
+.theme-preview-paper .mini-row{left:20%;top:45%;width:70%;height:12%;background:#ddc5a5}.theme-preview-paper .mini-row.second{top:68%}.theme-preview-paper .mini-nav{bottom:0;left:0;width:100%;background:#e5d3b9}
+.theme-preview-forest .theme-miniature{background:#e4eee5}
+.theme-preview-forest .mini-hero{left:7%;width:86%;height:30%;border-radius:20px 6px 20px 6px!important;background:linear-gradient(120deg,#3d765a,#75a484)!important}
+.theme-preview-forest .mini-chart{left:59%;top:49%;width:29%;height:31%;border-color:#5a9574;border-right-color:#bed7bd}
+.theme-preview-forest .mini-row{left:8%;top:48%;width:43%;height:14%;background:#b5ceaf}.theme-preview-forest .mini-row.second{top:69%;width:35%}
+.theme-preview-forest .mini-nav{left:17%;width:66%;border-radius:15px;background:#fff}
+.theme-chart{--chart-accent:var(--orange);--chart-secondary:#4f9c85;--chart-track:var(--line);overflow:hidden}
+.theme-gauge,.theme-orbit{position:relative;flex-shrink:0;width:160px;max-width:100%;margin:auto}
+.theme-gauge{width:190px;padding-top:4px}.theme-gauge svg,.theme-orbit svg{display:block;width:100%;overflow:visible}
+.theme-gauge>div,.theme-orbit>div{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;pointer-events:none}
+.theme-gauge>div{padding-top:36px}.theme-gauge strong,.theme-orbit strong{font-size:28px;color:var(--ink);line-height:1.2;font-variant-numeric:tabular-nums}
+.theme-gauge strong small,.theme-orbit strong small{font-size:12px}.theme-gauge>div>span,.theme-orbit>div>span{font-size:10px;color:var(--muted);margin-top:6px}
+.theme-track{fill:none;stroke:var(--chart-track);stroke-width:12}.theme-stroke{fill:none;stroke:var(--chart-accent);stroke-width:12;stroke-linecap:round}
+.gauge-ticks{fill:none;stroke:var(--muted);stroke-width:2}.orbit-decoration{fill:none;stroke:var(--chart-secondary);stroke-width:1;stroke-dasharray:2 6;transform-origin:center;animation:theme-orbit-turn 65s linear infinite}
+.theme-draw{animation:theme-chart-draw 1.1s ease-out both}.theme-line{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.theme-dot{stroke-width:2;fill:var(--chart-accent)}.theme-received{stroke:var(--chart-secondary);fill:none;stroke-width:3}.theme-dot.theme-received{fill:var(--chart-secondary)}
+.theme-loss{stroke:#d0505b;fill:#d0505b}.theme-stem{stroke-width:3;animation:theme-stem-rise .7s ease-out both;transform-box:fill-box;transform-origin:bottom}
+.theme-area{fill:var(--chart-accent);opacity:.14;animation:theme-area-in 1s ease-out both}
+.theme-settlement{display:flex;align-items:center;gap:16px}.theme-settlement .chart-key-values{flex:1;min-width:0}
+.theme-settlement .chart-key-values strong{font-size:15px;overflow-wrap:anywhere}
+.paper-receipt{width:45%;display:flex;flex-direction:column;gap:8px;flex-shrink:0}.paper-receipt>span{font-size:10px;color:var(--muted)}.paper-receipt>strong{font-size:32px;color:var(--ink)}.paper-receipt small{font-size:13px}
+.theme-meter{height:8px;width:100%;border-radius:10px;background:var(--line);overflow:hidden}
+.theme-meter>i,.theme-meter>b{display:block;height:100%;background:var(--orange);border-radius:inherit;animation:theme-meter-fill .9s ease-out both;transform-origin:left}
+.paper-timeline{display:flex!important;align-items:stretch!important;flex-direction:column;border-left:1px dashed var(--orange);gap:18px!important;margin:20px 8px 10px;padding-left:20px}
+.paper-timeline>div{position:relative;display:flex;flex-direction:column;gap:6px}.paper-timeline>div>i{position:absolute;left:-25px;top:4px;width:9px;height:9px;background:var(--orange);border-radius:50%}
+.paper-timeline span,.paper-timeline small{font-size:11px;color:var(--muted)}.paper-timeline strong{font-size:17px;color:var(--ink)}
+.wage-heatmap{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:16px 0}
+.wage-heat-cell{position:relative;border-radius:4px;padding:8px 3px;isolation:isolate;min-width:0;display:flex;flex-direction:column;gap:6px;color:#385d46}
+.wage-heat-cell:before{content:'';position:absolute;inset:0;background:#86b27b;opacity:var(--heat);z-index:-1;animation:theme-area-in .8s both}
+.wage-heat-cell.loss{color:#ab303d}.wage-heat-cell.loss:before{background:#e78580}.wage-heat-cell.unaccrued,.wage-heat-cell.zero{color:var(--muted)}
+.wage-heat-cell.unaccrued:before,.wage-heat-cell.zero:before{background:#9a9d96;opacity:.1}
+.wage-heat-cell span{font-size:10px}.wage-heat-cell strong{font-size:10px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.annual-rails{display:grid;gap:9px;margin:16px 0}.annual-rails>div{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:9px;align-items:center}
+.annual-rails>div>span{font-size:10px;color:var(--muted)}.annual-rails small{font-size:9px;color:var(--muted);font-variant-numeric:tabular-nums}
+.annual-rail-pair{min-width:0;display:flex;flex-direction:column;gap:3px}.annual-rail{display:block;height:5px;background:var(--orange);border-radius:0 5px 5px 0;animation:theme-meter-fill 1s ease-out both;transform-origin:left}
+.annual-rail.received{background:#588a74}.annual-rail.negative{background:#c45261}
+.mix-orbit{position:relative;width:180px;max-width:65%;margin:10px auto 20px}.mix-orbit svg{width:100%;display:block}
+.mix-arc{fill:none;stroke-width:13;animation:theme-area-in 1.1s ease-out both}
+.mix-orbit>strong{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:28px;color:var(--ink)}
+.mix-orbit small{font-size:10px;color:var(--muted);font-weight:400}
+.theme-chart .chart-blue{background:var(--chart-accent)}.theme-chart .chart-green{background:var(--chart-secondary)}
+.theme-chart .chart-axis{fill:var(--muted)}.theme-chart .chart-guide{stroke:var(--line)}
+/* Deep instrument dashboard */
+body[data-theme=neon]{--orange:#6ce7cc;--orange-dark:#3ab69b;--orange-light:#163d3c;--ink:#e1f4f0;--muted:#9bb9bf;--bg:#091820;--line:#29414a;--green:#79ddc0;--white:#10242e;color:var(--ink);background:radial-gradient(ellipse at 100% 0,#1d4249 0,transparent 55%),#091820}
+body[data-theme=neon] .workspace{background:transparent}
+body[data-theme=neon] :is(.panel,.modal,.choice-sheet,.choice-card,.sidebar,.month-pay-card,.calendar-summary,.calendar-policy,.period-banner,.today-insight,.ledger-overview){background:#102630;border-color:#294650;color:var(--ink);border-radius:11px;box-shadow:0 0 0 1px #56b4a408}
+body[data-theme=neon] :is(h1,h2,h3,.page-title,.setting-text strong,.ledger-info strong,.pay-card-title strong,.employment-year strong,.setting-value,.chart-topline strong,.chart-key-values strong,.employment-metrics strong,.record-type-row strong,.profile-company,.choice-title,.metric-total){color:#e1f4f0}
+body[data-theme=neon] :is(.muted,.hello,.setting-text p,.field-note,.chart-caption,.employment-year small,.employment-year span,.employment-metrics span,.ring-label span,.record-type-row span,.record-type-row small,.chart-legend,.calendar-hint,.ledger-info>span,.ledger-info>p,.pay-card-foot,.page-foot){color:#9bb9bf}
+body[data-theme=neon] .balance-hero{background:linear-gradient(130deg,#16454a,#102c38);border:1px solid #3c8b85;border-radius:10px;box-shadow:inset 4px 0 #6ce7cc}
+body[data-theme=neon] .balance-primary strong{color:#afffe9;text-shadow:0 0 25px #6ce7cc26}
+body[data-theme=neon] .profile-card{background:linear-gradient(120deg,#103b3c,#183344);border-radius:10px;border:1px solid #43736e}
+body[data-theme=neon] :is(.month-account,.calendar-panel){border-top:2px solid #65cbb7}
+body[data-theme=neon] .view-home{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+body[data-theme=neon] .view-home>*{grid-column:1/-1;margin:0}
+body[data-theme=neon] .view-home>.record-hub{grid-row:2}
+body[data-theme=neon] .view-home>.today-insight{grid-row:3}
+body[data-theme=neon] .quick-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+body[data-theme=neon] .quick-action>span{background:#1b4149;color:#8aedd6;border:1px solid #37616a;border-radius:8px}
+body[data-theme=neon] :is(.bottom-nav,.topbar,.calendar-panel-header){background:#102630f5;border-color:#294650}
+body[data-theme=neon] .bottom-nav{left:0;right:0;bottom:0;max-width:100%;border-radius:0;border-top:1px solid #43746e;box-shadow:none;height:calc(64px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom)}
+body[data-theme=neon] .bottom-nav>button.active{background:#1a403f;color:#afffe9}
+body[data-theme=neon] .bottom-nav>button.active svg{color:#6ce7cc}
+body[data-theme=neon] .record-launcher{bottom:calc(6px + env(safe-area-inset-bottom))}
+body[data-theme=neon] .record-plus{background:#28665f;outline-color:#102630;color:#afffe9;border-radius:9px}
+body[data-theme=neon] :is(.setting-icon,.accrual-chip,.filter,.select-trigger,.field input,.field select,.field textarea,.detail-tabs,.profile-chart-switch,.month-option,.notice,.record-year-option){background:#15313a;border-color:#35505a;color:#b5ddd5}
+body[data-theme=neon] :is(.filter.active,.detail-tabs button.active,.record-year-option[aria-pressed=true]){background:#6ce7cc;color:#102b2a}
+body[data-theme=neon] .calendar-day{color:#d5eae5;background:#102630;border-color:transparent}
+body[data-theme=neon] .calendar-day.today{background:#18443f;border-color:#7cddc3;box-shadow:inset 0 0 0 1px #7cddc3;color:#c5ffed}
+body[data-theme=neon] .calendar-day small{color:#9fb4bf}
+body[data-theme=neon] .calendar-day :is(.wage-income){color:#7ce4b6}
+body[data-theme=neon] .calendar-day :is(.wage-loss){color:#ff9aa6}
+body[data-theme=neon] .calendar-day :is(.wage-neutral){color:#a1b3ba}
+body[data-theme=neon] .theme-chart{--chart-accent:#6ce7cc;--chart-secondary:#b1a0ee;--chart-track:#26434b}
+body[data-theme=neon] .theme-gauge .theme-stroke{filter:drop-shadow(0 0 4px #6ce7cc60)}
+body[data-theme=neon] :is(.chart-key-values button,.employment-metrics>div,.record-type-row,.setting-row){border-color:#294650}
+body[data-theme=neon] .theme-option{background:#15313a;border-color:#36515a;color:#dcf2ed}
+body[data-theme=neon] :is(.theme-description,.theme-tag,.theme-features,.theme-selected){color:#abc9ca}
+/* Cream paper ledger: a single-column journal with receipt rules. */
+body[data-theme=paper]{--orange:#9f5938;--orange-dark:#79432b;--orange-light:#f3e4d4;--ink:#44392f;--muted:#796f60;--bg:#f3ecdf;--line:#dfd0b9;--green:#48715a;color:var(--ink);background:repeating-linear-gradient(0deg,#a38c6c08 0 1px,transparent 1px 28px),#f3ecdf}
+body[data-theme=paper] .workspace{background:transparent}
+body[data-theme=paper] :is(.panel,.modal,.choice-sheet,.choice-card,.sidebar,.month-pay-card,.calendar-summary,.calendar-policy,.period-banner,.today-insight){background:#fffbf2;border:1px solid #dfd0b9;border-radius:4px;box-shadow:3px 4px 0 #d5c3a431}
+body[data-theme=paper] :is(h1,h2,h3,.page-title,.setting-text strong,.setting-value,.chart-topline strong,.employment-metrics strong,.employment-year strong,.chart-key-values strong,.ledger-main-metric strong,.ledger-secondary strong,.ledger-info strong){color:#44392f}
+body[data-theme=paper] .balance-hero{background:#fffbf2;border:1px solid #c9b695;border-radius:3px;box-shadow:4px 6px 0 #d5c3a44d}
+body[data-theme=paper] :is(.balance-primary strong,.balance-label,.balance-eyebrow,.balance-heading>button,.balance-caption,.hero-data-strip strong){color:#614735;text-shadow:none}
+body[data-theme=paper] .hero-data-strip{background:#f3e8d6;border-top:1px dashed #ba9b7a}
+body[data-theme=paper] .profile-card{background:#efe0c7;border:1px solid #cbb697;border-radius:3px;color:#5a4334}
+body[data-theme=paper] :is(.profile-company,.profile-label,.profile-join,.profile-meta>button,.profile-edit){color:#604833}
+body[data-theme=paper] .view-home{display:flex;flex-direction:column;gap:16px}
+body[data-theme=paper] .view-home>*{margin-top:0;margin-bottom:0}
+body[data-theme=paper] .view-home>.settlement-chart{order:1}
+body[data-theme=paper] .account-components{grid-template-columns:minmax(0,1fr);gap:0}
+body[data-theme=paper] .component{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px 0!important;border-bottom:1px dashed #d9c7ac}
+body[data-theme=paper] .component>strong{margin:0;font-size:18px}
+body[data-theme=paper] .month-account-head{border-bottom:2px solid #6e5943}
+body[data-theme=paper] .quick-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+body[data-theme=paper] .quick-action>span{background:#f1e5d3;color:#8e5435;border-radius:3px}
+body[data-theme=paper] :is(.calendar-panel-header,.topbar){background:#f9f2e6}
+body[data-theme=paper] .calendar-day.today{background:#ede0c7;color:#71482c;border-color:#b58e64;box-shadow:none}
+body[data-theme=paper] .calendar-day small{color:#7c715f}
+body[data-theme=paper] .calendar-day .wage-income{color:#376848}
+body[data-theme=paper] .calendar-day .wage-loss{color:#b3323f}
+body[data-theme=paper] .calendar-day .wage-neutral{color:#796f60}
+body[data-theme=paper] .bottom-nav{background:#fffbf2;border-color:#d7c3a3;border-radius:4px;box-shadow:3px 4px 0 #d5c3a454}
+body[data-theme=paper] .bottom-nav>button.active{background:#efe2cd;color:#8e4d30;border-radius:3px}
+body[data-theme=paper] .bottom-nav>button.active svg{color:#8e4d30}
+body[data-theme=paper] .record-plus{background:#a26645;outline-color:#fffbf2;border-radius:4px}
+body[data-theme=paper] :is(.setting-icon,.accrual-chip,.filter,.profile-chart-switch,.select-trigger){background:#f2e6d3;border-color:#d7c5aa;color:#765336;border-radius:4px}
+body[data-theme=paper] .employment-metrics{grid-template-columns:2fr 1fr 1fr}.employment-metrics>div{min-width:0}
+body[data-theme=paper] .employment-metrics>div:first-child strong{font-size:34px}
+body[data-theme=paper] .theme-chart{--chart-accent:#a36643;--chart-secondary:#527f66}
+body[data-theme=paper] .record-type-track{height:5px;border-radius:0}
+body[data-theme=paper] .record-type-fill{position:relative;border-radius:0}
+body[data-theme=paper] .record-type-fill:after{content:'';position:absolute;right:0;top:-2px;width:9px;height:9px;border-radius:50%;background:inherit}
+/* Sage breathing garden: offset cards and orbital/area plots. */
+body[data-theme=forest]{--orange:#3c7956;--orange-dark:#28583c;--orange-light:#e5efdf;--ink:#294b38;--muted:#667c69;--bg:#edf3e9;--line:#d4e1cc;--green:#3e805b;color:var(--ink);background:radial-gradient(ellipse at 0 0,#d9e9d1,transparent 60%),#edf3e9}
+body[data-theme=forest] .workspace{background:transparent}
+body[data-theme=forest] :is(.panel,.modal,.choice-sheet,.choice-card,.sidebar,.month-pay-card,.calendar-summary,.calendar-policy,.period-banner,.today-insight){background:#fcfff9;border-color:#d4e1cc;color:#294b38;border-radius:28px 10px 28px 10px;box-shadow:0 7px 22px #476a4610}
+body[data-theme=forest] :is(h1,h2,h3,.page-title,.setting-text strong,.setting-value,.chart-topline strong,.employment-metrics strong,.employment-year strong,.chart-key-values strong,.ledger-main-metric strong,.ledger-secondary strong,.ledger-info strong){color:#294b38}
+body[data-theme=forest] .balance-hero{background:linear-gradient(125deg,#356746,#6a956d);border:0;border-radius:32px 9px 32px 9px;box-shadow:0 12px 25px #476a4620}
+body[data-theme=forest] .profile-card{background:linear-gradient(125deg,#3d6d4b,#7a9e75);border-radius:32px 9px 32px 9px}
+body[data-theme=forest] .view-home{display:flex;flex-direction:column;gap:18px}
+body[data-theme=forest] .view-home>*{margin-top:0;margin-bottom:0}
+body[data-theme=forest] .view-home>.balance-hero{order:-3}
+body[data-theme=forest] .view-home>.today-insight{order:-2;margin-left:18px}
+body[data-theme=forest] .view-home>.record-hub{order:-1;margin-right:18px}
+body[data-theme=forest] .account-components{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+body[data-theme=forest] .component{padding:0!important;border:0!important}.component{min-width:0}
+body[data-theme=forest] .component>span{font-size:10px;display:block}
+body[data-theme=forest] .component>span svg{display:none}
+body[data-theme=forest] .component>strong{font-size:16px;overflow-wrap:anywhere}
+body[data-theme=forest] .quick-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+body[data-theme=forest] .quick-action>span{border-radius:50%;background:#e4efdc;color:#487a4e}
+body[data-theme=forest] :is(.topbar,.calendar-panel-header){background:#f2f7ed}
+body[data-theme=forest] .calendar-day.today{background:#e0edda;color:#386044;border-color:#79a66e;box-shadow:inset 0 0 0 1px #79a66e}
+body[data-theme=forest] .calendar-day small{color:#5c745c}
+body[data-theme=forest] .calendar-day .wage-income{color:#236b40}
+body[data-theme=forest] .calendar-day .wage-loss{color:#b23140}
+body[data-theme=forest] .calendar-day .wage-neutral{color:#687868}
+body[data-theme=forest] .bottom-nav{background:#fcfff9;border-color:#cddfc3;border-radius:34px;box-shadow:0 8px 25px #466f4021}
+body[data-theme=forest] .bottom-nav>button.active{background:#e2efd9;border-radius:22px;color:#386d48}
+body[data-theme=forest] .bottom-nav>button.active svg{color:#386d48}
+body[data-theme=forest] .record-plus{background:#537e4f;outline-color:#fcfff9;border-radius:50%}
+body[data-theme=forest] :is(.setting-icon,.accrual-chip,.filter,.profile-chart-switch,.select-trigger){background:#e9f1e3;border-color:#cddfc3;color:#426e4b}
+body[data-theme=forest] .theme-chart{--chart-accent:#548956;--chart-secondary:#a0824e}
+body[data-theme=forest] .view-settings>.profile-chart-panel{margin-left:12px}
+body[data-theme=forest] .theme-orbit{animation:theme-breathe 5s ease-in-out infinite}
+/* Shared bounds and accessible motion. */
+body[data-theme] .theme-chart .section-header{flex-wrap:wrap;gap:6px}
+body[data-theme] .theme-chart .section-header>.muted{font-size:10px}
+body[data-theme] .profile-chart-switch{min-height:40px}
+body[data-theme] .theme-chart .employment-progress{flex-wrap:wrap;justify-content:center}
+body[data-theme] .theme-chart .employment-year{min-width:120px}
+body[data-theme] .theme-chart .employment-metrics strong{overflow-wrap:anywhere}
+@media(max-width:380px){.theme-settlement{gap:10px;flex-wrap:wrap}.theme-settlement>.chart-key-values{flex-basis:100%}.paper-receipt{width:100%}.theme-options{gap:8px}.theme-option{padding:10px}.theme-option[aria-pressed=true]{padding:9px}.theme-option-heading{align-items:flex-start;flex-direction:column}.theme-gauge{width:165px}.theme-orbit{width:140px}.annual-rails>div{grid-template-columns:22px minmax(0,1fr);gap:5px}.annual-rails small{grid-column:2}.wage-heatmap{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@keyframes theme-chart-draw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+@keyframes theme-meter-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes theme-area-in{from{opacity:0}to{opacity:1}}
+.theme-area{animation-name:theme-area-fill}
+@keyframes theme-area-fill{from{opacity:0}to{opacity:.14}}
+@keyframes theme-stem-rise{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes theme-orbit-turn{to{transform:rotate(360deg)}}
+@keyframes theme-breathe{50%{transform:scale(.975);opacity:.88}}
+body.motion-off *,body.motion-off *:before,body.motion-off *:after{animation:none!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+
+/* Keep legacy label and metric selectors legible on the dark dashboard. */
+body[data-theme=neon] :is(.component>strong,.month-account-head>button:first-child>strong,.month-account-foot strong,.ledger-main-metric>strong,.annual-metrics strong,.today-insight>b,.period-component-list strong,.metric-row b,.metric-total){color:#ddf6ee}
+body[data-theme=neon] .component.positive>strong{color:#86e8c5}
+body[data-theme=neon] .component.negative>strong{color:#ff9eab}
+body[data-theme=neon] :is(.component>span,.month-account-head>button>span,.month-account-foot>button>span,.today-insight strong,.annual-metrics>button>span,.chart-topline>span,.ledger-secondary>button>span,.field label,.modal-body .field label,.record-hub .link,.theme-intro){color:#b1c9cf}
+body[data-theme=neon] :is(.modal-v2 .modal-header h2,.choice-header h3,.metric-title){color:#e1f4f0}
+body[data-theme=neon] :is(.modal-footer,.choice-header,.modal-header){background:#102630;border-color:#294650}
+
+.data-chart .chart-number{display:inline;font:inherit;line-height:inherit;color:inherit;white-space:nowrap;margin:0;padding:0}
+
+.annual-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:12px 0}.annual-totals>div{min-width:0}.annual-totals>div>span{font-size:10px;color:var(--muted)}.annual-totals strong{display:block;font-size:17px!important;overflow-wrap:anywhere;margin-top:4px}
+
+body[data-theme=neon] .calendar-day.today .day-wage.wage-income{color:#7ce4b6}
+body[data-theme=neon] .calendar-day.today .day-wage.wage-loss{color:#ff9aa6}
+body[data-theme=neon] .calendar-day.today .day-wage.wage-neutral{color:#a1b3ba}
+
+.profile-chart-panel,.profile-chart-panel *{touch-action:pan-y pinch-zoom}
+
+/* SVG viewBox determines the chart's height instead of the app icon default. */
+.theme-gauge>svg{display:block;width:100%;height:auto;aspect-ratio:240/142}
+.theme-orbit>svg,.mix-orbit>svg{display:block;width:100%;height:auto;aspect-ratio:1}
+body[data-theme=neon] .quick-action>strong{color:#bbddd5}
+body[data-theme=neon] .record-launcher{color:#b1c9cf}
+body[data-theme=neon] .cloud-button{background:#16353f;color:#b8e4d8;border-color:#355b62;box-shadow:none}
+body[data-theme=paper] .balance-hero .balance-heading>button,
+body[data-theme=paper] .balance-hero .balance-caption>button,
+body[data-theme=paper] .balance-hero .balance-primary>strong>small{color:#765336}
+body[data-theme=paper] .balance-hero .hero-data-strip>button>span,
+body[data-theme=paper] .balance-hero .hero-data-strip>button>span small{color:#786750}
+body[data-theme=paper] .balance-hero .balance-label>small{color:#7d6c55;background:#eee0ca}
+body[data-theme=neon] .modal-v2 .modal-header,
+body[data-theme=paper] .modal-v2 .modal-header,
+body[data-theme=forest] .modal-v2 .modal-header{min-height:90px;padding-bottom:16px;overflow:visible}
+body[data-theme=neon] .modal-v2 .modal-actions.modal-footer{background:#102630;border-color:#294650}
+body[data-theme=paper] .modal-v2 .modal-header,
+body[data-theme=paper] .modal-v2 .modal-actions.modal-footer{background:#fffbf2;border-color:#dfd0b9}
+body[data-theme=forest] .modal-v2 .modal-header,
+body[data-theme=forest] .modal-v2 .modal-actions.modal-footer{background:#fcfff9;border-color:#d4e1cc}
+body[data-theme=neon] .modal-footer>.btn-primary{background:#6ce7cc;color:#102b2a;box-shadow:none}
+body[data-theme=paper] .modal-footer>.btn-primary{background:#9f5938;color:#fff;box-shadow:none}
+body[data-theme=forest] .modal-footer>.btn-primary{background:#3c7956;color:#fff;box-shadow:none}
+
+.balance-hero .hero-startup-glare{position:absolute;inset:-12%;z-index:6;pointer-events:none;display:block;background:linear-gradient(135deg,transparent 34%,rgba(255,255,255,.12)42%,rgba(255,255,255,.88)49%,rgba(255,255,255,.98)50%,rgba(255,255,255,.78)52%,rgba(255,255,255,.13)60%,transparent 68%);mix-blend-mode:screen;filter:blur(.3px);will-change:transform,opacity;transform:translate3d(-105%,-105%,0);opacity:0}
