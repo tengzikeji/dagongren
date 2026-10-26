@@ -46,7 +46,7 @@ public class AppSmokeTest {
             Thread.sleep(150);
         }
         screenshot("condition-failed");
-        String details=evaluate(scenario,"JSON.stringify({view:document.querySelector('.bottom-nav [aria-current=page]')?.dataset.view,classes:document.getElementById('app').className,pointers:window.__pointerEvents,swipe:window.__lastSwipeTarget,viewport:[innerWidth,innerHeight,visualViewport.height],keyboard:document.body.classList.contains('keyboard-open'),focused:document.activeElement.id,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,motion:JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion,introAllowed:AndroidFiles.shouldPlayIntro(),rects:['.modal','.modal-body','.modal-footer','#company-name'].map(s=>{const e=document.querySelector(s);return e?{s,top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom}:null})})");
+        String details=evaluate(scenario,"JSON.stringify({view:document.querySelector('.bottom-nav [aria-current=page]')?.dataset.view,classes:document.getElementById('app').className,modal:document.getElementById('modal-title')?.textContent,forms:[...document.querySelectorAll('#modal-root form')].map(f=>f.id),pointers:window.__pointerEvents,swipe:window.__lastSwipeTarget,viewport:[innerWidth,innerHeight,visualViewport.height],keyboard:document.body.classList.contains('keyboard-open'),focused:document.activeElement.id,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,motion:JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion,introAllowed:AndroidFiles.shouldPlayIntro(),rects:['.modal','.modal-body','.modal-footer','#company-name'].map(s=>{const e=document.querySelector(s);return e?{s,top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom}:null})})");
         fail("Condition did not become true: "+script+"; last result: "+last+"; "+details);
     }
     private void waitReady(ActivityScenario<MainActivity> scenario) throws Exception {
@@ -153,12 +153,12 @@ public class AppSmokeTest {
             for(String main:new String[]{"home","calendar","records","settings"}){
                 evaluate(scenario,"document.querySelector('[data-view="+main+"]').click();document.querySelector('[data-action=record-entry]').click();document.querySelector('[data-kind=subsidy]').click();document.getElementById('adjustment-note').value='保留上层草稿';document.querySelector('.select-trigger').click()");
                 waitTrue(scenario,"Boolean(document.querySelector('.choice-sheet'))");
-                device.pressBack();
+                awaitInputWindow(scenario);assertTrue("System Back input was not delivered",device.pressBack());
                 waitTrue(scenario,"!document.querySelector('.choice-sheet')&&Boolean(document.getElementById('subsidy-form'))");
                 assertEquals("\"保留上层草稿\"",evaluate(scenario,"document.getElementById('adjustment-note').value"));
                 evaluate(scenario,"document.querySelector('.modal-back').click()");
                 waitTrue(scenario,"document.getElementById('modal-title').textContent==='记一笔'");
-                device.pressBack();
+                awaitInputWindow(scenario);assertTrue("System Back input was not delivered",device.pressBack());
                 waitTrue(scenario,"!document.querySelector('.modal')&&!document.getElementById('app').inert");
                 assertEquals("\""+main+"\"",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view"));
                 evaluate(scenario,"document.querySelector('[data-action=record-entry]').click();document.querySelector('[data-kind=subsidy]').click();document.querySelector('.select-trigger').click();document.querySelector('.choice-close').click()");
@@ -166,13 +166,13 @@ public class AppSmokeTest {
                 assertEquals("\""+main+"\"",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view"));
             }
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-view=sync]').click();document.querySelector('[data-action=connection-settings]').click()");
-            device.pressBack();waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.sync-hero'))");
-            device.pressBack();waitTrue(scenario,"Boolean(document.querySelector('.profile-card'))");
+            awaitInputWindow(scenario);assertTrue("System Back input was not delivered",device.pressBack());waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.sync-hero'))");
+            awaitInputWindow(scenario);assertTrue("System Back input was not delivered",device.pressBack());waitTrue(scenario,"Boolean(document.querySelector('.profile-card'))");
             evaluate(scenario,"document.querySelector('[data-view=sync]').click();document.querySelector('[data-action=connection-settings]').click();document.querySelector('.modal-close').click()");
             waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.profile-card'))");
             evaluate(scenario,"document.querySelector('[data-action=open-cleanup]').click();document.querySelector('[data-action=review-cleanup]').click()");
             assertEquals("\"确认清理\"",evaluate(scenario,"document.querySelector('[data-action=confirm-cleanup]').textContent"));
-            device.pressBack();waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.cleanup-panel'))");
+            awaitInputWindow(scenario);assertTrue("System Back input was not delivered",device.pressBack());waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.cleanup-panel'))");
             evaluate(scenario,"document.querySelector('[data-action=review-cleanup]').click();document.querySelector('.modal-close').click()");
             waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.profile-card'))");
             paintedScreenshot(scenario,"menus-return-profile");
@@ -370,10 +370,30 @@ public class AppSmokeTest {
     private void swipeCalendar(ActivityScenario<MainActivity> scenario,int direction) throws Exception {
         swipeRegion(scenario,".calendar-days",direction);
     }
+    private void awaitInputWindow(ActivityScenario<MainActivity> scenario) throws Exception {
+        UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        String expected=InstrumentationRegistry.getInstrumentation().getTargetContext().getPackageName();
+        long deadline=System.currentTimeMillis()+15000;
+        while(System.currentTimeMillis()<deadline){
+            java.util.concurrent.atomic.AtomicBoolean focused=new java.util.concurrent.atomic.AtomicBoolean(false);
+            withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);focused.set(activity.hasWindowFocus()&&web.hasWindowFocus()&&web.isShown());});
+            if(focused.get()&&expected.equals(device.getCurrentPackageName())){
+                CountDownLatch frame=new CountDownLatch(1);
+                withActivity(activity->((WebView)activity.findViewById(R.id.web_view)).postVisualStateCallback(2,new WebView.VisualStateCallback(){@Override public void onComplete(long requestId){frame.countDown();}}));
+                if(frame.await(8,TimeUnit.SECONDS)){
+                    device.waitForIdle(1000);
+                    if(expected.equals(device.getCurrentPackageName()))return;
+                }
+            }
+            Thread.sleep(100);
+        }
+        fail("Application window did not become ready for native input; active package="+device.getCurrentPackageName());
+    }
+
     private void swipeRegion(ActivityScenario<MainActivity> scenario,String selector,int direction) throws Exception {
         waitTrue(scenario,"Boolean(document.querySelector('"+selector+"'))");
         evaluate(scenario,"document.querySelector('"+selector+"').scrollIntoView({block:'center',behavior:'instant'})");
-        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).waitForIdle(1000);
+        awaitInputWindow(scenario);
         Thread.sleep(250);
         evaluate(scenario,"window.__pointerEvents=[];if(!window.__pointerEventsInstalled){window.__pointerEventsInstalled=true;for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])document.addEventListener(type,e=>{if(window.__pointerEvents.length<80)window.__pointerEvents.push({type:e.type,x:e.clientX,y:e.clientY,t:e.timeStamp,target:e.target.tagName});},true);}");
         JSONObject rect=new JSONObject(new org.json.JSONTokener(evaluate(scenario,"JSON.stringify((()=>{const node=document.querySelector('"+selector+"'),r=node.getBoundingClientRect(),header=node.closest('[data-calendar-swipe]')?.querySelector('.calendar-panel-header')?.getBoundingClientRect(),top=Math.max(8,r.top,header?.bottom||0),bottom=Math.min(r.bottom,visualViewport.height-100);if(bottom-top<8)throw Error('Swipe region is outside visible page');return window.__lastSwipeTarget={left:Math.max(12,r.left),top,width:Math.min(r.right,innerWidth-12)-Math.max(12,r.left),bottom,y:top+(bottom-top)*.6}})())")).nextValue().toString());
