@@ -115,7 +115,7 @@ jobs:
                           print((failure.text or '')[:12000])
               except Exception:
                   pass
-          wanted = ['charts-home', 'charts-records', 'charts-profile', 'charts-calendar', 'calendar-four-weeks', 'calendar-five-weeks', 'calendar-six-weeks', 'cleanup-cloud-option']
+          wanted = ['charts-home', 'charts-records', 'charts-profile', 'charts-profile-records', 'charts-calendar', 'calendar-four-weeks', 'calendar-five-weeks', 'calendar-six-weeks', 'cleanup-cloud-option']
           root = Path('android/app/build/reports')
           found = []
           for name in wanted:

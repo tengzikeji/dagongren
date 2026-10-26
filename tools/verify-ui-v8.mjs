@@ -107,6 +107,6 @@ console.log('Passed: all prior wage, leave, pay-period, cash, sync, cleanup, and
 {
  const ui=boot(fixture);assert.match(ui.el('app').innerHTML,/settlement-chart/);ui.click('nav',{view:'calendar'});
  for(const [month,weeks] of [['2021-02',4],['2024-02',5],['2026-08',6]]){ui.click('choose-month',{month});const html=ui.el('app').innerHTML;assert.ok(html.includes('data-weeks="'+weeks+'"'));assert.equal([...html.matchAll(/class="calendar-day /g)].length,weeks*7);}
- ui.click('choose-month',{month:'2026-10'});assert.match(ui.el('app').innerHTML,/daily-chart/);ui.click('nav',{view:'records'});assert.match(ui.el('app').innerHTML,/annual-chart/);ui.click('nav',{view:'settings'});assert.match(ui.el('app').innerHTML,/record-mix-chart/);
+ ui.click('choose-month',{month:'2026-10'});assert.match(ui.el('app').innerHTML,/daily-chart/);ui.click('nav',{view:'records'});assert.match(ui.el('app').innerHTML,/annual-chart/);ui.click('nav',{view:'settings'});assert.match(ui.el('app').innerHTML,/record-mix-chart/);assert.match(ui.el('app').innerHTML,/employment-chart/);assert.match(ui.el('app').innerHTML,/入职天数/);assert.match(ui.el('app').innerHTML,/已满月数/);assert.match(ui.el('app').innerHTML,/已满年数/);
  ui.click('metric',{metric:'rate',scope:'month',ref:'2026-10'});assert.match(ui.el('modal-root').innerHTML,/30天/);assert.match(ui.el('modal-root').innerHTML,/31天/);assert.doesNotMatch(ui.el('modal-root').innerHTML,/跨月日薪仍分别按各自然月/);
 }

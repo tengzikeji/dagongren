@@ -126,3 +126,26 @@
 .chart-topline strong>small{font-size:12px}
 .motion-off .mix-segment{animation:none!important}
 @media(prefers-reduced-motion:reduce){.mix-segment{animation:none!important}}
+
+.employment-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:4px 0 18px;border-bottom:1px solid #edf1f7}
+.employment-metrics>div{display:flex;flex-direction:column;gap:9px;min-width:0;padding-left:12px;border-left:1px solid #edf1f7}
+.employment-metrics>div:first-child{padding-left:0;border:0}
+.employment-metrics span{font-size:10px;color:#8594a9}
+.employment-metrics strong{font-size:22px;color:#29476d;font-variant-numeric:tabular-nums;white-space:nowrap}
+.employment-metrics small{font-size:10px;font-weight:400;color:#8c9bb0;margin-left:3px}
+.employment-progress{display:flex;align-items:center;gap:22px;margin-top:16px}
+.employment-chart .chart-ring-fill{stroke:#5c9d9a}
+.employment-chart .ring-label strong{font-size:22px}
+.employment-chart .ring-label>span{font-size:9px}
+.employment-year{display:flex;flex-direction:column;gap:6px;color:#7488a2;font-size:11px;min-width:0}
+.employment-year>strong{font-size:14px;color:#344f71}
+.employment-year p{margin:0;font-size:11px;line-height:1.6}.employment-year b{color:#368f87}
+.employment-year>small{font-size:10px;color:#91a0b2}
+.record-mix-legend>.record-type-row{display:block;min-width:0}
+.record-type-row>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.record-type-track{height:5px;background:#edf2f8;margin-top:7px;border-radius:4px;overflow:hidden}
+.record-type-track .record-type-fill{display:block;height:100%;width:0;border-radius:4px;animation:record-type-grow .7s ease-out both;transform-origin:left}
+@keyframes record-type-grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.motion-off .record-type-fill{animation:none!important}
+@media(prefers-reduced-motion:reduce){.record-type-fill{animation:none!important}}
+@media(max-width:360px){.employment-metrics strong{font-size:20px}.employment-progress{gap:16px}.employment-year p{font-size:10px}}

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {calculateBook,payPeriodForDate,salaryRateForDate,daysInMonth,shiftMonth,shiftDay} from '../dist/payroll.js';
-import {settlementChart,dailyWageChart,annualWageChart,recordMixChart} from '../dist/charts.js';
+import {settlementChart,dailyWageChart,annualWageChart,recordMixChart,employmentStats,employmentChart} from '../dist/charts.js';
 const salary=600001;
 const settings={company:'周期测试',salaryCents:salary,joinDate:'2023-01-01',periodMode:'custom',periodStartDay:21,payday:15};
 const record=joinDate=>({...settings,joinDate,leaves:[],overtime:[],payments:[],advances:[],subsidies:[],deductions:[]});
@@ -46,4 +46,20 @@ test('图表空数据不出现无效比例，负计薪单独显示，图表金�
 test('我的页逐笔分布统计六类记录，兼容旧版发工资且清理后更新',()=>{
  const r=record('2026-09-21');r.leaves=[{id:'l'}];r.overtime=[{id:'o'}];r.subsidies=[{id:'s'}];r.deductions=[{id:'d'}];r.advances=[{id:'a'}];r.payment={amountCents:1,date:'2026-10-01'};
  const html=recordMixChart({'2026-10':r});assert.equal([...html.matchAll(/data-count="(\d+)"/g)].reduce((n,x)=>n+Number(x[1]),0),6);assert.equal([...html.matchAll(/class="mix-segment"/g)].length,6);assert.match(html,/发工资/);assert.doesNotMatch(recordMixChart({}),/NaN|Infinity|undefined/);assert.match(recordMixChart({}),/暂无逐笔记录/);
+});
+
+test('入职当天计一天，整月和整年按对应入职日计算',()=>{
+ let value=employmentStats('2026-09-21','2026-09-21');assert.equal(value.days,1);assert.equal(value.months,0);assert.equal(value.years,0);assert.equal(value.progress,0);
+ value=employmentStats('2026-09-21','2026-10-20');assert.equal(value.days,30);assert.equal(value.months,0);
+ value=employmentStats('2026-09-21','2026-10-21');assert.equal(value.days,31);assert.equal(value.months,1);
+ value=employmentStats('2025-09-21','2026-09-21');assert.equal(value.years,1);assert.equal(value.months,12);assert.equal(value.elapsed,0);assert.equal(value.remaining,365);
+});
+test('工龄覆盖闰年入职和月底入职，不按30天或365天近似折算月年',()=>{
+ for(const [join,date,months,years] of [['2023-01-31','2023-02-28',1,0],['2024-01-31','2024-02-29',1,0],['2024-02-29','2025-02-27',11,0],['2024-02-29','2025-02-28',12,1],['2024-02-29','2028-02-28',47,3],['2024-02-29','2028-02-29',48,4]]){
+  const value=employmentStats(join,date);assert.equal(value.months,months);assert.equal(value.years,years);assert.ok(value.progress>=0&&value.progress<100);assert.ok(value.yearDays===365||value.yearDays===366);
+ }
+});
+test('未来入职不显示负工龄，工龄和记录数量分别展示',()=>{
+ const value=employmentStats('2026-10-28','2026-10-26');assert.equal(value.days,0);assert.equal(value.months,0);assert.equal(value.years,0);assert.equal(value.untilJoin,2);
+ const html=employmentChart('2026-09-21','2026-10-26');for(const word of ['入职天数','已满月数','已满年数','本入职年进度','下次周年'])assert.ok(html.includes(word));assert.doesNotMatch(html,/NaN|Infinity|undefined/);assert.match(employmentChart('2026-10-28','2026-10-26'),/距入职还有 2 天/);
 });
