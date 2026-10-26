@@ -63,8 +63,9 @@ test('图表金额、百分比、工龄与数量独立标记，日期和刻度�
 test('每套主题的数据数值均可统一滚动，不改变最终文本或把日期当金额',()=>{
  const months={'2026-10':{leaves:[{}],overtime:[],subsidies:[],deductions:[],advances:[],payments:[]}},strip=html=>html.replace(/<[^>]*>/g,'');
  for(const {id} of themeCatalog()){
-  for(const raw of [settlementChart({receivedCents:20000,unappliedCents:0,remainingCents:40000},id),employmentChart('2024-01-01','2026-10-26',id),recordMixChart(months,id),dailyWageChart('2026-10',[{date:'2026-10-01',amountCents:12345}],12345,id)]){
+  for(const raw of [settlementChart({receivedCents:20000,unappliedCents:0,remainingCents:40000},id),employmentChart('2024-01-01','2026-10-26',id),employmentChart('2026-12-01','2026-10-26',id),recordMixChart(months,id),dailyWageChart('2026-10',[{date:'2026-10-01',amountCents:12345}],12345,id)]){
    const html=chartNumberMarkup(raw);assert.match(html,/data-chart-number/);assert.equal(strip(html),strip(raw));
+   if(raw.includes('入职还有'))assert.match(html,/<div class="chart-empty">距(?:离)?入职还有 <span class="number chart-number" data-chart-number>36<\/span> 天/);
   }
  }
 });

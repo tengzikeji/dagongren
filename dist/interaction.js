@@ -42,9 +42,9 @@ export function fitCompanyNames(root){
  }
 }
 export function chartNumberMarkup(markup){
- return markup.replace(/<section\b[^>]*\bdata-chart\b[^>]*>[\s\S]*?<\/section>/g,section=>section.replace(/(<(strong|b|small|span)\b([^>]*)>)([^<]*)/g,(full,opening,tag,attrs,text)=>{
+ return markup.replace(/<section\b[^>]*\bdata-chart\b[^>]*>[\s\S]*?<\/section>/g,section=>section.replace(/(<(strong|b|small|span|div)\b([^>]*)>)([^<]*)/g,(full,opening,tag,attrs,text)=>{
   if(!/\d/.test(text)||/data-chart-number/.test(attrs)||/\d{4}-\d{2}-\d{2}/.test(text))return full;
-  const metric=tag==='strong'||tag==='b'||tag==='small'&&(/\d(?:\.\d+)?%/.test(text)||/\d[\d,]*\.\d{2}\s*\/\s*-?\d/.test(text))||tag==='span'&&/^(已记|已过|今天 · 第|下一次周年 · 还剩)/.test(text);
+  const metric=tag==='strong'||tag==='b'||tag==='small'&&(/\d(?:\.\d+)?%/.test(text)||/\d[\d,]*\.\d{2}\s*\/\s*-?\d/.test(text))||tag==='span'&&/^(已记|已过|今天 · 第|下一次周年 · 还剩)/.test(text)||tag==='div'&&/\bchart-empty\b/.test(attrs)&&/^距(?:离)?入职还有 /.test(text);
   if(!metric)return full;
   return opening+text.replace(/\d[\d,]*(?:\.\d+)?/g,value=>'<span class="number chart-number" data-chart-number>'+value+'</span>');
  }));
