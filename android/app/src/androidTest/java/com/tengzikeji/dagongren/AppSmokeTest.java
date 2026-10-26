@@ -14,10 +14,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.json.JSONObject;
 import org.junit.Test;
+import org.junit.Before;
 import org.junit.runner.RunWith;
 
 @RunWith(AndroidJUnit4.class)
 public class AppSmokeTest {
+    @Before public void enableAnimationTestEnvironment() throws Exception {
+        UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        device.executeShellCommand("settings put global window_animation_scale 1");
+        device.executeShellCommand("settings put global transition_animation_scale 1");
+        device.executeShellCommand("settings put global animator_duration_scale 1");
+    }
     private boolean withActivity(java.util.function.Consumer<MainActivity> action) {
         java.util.concurrent.atomic.AtomicBoolean found=new java.util.concurrent.atomic.AtomicBoolean(false);
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
@@ -72,12 +79,13 @@ public class AppSmokeTest {
         CountDownLatch frame=new CountDownLatch(1);
         withActivity(activity->((WebView)activity.findViewById(R.id.web_view)).postVisualStateCallback(1,new WebView.VisualStateCallback(){@Override public void onComplete(long requestId){frame.countDown();}}));
         assertTrue("WebView frame was not committed",frame.await(10,TimeUnit.SECONDS));
-        Thread.sleep(100);
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).waitForIdle(1000);
+        Thread.sleep(450);
         screenshot(name);
     }
 
     private void selectCalendarMonth(ActivityScenario<MainActivity> scenario,String month) throws Exception {
-        evaluate(scenario,"document.querySelector('[data-action=month-picker]').click();const year=Number('"+month+"'.slice(0,4));for(let n=0;n<25;n++){const current=parseInt(document.querySelector('.month-year span').textContent);if(current===year)break;document.querySelector('[data-action=picker-year][data-delta=\"'+(current>year?'-1':'1')+'\"]').click();}document.querySelector('[data-action=choose-month][data-month=\""+month+"\"]').click()");
+        evaluate(scenario,"document.querySelector('[data-action=month-picker]').click();var targetYear=Number('"+month+"'.slice(0,4));for(let n=0;n<25;n++){const current=parseInt(document.querySelector('.month-year span').textContent);if(current===targetYear)break;document.querySelector('[data-action=picker-year][data-delta=\"'+(current>targetYear?'-1':'1')+'\"]').click();}document.querySelector('[data-action=choose-month][data-month=\""+month+"\"]').click()");
     }
     @Test public void cycleWagesChartsAndAdaptiveCalendarMatchLedger() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
@@ -119,6 +127,7 @@ public class AppSmokeTest {
             paintedScreenshot(scenario,"calendar-six-weeks");
             selectCalendarMonth(scenario,"2026-10");
             waitTrue(scenario,"document.querySelectorAll('.daily-chart .chart-bar').length>0");
+            waitTrue(scenario,"!document.querySelector('.calendar-summary .number-roll-strip')");
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.daily-chart .chart-bar')].reduce((n,e)=>n+Number(e.dataset.amount),0)===Math.round(Number(document.querySelector('.calendar-summary button strong').textContent.replace(/[^0-9.-]/g,''))*100)"));
             evaluate(scenario,"document.querySelector('.daily-chart').scrollIntoView({block:'start'})");
             waitTrue(scenario,"[...document.querySelectorAll('.data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
