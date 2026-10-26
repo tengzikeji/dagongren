@@ -70,6 +70,9 @@ export function renderStable(root,markup,view,motion=true,replayNumbers=false){
  fitCompanyNames(root);
  if(!uiResizeObserver&&typeof ResizeObserver==='function'){uiResizeObserver=new ResizeObserver(entries=>{const width=entries[0]?.contentRect.width;if(width&&width!==uiObservedWidth){uiObservedWidth=width;fitCompanyNames(root);}});uiResizeObserver.observe(root);}
  if(same){window.scrollTo({left:scrollX,top:scrollY,behavior:'instant'});for(const el of root.querySelectorAll('.profile-name-viewport')){const prior=scrolls.find(s=>s.key===uiKey(el,root));if(prior)el.scrollLeft=prior.left;}}
+ uiRollNumbers(root,oldNumbers,same,motion,themeChanged,replayNumbers);
+}
+function uiRollNumbers(root,oldNumbers,same,motion,themeChanged=false,replayNumbers=false){
  if(!motion||root.classList.contains('page-transitioning')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
  for(const node of root.querySelectorAll('.number')){
   const calendarAmount=Boolean(node.closest?.('.calendar-day')&&node.classList.contains('day-wage'));
@@ -245,9 +248,9 @@ export function installPageSwipe(root,api){
   const sticky=outgoing.querySelector('.calendar-panel-header');if(sticky&&stickyRect){sticky.style.position='relative';sticky.style.top='auto';sticky.style.transform='translateY('+(stickyRect.top-sticky.getBoundingClientRect().top)+'px)';}
   const priorVisibility=incoming.style.visibility,duration=trigger==='tap'?200:220;incoming.style.visibility='hidden';
   const push=track.animate([{transform:'translate3d('+offset+'px,0,0)'},{transform:'translate3d('+(-delta*width)+'px,0,0)'}],{duration,easing:'cubic-bezier(.25,.65,.35,1)',fill:'both'});
-  let done=false;const finish=()=>{if(done)return;done=true;layer.remove();incoming.style.visibility=priorVisibility;push.cancel();busy=false;root.classList.remove('page-transitioning');if(uiPageSlideCleanup===finish)uiPageSlideCleanup=null;};uiPageSlideCleanup=finish;
+  let done=false;const finish=(completed=false)=>{if(done)return;done=true;layer.remove();incoming.style.visibility=priorVisibility;push.cancel();busy=false;root.classList.remove('page-transitioning');if(uiPageSlideCleanup===finish)uiPageSlideCleanup=null;if(completed&&trigger==='tap')uiRollNumbers(root,new Map(),false,true);};uiPageSlideCleanup=finish;
   try{performance.mark('dagongren.page.slide',{detail:{from,to,direction:delta,duration,trigger,sharedTrack:true}});}catch{}
-  push.finished.then(finish,finish);
+  push.finished.then(()=>finish(true),()=>finish(false));
  };
  root.addEventListener('pointerdown',event=>{
   if(event.pointerType==='touch'&&event.target.closest?.('.profile-chart-panel'))return;

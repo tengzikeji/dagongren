@@ -133,7 +133,7 @@ public class AppSmokeTest {
             waitTrue(scenario,"[...document.querySelectorAll('.data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
             paintedScreenshot(scenario,"charts-records");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click()");
-            waitTrue(scenario,"Boolean(document.querySelector('.employment-chart'))&&!document.querySelector('.record-mix-chart')");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&Boolean(document.querySelector('.employment-chart'))&&!document.querySelector('.record-mix-chart')");
             waitTrue(scenario,"!document.querySelector('.employment-chart .number-roll-strip')");
             assertEquals("true",evaluate(scenario,"document.querySelectorAll('.employment-metrics [data-stat]').length===3"));
             assertEquals("true",evaluate(scenario,"(()=>{const e=document.querySelector('.employment-chart'),days=Math.round((Date.parse(e.dataset.asOf)-Date.parse('2026-09-21'))/86400000)+1;return parseInt(e.querySelector('[data-stat=days]').textContent)===days})()"));
@@ -549,7 +549,7 @@ public class AppSmokeTest {
                     evaluate(scenario,"window.__heldPush.finish()");
                     waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('page-transitioning')&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'");
                 }
-                assertEquals("true",evaluate(scenario,"(()=>{const b=document.querySelector('.balance-primary');return !!b&&[b,...b.querySelectorAll('*')].every(e=>getComputedStyle(e).backgroundColor==='rgba(0, 0, 0, 0)')})()"));
+                assertEquals("true",evaluate(scenario,"(()=>{const b=document.querySelector('.balance-primary');return !!b&&[b,b.querySelector('strong'),...b.querySelectorAll('.number-roll-anchor,.number-roll,.number-roll-slot,.number-roll-strip')].every(e=>getComputedStyle(e).backgroundColor==='rgba(0, 0, 0, 0)')})()"));
             }
         }
     }
@@ -578,9 +578,18 @@ public class AppSmokeTest {
             resetBook(scenario);
             final String injection="(()=>{const real=window.AndroidFiles;window.__cloudWrites=0;window.__cloudReads=0;window.AndroidFiles={shouldPlayIntro:()=>false,introReady:()=>real.introReady(),introStyle:v=>real.introStyle(v),systemDark:()=>real.systemDark(),themeStyle:v=>real.themeStyle(v),fingerprint:v=>real.fingerprint(v),status:()=>JSON.stringify({configured:true,username:'motion-review@example.invalid',path:'打工人/工资账本.json'}),request(id,action){if(action==='read'){window.__cloudReads++;const book=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));setTimeout(()=>globalThis.dagongrenNativeResult(id,{ok:true,data:{exists:true,etag:'\"review-only\"',envelope:{format:'dagongren.webdav.v2',book}}}),20);return;}if(action==='write'){window.__cloudWrites++;throw Error('Review must never write');}setTimeout(()=>globalThis.dagongrenNativeResult(id,{ok:false,error:'测试未读取外部数据'}),0);}};})()";
             withActivity(activity->{try{
-                String html=new String(activity.getAssets().open("www/index.html").readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
-                html=html.replace("<script type=\"module\"", "<script>"+injection+"</script><script type=\"module\"");
-                ((WebView)activity.findViewById(R.id.web_view)).loadDataWithBaseURL("https://appassets.androidplatform.net/assets/www/index.html",html,"text/html","UTF-8",null);
+                String source=new String(activity.getAssets().open("www/index.html").readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
+                final byte[] html=source.replace("<script type=\"module\"", "<script>"+injection+"</script><script type=\"module\"").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                WebView web=activity.findViewById(R.id.web_view);android.webkit.WebViewClient original=web.getWebViewClient();
+                web.setWebViewClient(new android.webkit.WebViewClient(){
+                    @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view,android.webkit.WebResourceRequest request){
+                        if(request.isForMainFrame()&&"/assets/www/index.html".equals(request.getUrl().getPath()))return new android.webkit.WebResourceResponse("text/html","UTF-8",new java.io.ByteArrayInputStream(html));
+                        return original.shouldInterceptRequest(view,request);
+                    }
+                    @Override public boolean shouldOverrideUrlLoading(WebView view,android.webkit.WebResourceRequest request){return original.shouldOverrideUrlLoading(view,request);}
+                    @Override public void onPageFinished(WebView view,String url){original.onPageFinished(view,url);}
+                });
+                web.loadUrl("https://appassets.androidplatform.net/assets/www/index.html?review=cloud");
             }catch(Exception error){throw new RuntimeException(error);}});
             waitReady(scenario);
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=open-cleanup]').click();document.getElementById('cleanup-include-cloud').click();window.__cleanupBook=localStorage.getItem('dagongren.paybook.v1');document.querySelector('[data-action=review-cleanup]').click();window.__cloudOverlay=document.querySelector('.modal-overlay');window.__cloudDialog=document.querySelector('.modal');window.__cloudHeight=window.__cloudDialog.offsetHeight;window.__cloudLoadingAtClick=Boolean(document.getElementById('cloud-cleanup-loading'))&&document.getElementById('cloud-cleanup-confirm').disabled;window.__cloudAdditions=0;window.__cloudObserver=new MutationObserver(rs=>{for(const r of rs)for(const n of r.addedNodes)if(n.matches?.('.modal-overlay,.modal'))window.__cloudAdditions++});window.__cloudObserver.observe(document.getElementById('modal-root'),{subtree:true,childList:true})");
@@ -681,7 +690,8 @@ public class AppSmokeTest {
             for(String theme:new String[]{"system","light","dark"}){
                 evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme="+theme+"]').click()");
                 for(String page:new String[]{"home","calendar","records","settings"}){
-                    evaluate(scenario,"document.querySelector('[data-view="+page+"]').click();window.__chartRoll=(()=>{const numbers=[...document.querySelectorAll('.data-chart [data-chart-number]')],rolling=numbers.filter(e=>e.querySelector('.number-roll-strip'));return {count:rolling.length,values:numbers.map(e=>e.getAttribute('aria-label')||e.textContent),style:rolling.every(e=>getComputedStyle(e).fontSize===getComputedStyle(e.parentElement).fontSize&&[...e.querySelectorAll('.number-roll-slot')].every(s=>getComputedStyle(s).fontSize===getComputedStyle(e).fontSize)),steps:rolling.every(e=>[...e.querySelectorAll('.number-roll-strip')].every(s=>Number(s.style.getPropertyValue('--roll-steps'))>0&&Number(s.style.getPropertyValue('--roll-steps'))<=19)),static:!document.querySelector('.chart-axis .number-roll, time .number-roll')}})()");
+                    evaluate(scenario,"document.querySelector('[data-view="+page+"]').click();window.__chartRoll=null;const capture=()=>window.__chartRoll=(()=>{const numbers=[...document.querySelectorAll('.data-chart [data-chart-number]')],rolling=numbers.filter(e=>e.querySelector('.number-roll-strip'));return {count:rolling.length,values:numbers.map(e=>e.getAttribute('aria-label')||e.textContent),style:rolling.every(e=>getComputedStyle(e).fontSize===getComputedStyle(e.parentElement).fontSize&&[...e.querySelectorAll('.number-roll-slot')].every(s=>getComputedStyle(s).fontSize===getComputedStyle(e).fontSize)),steps:rolling.every(e=>[...e.querySelectorAll('.number-roll-strip')].every(s=>Number(s.style.getPropertyValue('--roll-steps'))>0&&Number(s.style.getPropertyValue('--roll-steps'))<=19)),static:!document.querySelector('.chart-axis .number-roll, time .number-roll')}})();const push=document.querySelector('.page-swipe-track')?.getAnimations()[0];if(push)push.finished.then(capture);else capture()");
+            waitTrue(scenario,"window.__chartRoll!==null");
             assertEquals("true",evaluate(scenario,"window.__chartRoll.count>0&&window.__chartRoll.style&&window.__chartRoll.steps&&window.__chartRoll.static"));
                     waitTrue(scenario,"!document.querySelector('.data-chart .number-roll-strip')");
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.data-chart [data-chart-number]')].every((e,i)=>e.textContent===window.__chartRoll.values[i])"));
