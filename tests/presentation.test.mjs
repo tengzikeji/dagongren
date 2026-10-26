@@ -124,3 +124,8 @@ test('连续触摸移动每帧只更新一次，取消手势后不留下延迟�
   if(beforeCancel===undefined)delete globalThis.cancelAnimationFrame;else globalThis.cancelAnimationFrame=beforeCancel;
  }
 });
+
+test('导航点击复用主页面推进，跳转方向正确且不干扰弹窗',()=>{
+ const oldWindow=globalThis.window,oldDocument=globalThis.document;let view='home',blocked=false;
+ try{globalThis.window={matchMedia:()=>({matches:true})};globalThis.document={documentElement:{clientWidth:400},body:{classList:{contains:()=>false}}};const f=swipeFixture(),controller=installPageSwipe(f.root,{current:()=>view,blocked:()=>blocked,navigate:next=>view=next});assert.equal(controller.navigate('settings'),true);assert.equal(view,'settings');assert.equal(controller.navigate('home'),true);assert.equal(view,'home');assert.equal(controller.navigate('home'),false);assert.equal(controller.navigate('sync'),false);blocked=true;assert.equal(controller.navigate('calendar'),false);assert.equal(view,'home');}finally{globalThis.window=oldWindow;globalThis.document=oldDocument;}
+});

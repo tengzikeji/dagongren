@@ -227,7 +227,7 @@ export function installPageSwipe(root,api){
  if(!root.addEventListener)return;
  let gesture=null,busy=false,blockedUntil=0;
  const reset=()=>{root.classList.remove('is-paging');uiClearDrag(root.style,'--page-drag');gesture=null;};
- const change=(from,to,delta,offset)=>{
+ const change=(from,to,delta,offset,trigger='swipe')=>{
   if(api.current()!==from||api.blocked?.())return;uiPageSlideCleanup?.();uiCalendarSlideCleanup?.();for(const finish of uiRollCleanups)finish();uiRollCleanups=[];
   const content=root.querySelector('.workspace .content'),rect=content?.getBoundingClientRect(),outgoing=content?.cloneNode(true),stickyRect=content?.querySelector('.calendar-panel-header')?.getBoundingClientRect();
   const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.body.classList.contains('motion-off');
@@ -243,10 +243,10 @@ export function installPageSwipe(root,api){
   }
   layer.appendChild(track);document.body.appendChild(layer);
   const sticky=outgoing.querySelector('.calendar-panel-header');if(sticky&&stickyRect){sticky.style.position='relative';sticky.style.top='auto';sticky.style.transform='translateY('+(stickyRect.top-sticky.getBoundingClientRect().top)+'px)';}
-  const priorVisibility=incoming.style.visibility;incoming.style.visibility='hidden';
-  const push=track.animate([{transform:'translate3d('+offset+'px,0,0)'},{transform:'translate3d('+(-delta*width)+'px,0,0)'}],{duration:220,easing:'cubic-bezier(.25,.65,.35,1)',fill:'both'});
+  const priorVisibility=incoming.style.visibility,duration=trigger==='tap'?200:220;incoming.style.visibility='hidden';
+  const push=track.animate([{transform:'translate3d('+offset+'px,0,0)'},{transform:'translate3d('+(-delta*width)+'px,0,0)'}],{duration,easing:'cubic-bezier(.25,.65,.35,1)',fill:'both'});
   let done=false;const finish=()=>{if(done)return;done=true;layer.remove();incoming.style.visibility=priorVisibility;push.cancel();busy=false;root.classList.remove('page-transitioning');if(uiPageSlideCleanup===finish)uiPageSlideCleanup=null;};uiPageSlideCleanup=finish;
-  try{performance.mark('dagongren.page.slide',{detail:{from,to,direction:delta,duration:220,sharedTrack:true}});}catch{}
+  try{performance.mark('dagongren.page.slide',{detail:{from,to,direction:delta,duration,trigger,sharedTrack:true}});}catch{}
   push.finished.then(finish,finish);
  };
  root.addEventListener('pointerdown',event=>{
@@ -295,5 +295,6 @@ export function installPageSwipe(root,api){
  },{passive:false});
  root.addEventListener('touchcancel',()=>{if(gesture?.touch)reset();},{passive:true});
  root.addEventListener('click',event=>{if(event.isTrusted&&Date.now()<blockedUntil){event.preventDefault();event.stopImmediatePropagation();}},true);
+ reset.navigate=to=>{const from=api.current(),views=['home','calendar','records','settings'],a=views.indexOf(from),b=views.indexOf(to);if(a<0||b<0||a===b||api.blocked?.())return false;reset();uiPageSlideCleanup?.();change(from,to,Math.sign(b-a),0,'tap');return true;};
  return reset;
 }

@@ -87,6 +87,7 @@ try{activeTheme=resolveTheme(localStorage.getItem(THEME_STORAGE)).id;}catch{}
 let persistedBook=snapshotBook(db);
 let bookCache = null;
 let view = 'home';
+let pageNavigator=null;
 let selectedMonth = today.slice(0,7);
 let homePeriodMonth=payPeriodForDate(today,db.defaults).start.slice(0,7);
 let profileChartMode='employment';
@@ -740,12 +741,15 @@ function showDayLedger(date) {
   showModal(shortDate(date)+' · 当日账目',`<div class="day-ledger-head"><span>${date} · ${esc(calendarDay(date).lunarFull)}${calendarDay(date).festival?' · '+esc(calendarDay(date).festival):calendarDay(date).term?' · '+esc(calendarDay(date).term):''}${date===today?' · 今天':date>today?' · 未来日期':''}</span><strong class="number">¥ ${money(day?.amountCents||0)}</strong><small>${day?'当日净计薪':date<r.joinDate?'入职前，不计薪':date>today?'当天尚未到达，暂不计薪':'本月未建账，不计薪'}</small></div><div class="day-components">${fields.map(([key,label,amount])=>`<button ${metricAttrs(key,'date',date)}><span>${label}</span><b class="number">${['leave','deduction'].includes(key)?'− ':''}¥ ${money(amount)}</b>${icon('chevron')}</button>`).join('')}</div><div class="section-header day-record-title"><h2>当日记录</h2><span class="muted small">${entries.length}笔</span></div>${ledgerEntryRows(selectedMonth,'all',Infinity,date)||'<div class="empty-state">当天暂无逐笔记录</div>'}<div class="day-record-actions">${[['leave','记请假'],['overtime','记加班'],['subsidy','记补贴'],['deduction','记扣款']].map(([kind,label])=>`<button data-action="record-kind" data-kind="${kind}" data-month="${selectedMonth}" data-date="${date}">${label}</button>`).join('')}</div>`,true);
 }
 
+function activateNav(next,tab=''){
+ navigateView(next);if(view==='cleanup')cleanupDraft.target='local';if(view==='records')entryMonthScope='';if(view==='records'&&tab){detailTab=tab;recordYear=selectedMonth.slice(0,4);}closeModal();render();window.scrollTo({top:0});
+}
 document.addEventListener('click',e=>{
   if(e.target.classList.contains('modal-overlay')){if(!stepBackModal())closeModal();return;}
   const button=e.target.closest('[data-action]');if(!button||button.disabled)return;
   const action=button.dataset.action;
   if(nativeSync?.handleClick(action))return;
-  if(action==='nav'){navigateView(button.dataset.view);if(view==='cleanup')cleanupDraft.target='local';if(view==='records')entryMonthScope='';if(view==='records'&&button.dataset.tab){detailTab=button.dataset.tab;recordYear=selectedMonth.slice(0,4);}closeModal();render();window.scrollTo({top:0});}
+  if(action==='nav'){if(button.closest('.bottom-nav,.side-nav')&&!button.dataset.tab&&pageNavigator?.navigate(button.dataset.view))return;activateNav(button.dataset.view,button.dataset.tab);}
   else if(action==='month-entries'){selectedMonth=button.dataset.month;recordYear=selectedMonth.slice(0,4);detailTab='entries';entryFilter='all';entryMonthScope=selectedMonth;navigateView('records');closeModal();render();window.scrollTo({top:0});}
   else if(action==='metric')showMetric(button.dataset.metric,button.dataset.scope||'all',button.dataset.ref||'');
   else if(action==='day-ledger')showDayLedger(button.dataset.date);
@@ -879,7 +883,7 @@ playBrandIntro(db.defaults.motion!==false,()=>{if(view==='home')playHomeStartupG
 const systemThemeChanged=dark=>{systemDark=Boolean(dark);if(activeTheme==='system')render();};
 systemTheme?.addEventListener?.('change',event=>{if(!isAndroid)systemThemeChanged(event.matches);});
 globalThis.dagongrenSystemTheme=systemThemeChanged;
-installPageSwipe(app,{current:()=>view,blocked:()=>Boolean(modalRoot.firstElementChild),navigate:next=>app.querySelector('.bottom-nav [data-view="'+next+'"]')?.click()});
+pageNavigator=installPageSwipe(app,{current:()=>view,blocked:()=>Boolean(modalRoot.firstElementChild),navigate:next=>activateNav(next)});
 installCalendarSwipe(app,delta=>app.querySelector('[data-action=shift-month][data-delta="'+delta+'"]')?.click());
 setTimeout(refreshAccrualDay,60000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(nativeSync)nativeSync.foreground();calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)));const next=chinaDate();if(next!==today){today=next;ensureAccrualMonths(db,today);if(db.sync.demo||db.sync.connected)db.sync.pending++;persist();render();if((db.sync.demo||db.sync.connected)&&db.sync.auto&&!db.sync.offline)scheduleDemoSync();}}});
