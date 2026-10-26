@@ -1,4 +1,4 @@
-let uiRenderedView='',uiRollCleanups=[],uiActiveChoice=null,uiResizeObserver=null,uiObservedWidth=0,uiCalendarSlideCleanup=null,uiPageSlideCleanup=null;
+let uiRenderedView='',uiRenderedTheme='',uiRollCleanups=[],uiActiveChoice=null,uiResizeObserver=null,uiObservedWidth=0,uiCalendarSlideCleanup=null,uiPageSlideCleanup=null;
 const uiEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function uiKey(node,root){
  const date=node.closest?.('.calendar-day[data-date]')?.dataset.date;
@@ -17,7 +17,7 @@ function uiPatch(oldNode,newNode){
 function uiNumericText(node){
  const walker=document.createTreeWalker(node,4);let text;
  while((text=walker.nextNode())){
-  if(text.parentElement?.closest('small,time,.day-number,.lunar-label,[data-static-number]'))continue;
+  if(text.parentElement?.closest('small,time,.day-number,.lunar-label,[data-static-number]')&&!node.hasAttribute?.('data-chart-number'))continue;
   const match=text.nodeValue.match(/\d[\d,]*(?:\.\d+)?/);if(match)return {text,match};
  }return null;
 }
@@ -40,24 +40,34 @@ export function fitCompanyNames(root){
   viewport.dataset.overflow=String(name.scrollWidth>width+1);
  }
 }
+export function chartNumberMarkup(markup){
+ return markup.replace(/<section\b[^>]*\bdata-chart\b[^>]*>[\s\S]*?<\/section>/g,section=>section.replace(/(<(strong|b|small|span)\b([^>]*)>)([^<]*)/g,(full,opening,tag,attrs,text)=>{
+  if(!/\d/.test(text)||/data-chart-number/.test(attrs)||/\d{4}-\d{2}-\d{2}/.test(text))return full;
+  const metric=tag==='strong'||tag==='b'||tag==='small'&&(/\d(?:\.\d+)?%/.test(text)||/\d[\d,]*\.\d{2}\s*\/\s*-?\d/.test(text))||tag==='span'&&/^(已记|已过|今天 · 第|下一次周年 · 还剩)/.test(text);
+  if(!metric)return full;
+  return opening+text.replace(/\d[\d,]*(?:\.\d+)?/g,value=>'<span class="number chart-number" data-chart-number>'+value+'</span>');
+ }));
+}
 export function renderStable(root,markup,view,motion=true){
+ markup=chartNumberMarkup(markup);
  uiCalendarSlideCleanup?.();if(uiRenderedView!==view)uiPageSlideCleanup?.();
  const template=document.createElement?.('template');if(!template?.content){root.innerHTML=markup;return;}
- for(const finish of uiRollCleanups)finish();uiRollCleanups=[];const same=uiRenderedView===view,oldNumbers=new Map();
+ for(const finish of uiRollCleanups)finish();uiRollCleanups=[];const same=uiRenderedView===view,renderedTheme=document.body.getAttribute?.('data-theme')||'',themeChanged=renderedTheme!==uiRenderedTheme,oldNumbers=new Map();
  if(same)for(const node of root.querySelectorAll('.number')){const numeric=uiNumericText(node);if(numeric)oldNumbers.set(uiKey(node,root),numeric.match[0]);}
  const scrollX=window.scrollX||0,scrollY=window.scrollY||0,scrolls=[...root.querySelectorAll('.profile-name-viewport')].map(e=>({key:uiKey(e,root),left:e.scrollLeft}));
  template.innerHTML=markup;
  if(same){const existing=[...root.childNodes],incoming=[...template.content.childNodes];for(let i=0;i<Math.max(existing.length,incoming.length);i++){if(!incoming[i])existing[i].remove();else if(!existing[i])root.appendChild(incoming[i].cloneNode(true));else uiPatch(existing[i],incoming[i]);}}
  else root.replaceChildren(template.content);
- root.classList.toggle('stable-query',same);uiRenderedView=view;
+ root.classList.toggle('stable-query',same);uiRenderedView=view;uiRenderedTheme=renderedTheme;
  fitCompanyNames(root);
  if(!uiResizeObserver&&typeof ResizeObserver==='function'){uiResizeObserver=new ResizeObserver(entries=>{const width=entries[0]?.contentRect.width;if(width&&width!==uiObservedWidth){uiObservedWidth=width;fitCompanyNames(root);}});uiResizeObserver.observe(root);}
  if(same){window.scrollTo({left:scrollX,top:scrollY,behavior:'instant'});for(const el of root.querySelectorAll('.profile-name-viewport')){const prior=scrolls.find(s=>s.key===uiKey(el,root));if(prior)el.scrollLeft=prior.left;}}
  if(!motion||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
  for(const node of root.querySelectorAll('.number')){
   const calendarAmount=Boolean(node.closest?.('.calendar-day')&&node.classList.contains('day-wage'));
-  if(!same&&!calendarAmount)continue;
-  const old=oldNumbers.get(uiKey(node,root))??(calendarAmount?'':null),numeric=uiNumericText(node);if(old===null||!numeric)continue;
+  const chartAmount=node.hasAttribute?.('data-chart-number');
+  if(!same&&!calendarAmount&&!chartAmount)continue;
+  const old=chartAmount&&themeChanged?'':oldNumbers.get(uiKey(node,root))??(calendarAmount||chartAmount?'':null),numeric=uiNumericText(node);if(old===null||!numeric)continue;
   const {text,match}=numeric,original=text.nodeValue,target=match[0],plan=numberRollPlan(old,target);if(!plan.length)continue;
   const finalText=node.textContent,fragment=document.createDocumentFragment(),wrapper=document.createElement('span');wrapper.className='number-roll';wrapper.setAttribute('aria-hidden','true');const tracking=getComputedStyle(node).letterSpacing;wrapper.style.setProperty('--number-tracking',tracking==='normal'?'0px':tracking);let digitIndex=0;
   for(const char of target){

@@ -9,6 +9,8 @@ import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.UiDevice;
+import androidx.test.uiautomator.By;
+import androidx.test.uiautomator.UiObject2;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -21,9 +23,19 @@ import org.junit.runner.RunWith;
 public class AppSmokeTest {
     @Before public void enableAnimationTestEnvironment() throws Exception {
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        device.wakeUp();
+        dismissEmulatorLauncherAnr();
         device.executeShellCommand("settings put global window_animation_scale 1");
         device.executeShellCommand("settings put global transition_animation_scale 1");
         device.executeShellCommand("settings put global animator_duration_scale 1");
+    }
+    private void dismissEmulatorLauncherAnr() throws Exception {
+        UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        if(!"android".equals(device.getCurrentPackageName()))return;
+        UiObject2 launcher=device.findObject(By.textContains("Quickstep"));
+        if(launcher==null)return;
+        UiObject2 close=device.findObject(By.text("Close app"));
+        if(close!=null){close.click();device.waitForIdle(1000);System.out.println("Dismissed emulator Quickstep ANR; app assertions remain active.");}
     }
     private boolean withActivity(java.util.function.Consumer<MainActivity> action) {
         java.util.concurrent.atomic.AtomicBoolean found=new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -74,6 +86,7 @@ public class AppSmokeTest {
         device.executeShellCommand("screencap -p /sdcard/Download/dagongren-test/"+name+".png");
     }
     private void paintedScreenshot(ActivityScenario<MainActivity> scenario,String name) throws Exception {
+        dismissEmulatorLauncherAnr();
         evaluate(scenario,"window.__upgradePaintReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>{window.__upgradePaintReady=true;}))");
         waitTrue(scenario,"window.__upgradePaintReady===true");
         CountDownLatch frame=new CountDownLatch(1);
@@ -110,6 +123,7 @@ public class AppSmokeTest {
             paintedScreenshot(scenario,"charts-records");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click()");
             waitTrue(scenario,"Boolean(document.querySelector('.employment-chart'))&&!document.querySelector('.record-mix-chart')");
+            waitTrue(scenario,"!document.querySelector('.employment-chart .number-roll-strip')");
             assertEquals("true",evaluate(scenario,"document.querySelectorAll('.employment-metrics [data-stat]').length===3"));
             assertEquals("true",evaluate(scenario,"(()=>{const e=document.querySelector('.employment-chart'),days=Math.round((Date.parse(e.dataset.asOf)-Date.parse('2026-09-21'))/86400000)+1;return parseInt(e.querySelector('[data-stat=days]').textContent)===days})()"));
             waitTrue(scenario,"[...document.querySelectorAll('.data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
@@ -247,6 +261,7 @@ public class AppSmokeTest {
             assertEquals("true",evaluate(scenario,"document.querySelector('.profile-name-viewport').clientWidth>document.querySelector('.profile-card').clientWidth*.8"));
             paintedScreenshot(scenario,"profile-wrap");
             evaluate(scenario,"document.querySelector('[data-action=company-settings]').click()");
+            awaitInputWindow(scenario);
             JSONObject position=new JSONObject(new org.json.JSONTokener(evaluate(scenario,"JSON.stringify((()=>{const r=document.getElementById('company-name').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})())")).nextValue().toString());
             int[] location=new int[2];float[] scale=new float[1];
             withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(location);scale[0]=activity.getResources().getDisplayMetrics().density;});
@@ -380,6 +395,7 @@ public class AppSmokeTest {
         String expected=InstrumentationRegistry.getInstrumentation().getTargetContext().getPackageName();
         long deadline=System.currentTimeMillis()+15000;
         while(System.currentTimeMillis()<deadline){
+            dismissEmulatorLauncherAnr();
             java.util.concurrent.atomic.AtomicBoolean focused=new java.util.concurrent.atomic.AtomicBoolean(false);
             withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);focused.set(activity.hasWindowFocus()&&web.hasWindowFocus()&&web.isShown());});
             if(focused.get()&&expected.equals(device.getCurrentPackageName())){
@@ -557,6 +573,31 @@ public class AppSmokeTest {
             paintedScreenshot(scenario,"calendar-rolling-settled");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('[data-view=calendar]').click()");
             assertEquals("true",evaluate(scenario,"!document.querySelector('.calendar-day .number-roll-strip')"));
+        }
+    }
+
+
+    @Test public void allChartDataNumbersRollAndPreserveFinalValues() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            evaluate(scenario,"var chartMonth=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit'}).format(new Date()),chartDefaults={salaryCents:600000,company:'图表数字动效验收',joinDate:chartMonth.slice(0,4)+'-01-01',periodMode:'calendar',periodStartDay:1,payday:15,motion:true},chartRecord={...chartDefaults,leaves:[],overtime:[],subsidies:[{id:'s',date:chartMonth+'-01',amountCents:20000,category:'餐补'}],deductions:[],advances:[],payments:[{id:'p',date:chartMonth+'-01',amountCents:100000}],payment:null};localStorage.setItem('dagongren.paybook.v1',JSON.stringify({version:2,defaults:chartDefaults,months:{[chartMonth]:chartRecord},excludedMonths:[],sync:{auto:false,nativeVersion:1,pending:0,logs:[]}}))");
+            scenario.recreate();waitReady(scenario);
+            for(String theme:new String[]{"classic","neon","paper","forest"}){
+                evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme="+theme+"]').click()");
+                for(String page:new String[]{"home","calendar","records","settings"}){
+                    evaluate(scenario,"document.querySelector('[data-view="+page+"]').click();window.__chartRoll=(()=>{const numbers=[...document.querySelectorAll('.data-chart [data-chart-number]')],rolling=numbers.filter(e=>e.querySelector('.number-roll-strip'));return {count:rolling.length,values:numbers.map(e=>e.getAttribute('aria-label')||e.textContent),style:rolling.every(e=>getComputedStyle(e).fontSize===getComputedStyle(e.parentElement).fontSize&&[...e.querySelectorAll('.number-roll-slot')].every(s=>getComputedStyle(s).fontSize===getComputedStyle(e).fontSize)),steps:rolling.every(e=>[...e.querySelectorAll('.number-roll-strip')].every(s=>Number(s.style.getPropertyValue('--roll-steps'))>=30)),static:!document.querySelector('.chart-axis .number-roll, time .number-roll')}})()");
+            assertEquals("true",evaluate(scenario,"window.__chartRoll.count>0&&window.__chartRoll.style&&window.__chartRoll.steps&&window.__chartRoll.static"));
+                    waitTrue(scenario,"!document.querySelector('.data-chart .number-roll-strip')");
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.data-chart [data-chart-number]')].every((e,i)=>e.textContent===window.__chartRoll.values[i])"));
+                }
+            evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();window.__mixRoll=(()=>{const n=[...document.querySelectorAll('.record-type-row strong .chart-number')];return n.length===12&&n.every(e=>e.querySelector('.number-roll-strip'))})()");
+            assertEquals("true",evaluate(scenario,"window.__mixRoll"));
+                waitTrue(scenario,"!document.querySelector('.data-chart .number-roll-strip')");
+            evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('[data-view=home]').click()");
+            assertEquals("true",evaluate(scenario,"!document.querySelector('.data-chart .number-roll-strip')"));
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click()");
+            }
+            evaluate(scenario,"document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme=classic]').click()");
         }
     }
 

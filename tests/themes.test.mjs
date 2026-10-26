@@ -51,3 +51,20 @@ test('所有主题六类记录共用一个位置，兼容旧工资且清理后�
   assert.doesNotMatch(recordMixChart({},id),/NaN|Infinity|undefined/);
  }
 });
+
+import {chartNumberMarkup} from '../dist/interaction.js';
+test('图表金额、百分比、工龄与数量独立标记，日期和刻度保持静态',()=>{
+ const raw='<section class="panel data-chart"><strong>¥ -12,345.67<small>元</small></strong><strong>4笔 <small>28.6%</small></strong><strong>第2个入职年</strong><span>已过 30 / 365 天</span><span>已记 4 个月 · 6 类记录</span><small>下次周年 2027-01-01</small><span class="muted small">2026年10月</span><svg><text>12月</text></svg></section><strong>外部金额123</strong>';
+ const html=chartNumberMarkup(raw),numbers=[...html.matchAll(/data-chart-number>([^<]*)/g)].map(x=>x[1]);
+ assert.deepEqual(numbers,['12,345.67','4','28.6','2','30','365','4','6']);
+ assert.match(html,/<small>下次周年 2027-01-01<\/small>/);assert.match(html,/<text>12月<\/text>/);assert.match(html,/<strong>外部金额123<\/strong>/);
+ assert.equal(chartNumberMarkup(html),html);
+});
+test('每套主题的数据数值均可统一滚动，不改变最终文本或把日期当金额',()=>{
+ const months={'2026-10':{leaves:[{}],overtime:[],subsidies:[],deductions:[],advances:[],payments:[]}},strip=html=>html.replace(/<[^>]*>/g,'');
+ for(const {id} of themeCatalog()){
+  for(const raw of [settlementChart({receivedCents:20000,unappliedCents:0,remainingCents:40000},id),employmentChart('2024-01-01','2026-10-26',id),recordMixChart(months,id),dailyWageChart('2026-10',[{date:'2026-10-01',amountCents:12345}],12345,id)]){
+   const html=chartNumberMarkup(raw);assert.match(html,/data-chart-number/);assert.equal(strip(html),strip(raw));
+  }
+ }
+});

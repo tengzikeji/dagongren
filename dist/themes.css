@@ -188,3 +188,15 @@ body[data-theme] .theme-chart .employment-metrics strong{overflow-wrap:anywhere}
 @keyframes theme-breathe{50%{transform:scale(.975);opacity:.88}}
 body.motion-off *,body.motion-off *:before,body.motion-off *:after{animation:none!important;transition:none!important}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+
+/* Keep legacy label and metric selectors legible on the dark dashboard. */
+body[data-theme=neon] :is(.component>strong,.month-account-head>button:first-child>strong,.month-account-foot strong,.ledger-main-metric>strong,.annual-metrics strong,.today-insight>b,.period-component-list strong,.metric-row b,.metric-total){color:#ddf6ee}
+body[data-theme=neon] .component.positive>strong{color:#86e8c5}
+body[data-theme=neon] .component.negative>strong{color:#ff9eab}
+body[data-theme=neon] :is(.component>span,.month-account-head>button>span,.month-account-foot>button>span,.today-insight strong,.annual-metrics>button>span,.chart-topline>span,.ledger-secondary>button>span,.field label,.modal-body .field label,.record-hub .link,.theme-intro){color:#b1c9cf}
+body[data-theme=neon] :is(.modal-v2 .modal-header h2,.choice-header h3,.metric-title){color:#e1f4f0}
+body[data-theme=neon] :is(.modal-footer,.choice-header,.modal-header){background:#102630;border-color:#294650}
+
+.data-chart .chart-number{display:inline;font:inherit;line-height:inherit;color:inherit;white-space:nowrap;margin:0;padding:0}
+
+.annual-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:12px 0}.annual-totals>div{min-width:0}.annual-totals>div>span{font-size:10px;color:var(--muted)}.annual-totals strong{display:block;font-size:17px!important;overflow-wrap:anywhere;margin-top:4px}
