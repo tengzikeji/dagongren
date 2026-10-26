@@ -10,6 +10,7 @@ function uiKey(node,root){
  const parts=[];for(let n=node;n&&n!==root;n=n.parentElement)parts.unshift(n.tagName+':'+[...n.parentElement.children].indexOf(n));return parts.join('/');
 }
 function uiPatch(oldNode,newNode){
+ if(oldNode.id==='view-content'&&newNode.id==='view-content'&&oldNode.className!==newNode.className){oldNode.replaceWith(newNode.cloneNode(true));return;}
  if(oldNode.nodeType!==newNode.nodeType||oldNode.nodeName!==newNode.nodeName){oldNode.replaceWith(newNode.cloneNode(true));return;}
  const rolling=uiRollingNodes.get(oldNode);
  if(rolling){if(rolling.text===newNode.textContent&&oldNode.className===newNode.className)return;rolling.finish();}
@@ -57,7 +58,7 @@ export function chartNumberMarkup(markup){
 }
 export function renderStable(root,markup,view,motion=true,replayNumbers=false){
  markup=chartNumberMarkup(markup);
- uiCalendarSlideCleanup?.();if(uiRenderedView!==view)uiPageSlideCleanup?.();
+ uiCalendarSlideCleanup?.();uiPageSlideCleanup?.();
  const template=document.createElement?.('template');if(!template?.content){root.innerHTML=markup;return;}
  const same=uiRenderedView===view,renderedTheme=document.body.getAttribute?.('data-theme')||'',themeChanged=renderedTheme!==uiRenderedTheme,oldNumbers=new Map();
  if(same)for(const node of root.querySelectorAll('.number')){const value=uiRollingNodes.get(node)?.number||uiNumericText(node)?.match[0];if(value)oldNumbers.set(uiKey(node,root),value);}
@@ -69,6 +70,9 @@ export function renderStable(root,markup,view,motion=true,replayNumbers=false){
  fitCompanyNames(root);
  if(!uiResizeObserver&&typeof ResizeObserver==='function'){uiResizeObserver=new ResizeObserver(entries=>{const width=entries[0]?.contentRect.width;if(width&&width!==uiObservedWidth){uiObservedWidth=width;fitCompanyNames(root);}});uiResizeObserver.observe(root);}
  if(same){window.scrollTo({left:scrollX,top:scrollY,behavior:'instant'});for(const el of root.querySelectorAll('.profile-name-viewport')){const prior=scrolls.find(s=>s.key===uiKey(el,root));if(prior)el.scrollLeft=prior.left;}}
+ uiRollNumbers(root,oldNumbers,same,motion,themeChanged,replayNumbers);
+}
+function uiRollNumbers(root,oldNumbers,same,motion,themeChanged=false,replayNumbers=false){
  if(!motion||root.classList.contains('page-transitioning')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
  for(const node of root.querySelectorAll('.number')){
   const calendarAmount=Boolean(node.closest?.('.calendar-day')&&node.classList.contains('day-wage'));
@@ -99,8 +103,8 @@ export function playHomeStartupGlare(root,motion=true){
  const hero=root.querySelector('.view-home .balance-hero');if(!hero?.animate)return false;
  uiHomeGlareDone=true;
  const glare=document.createElement('span');glare.className='hero-startup-glare';glare.setAttribute('aria-hidden','true');hero.appendChild(glare);
- const duration=680,from='translate3d(0,0,0) skewX(-25deg)',to='translate3d('+Math.round(hero.clientWidth*1.6)+'px,0,0) skewX(-25deg)';
- const sweep=glare.animate([{offset:0,transform:from,opacity:0},{offset:.18,opacity:.65},{offset:.82,opacity:.65},{offset:1,transform:to,opacity:0}],{duration,easing:'cubic-bezier(.2,.55,.35,1)',fill:'both'});
+ const duration=1000,from='translate3d(0,0,0) skewX(-25deg)',to='translate3d('+Math.round(hero.clientWidth*1.6)+'px,0,0) skewX(-25deg)';
+ const sweep=glare.animate([{offset:0,transform:from,opacity:0},{offset:.18,opacity:.5},{offset:.82,opacity:.5},{offset:1,transform:to,opacity:0}],{duration,easing:'cubic-bezier(.2,.55,.35,1)',fill:'both'});
  let finished=false,timer;const done=()=>{if(finished)return;finished=true;clearTimeout(timer);glare.remove();sweep.cancel();try{performance.mark('dagongren.home.glare.complete');}catch{}};
  timer=setTimeout(done,duration+100);sweep.finished.then(done,done);
  try{performance.mark('dagongren.home.glare',{detail:{runs:1,afterLaunch:!document.querySelector('.launch-page'),direction:'left-to-right',from,to,duration,at:Date.now(),rolling:hero.querySelectorAll('.number-roll-strip').length}});}catch{}
@@ -149,44 +153,7 @@ export function enhanceModalChoices(root){
   });
  }
 }
-export function playBrandIntro(enabled=true,onComplete=null){
- const bridge=globalThis.AndroidFiles,app=document.getElementById('app');
- const releaseNative=()=>{try{bridge?.introReady?.();}catch{}};
- if(!enabled||!document.body.appendChild||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||bridge?.shouldPlayIntro?.()===false){bridge?.introStyle?.(false);releaseNative();return;}
- bridge?.introStyle?.(true);
- const page=document.createElement('section');page.className='launch-page';page.dataset.phase='preparing';page.setAttribute('role','status');page.setAttribute('aria-label','打工人，正在打开账本');
- page.innerHTML='<div class="launch-grid" aria-hidden="true"></div><header class="launch-header"><span class="launch-app-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="18" height="14" rx="4"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12a22 22 0 0 0 18 0M12 11v5"/></svg></span><div><strong>打工人</strong><span>工作有迹 · 收入有数</span></div><span class="launch-edition">工资账本</span></header><div class="launch-copy"><span class="launch-eyebrow"><i></i> 认真工作，从容生活</span><h2>每一份努力<br>都有清晰的记录<span>。</span></h2><p>把工作的付出，记成生活的底气。</p></div><div class="launch-art" aria-hidden="true"><div class="launch-orbit orbit-one"><i></i></div><div class="launch-orbit orbit-two"><i></i></div><div class="launch-ledger"><div class="launch-ledger-top"><span><i></i> 我的工资账本</span><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="4"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></div><div class="launch-value"><span>¥</span><div class="launch-value-line"></div><span class="launch-value-dot"></span></div><div class="launch-ledger-divider"></div><div class="launch-ledger-bottom"><div><span>每一天的付出</span><b>都清清楚楚</b></div><div class="launch-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><span class="launch-card-sheen"></span></div><div class="launch-chip"><svg viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"/></svg><span>属于你的每一笔</span></div></div><footer class="launch-status"><span class="launch-status-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="6" y="10" width="12" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></span><span>本机账本已就绪<small>安心记录每一天</small></span><span class="launch-ready"><i></i><i></i><i></i></span></footer>';
- document.body.classList.add('intro-playing');document.body.appendChild(page);if(app)app.inert=true;
- const transitions=[];let started=false,finished=false,opening=false,timer,fallback;const priorOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
- const done=()=>{if(finished)return;finished=true;clearTimeout(timer);clearTimeout(fallback);for(const transition of transitions)transition.cancel();if(app)app.classList.add('stable-query');page.remove();document.body.classList.remove('intro-playing','intro-opening');document.body.style.overflow=priorOverflow;if(app)app.inert=false;bridge?.introStyle?.(false);if(globalThis.dagongrenLaunchReady===start)delete globalThis.dagongrenLaunchReady;document.removeEventListener('visibilitychange',hidden);if(started&&opening&&document.visibilityState!=='hidden')onComplete?.();};
- const open=()=>{if(opening||finished)return;opening=true;
-  const targets=[...document.querySelectorAll('.bottom-nav [data-view="home"],.side-nav [data-view="home"]')],home=targets.find(node=>{const r=node.getBoundingClientRect();return r.width>0&&r.height>0;}),bounds=home?.getBoundingClientRect(),width=window.innerWidth,height=window.innerHeight;
-  const target={x:bounds?bounds.left+bounds.width/2:width/8,y:bounds?bounds.top+bounds.height/2:height-28};
-  page.style.transformOrigin=target.x+'px '+target.y+'px';page.dataset.phase='absorbing';
-  document.body.classList.add('intro-opening');
-  const duration=980;
-  try{performance.mark('dagongren.launch.absorbing',{detail:{target,button:bounds?{left:bounds.left,top:bounds.top,width:bounds.width,height:bounds.height}:null,origin:getComputedStyle(page).transformOrigin,duration,surfaces:document.querySelectorAll('.launch-page').length}});}catch{}
-  const animate=(node,frames,options)=>{if(node?.animate)transitions.push(node.animate(frames,{duration,fill:'both',...options}));};
-  animate(page,[
-   {offset:0,transform:'scale(1,1) skewX(0deg)',borderRadius:'0px',opacity:1},
-   {offset:.3,transform:'scale(.88,.92) skewX(-3deg)',borderRadius:'24px',opacity:1},
-   {offset:.64,transform:'scale(.48,.6) skewX(-10deg)',borderRadius:'42px',opacity:.99},
-   {offset:.88,transform:'scale(.12,.24) skewX(-16deg)',borderRadius:'58px',opacity:.9},
-   {offset:1,transform:'scale(.001,.001) skewX(-18deg)',borderRadius:'64px',opacity:0}
-  ],{easing:'cubic-bezier(.34,.04,.7,.38)'});
-  animate(app,[{offset:0,opacity:0},{offset:.15,opacity:.08},{offset:.4,opacity:.4},{offset:.7,opacity:.82},{offset:1,opacity:1}],{easing:'linear'});
-  for(const [index,node] of [...document.querySelectorAll('.view-home>.balance-hero,.view-home>.settlement-chart,.view-home>.home-section-title,.view-home>.month-toolbar,.view-home>.month-account')].entries()){
-   const delay=100+index*65;animate(node,[{opacity:0,transform:'translateY(12px)'},{opacity:1,transform:'translateY(0)'}],{delay,duration:duration-delay-30,easing:'cubic-bezier(.2,.7,.25,1)'});
-  }
-  animate(home,[{offset:0,boxShadow:'0 0 0 0 #3276f500'},{offset:.75,boxShadow:'0 0 0 8px #3276f526'},{offset:1,boxShadow:'0 0 0 0 #3276f500'}],{easing:'ease-out'});
-  timer=setTimeout(done,duration+40);
- };
- const start=()=>{if(started||finished)return;started=true;clearTimeout(fallback);page.dataset.phase='playing';try{performance.mark('dagongren.launch.playing',{detail:{at:Date.now(),surfaces:document.querySelectorAll('.launch-page').length,oldBrand:Boolean(document.querySelector('.brand-intro')),inert:app?.inert===true,animated:getComputedStyle(page.querySelector('.launch-ledger')).animationName==='launch-card-in'}});}catch{}requestAnimationFrame(()=>requestAnimationFrame(()=>{if(!finished)timer=setTimeout(open,1450);}));};
- const hidden=()=>{if(document.visibilityState==='hidden')done();};document.addEventListener('visibilitychange',hidden);
- globalThis.dagongrenLaunchReady=start;
- requestAnimationFrame(()=>requestAnimationFrame(()=>{releaseNative();if(!bridge?.introReady)start();else fallback=setTimeout(start,600);}));
- return done;
-}
+export function playBrandIntro(enabled=true,onComplete=null){return globalThis.dagongrenIntro?.play(enabled,onComplete);}
 
 // Coalesce pointer events into one transform update per display frame.
 const uiDragFrames=new Map();
@@ -214,15 +181,17 @@ export function installCalendarSwipe(root,onShift){
   const panel=root.querySelector?.('[data-calendar-swipe]'),viewport=panel?.querySelector('.calendar-grid-viewport'),incoming=viewport?.querySelector('.calendar-days');
   if(!outgoing||!incoming?.animate||!viewport||panel.dataset.calendarMonth===oldMonth||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.body.classList.contains('motion-off'))return;
   const width=viewport.getBoundingClientRect().width;if(!width)return;
-  const nextHeight=incoming.getBoundingClientRect().height;
-  const resizing=oldHeight&&oldHeight!==nextHeight?viewport.animate([{height:oldHeight+'px'},{height:nextHeight+'px'}],{duration:300,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'}):null;
-  outgoing.classList.add('calendar-leaving');outgoing.setAttribute('aria-hidden','true');outgoing.inert=true;viewport.appendChild(outgoing);viewport.classList.add('calendar-month-switching');
-  const options={duration:300,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'};
-  const leaving=outgoing.animate([{transform:'translate3d('+offset+'px,0,0)'},{transform:'translate3d('+(-delta*width)+'px,0,0)'}],options);
-  const entering=incoming.animate([{transform:'translate3d('+(delta*width+offset)+'px,0,0)'},{transform:'translate3d(0,0,0)'}],options);
-  let done=false;const finish=()=>{if(done)return;done=true;outgoing.remove();viewport.classList.remove('calendar-month-switching');leaving.cancel();entering.cancel();resizing?.cancel();if(uiCalendarSlideCleanup===finish)uiCalendarSlideCleanup=null;};uiCalendarSlideCleanup=finish;
-  try{performance.mark('dagongren.calendar.slide',{detail:{from:oldMonth,to:panel.dataset.calendarMonth,direction:delta,duration:300}});}catch{}
-  Promise.all([leaving.finished,entering.finished]).catch(()=>{}).then(finish);
+  const nextHeight=incoming.getBoundingClientRect().height,options={duration:220,easing:'cubic-bezier(.25,.65,.35,1)',fill:'both'};
+  const track=document.createElement('div'),preview=incoming.cloneNode(true);track.className='calendar-swipe-track';track.setAttribute('aria-hidden','true');track.inert=true;
+  outgoing.classList.add('calendar-leaving');preview.classList.add('calendar-entering');
+  for(const [grid,left] of [[outgoing,0],[preview,delta*width]]){Object.assign(grid.style,{position:'absolute',left:left+'px',top:'0',width:width+'px',margin:'0',transform:'none'});track.appendChild(grid);}
+  const priorVisibility=incoming.style.visibility;incoming.style.visibility='hidden';viewport.appendChild(track);viewport.classList.add('calendar-month-switching');
+  const push=track.animate([{transform:'translate3d('+offset+'px,0,0)'},{transform:'translate3d('+(-delta*width)+'px,0,0)'}],options);
+  const resizing=oldHeight&&oldHeight!==nextHeight?viewport.animate([{height:oldHeight+'px'},{height:nextHeight+'px'}],options):null;
+  const startTime=document.timeline?.currentTime;if(startTime!=null){push.startTime=startTime;if(resizing)resizing.startTime=startTime;}
+  let done=false;const finish=()=>{if(done)return;done=true;track.remove();incoming.style.visibility=priorVisibility;viewport.classList.remove('calendar-month-switching');push.cancel();resizing?.cancel();if(uiCalendarSlideCleanup===finish)uiCalendarSlideCleanup=null;};uiCalendarSlideCleanup=finish;
+  try{performance.mark('dagongren.calendar.slide',{detail:{from:oldMonth,to:panel.dataset.calendarMonth,direction:delta,duration:220,sharedTrack:true}});}catch{}
+  push.finished.then(finish,finish);
  };
 
  root.addEventListener('pointerdown',event=>{
@@ -261,23 +230,27 @@ export function installPageSwipe(root,api){
  if(!root.addEventListener)return;
  let gesture=null,busy=false,blockedUntil=0;
  const reset=()=>{root.classList.remove('is-paging');uiClearDrag(root.style,'--page-drag');gesture=null;};
- const change=(from,to,delta,offset)=>{
+ const change=(from,to,delta,offset,trigger='swipe')=>{
   if(api.current()!==from||api.blocked?.())return;uiPageSlideCleanup?.();uiCalendarSlideCleanup?.();for(const finish of uiRollCleanups)finish();uiRollCleanups=[];
   const content=root.querySelector('.workspace .content'),rect=content?.getBoundingClientRect(),outgoing=content?.cloneNode(true),stickyRect=content?.querySelector('.calendar-panel-header')?.getBoundingClientRect();
   const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.body.classList.contains('motion-off');
   busy=true;root.classList.add('page-transitioning');api.navigate(to);root.classList.add('stable-query');
   const incoming=root.querySelector('.workspace .content');
   if(reduced||!outgoing||!rect?.width||!incoming?.animate){busy=false;root.classList.remove('page-transitioning');return;}
-  const layer=document.createElement('div');layer.className='page-swipe-layer';layer.setAttribute('aria-hidden','true');layer.inert=true;
-  outgoing.classList.add('page-swipe-outgoing');outgoing.removeAttribute('id');for(const element of outgoing.querySelectorAll('[id]'))element.removeAttribute('id');
-  Object.assign(outgoing.style,{position:'absolute',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px',margin:'0'});layer.appendChild(outgoing);document.body.appendChild(layer);
+  const layer=document.createElement('div'),track=document.createElement('div'),preview=incoming.cloneNode(true);layer.className='page-swipe-layer';track.className='page-swipe-track';layer.setAttribute('aria-hidden','true');layer.inert=true;
+  const nextRect=incoming.getBoundingClientRect(),width=document.documentElement.clientWidth,nav=root.querySelector('.bottom-nav'),navRect=nav?.getBoundingClientRect();
+  if(navRect?.height)layer.style.bottom=Math.max(0,innerHeight-navRect.top)+'px';
+  for(const [node,bounds,left,name] of [[outgoing,rect,rect.left,'page-swipe-outgoing'],[preview,nextRect,delta*width+nextRect.left,'page-swipe-incoming']]){
+   node.classList.add(name);node.removeAttribute('id');for(const element of node.querySelectorAll('[id]'))element.removeAttribute('id');
+   Object.assign(node.style,{position:'absolute',left:left+'px',top:bounds.top+'px',width:bounds.width+'px',height:bounds.height+'px',margin:'0',visibility:'visible'});track.appendChild(node);
+  }
+  layer.appendChild(track);document.body.appendChild(layer);
   const sticky=outgoing.querySelector('.calendar-panel-header');if(sticky&&stickyRect){sticky.style.position='relative';sticky.style.top='auto';sticky.style.transform='translateY('+(stickyRect.top-sticky.getBoundingClientRect().top)+'px)';}
-  const width=rect.width,options={duration:300,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'};
-  const leaving=outgoing.animate([{transform:'translate3d('+offset+'px,0,0)'},{transform:'translate3d('+(-delta*width)+'px,0,0)'}],options);
-  const entering=incoming.animate([{transform:'translate3d('+(delta*width+offset)+'px,0,0)'},{transform:'translate3d(0,0,0)'}],options);
-  let done=false;const finish=()=>{if(done)return;done=true;layer.remove();leaving.cancel();entering.cancel();busy=false;root.classList.remove('page-transitioning');if(uiPageSlideCleanup===finish)uiPageSlideCleanup=null;};uiPageSlideCleanup=finish;
-  try{performance.mark('dagongren.page.slide',{detail:{from,to,direction:delta,duration:300}});}catch{}
-  Promise.all([leaving.finished,entering.finished]).catch(()=>{}).then(finish);
+  const priorVisibility=incoming.style.visibility,duration=trigger==='tap'?200:220;incoming.style.visibility='hidden';
+  const push=track.animate([{transform:'translate3d('+offset+'px,0,0)'},{transform:'translate3d('+(-delta*width)+'px,0,0)'}],{duration,easing:'cubic-bezier(.25,.65,.35,1)',fill:'both'});
+  let done=false;const finish=(completed=false)=>{if(done)return;done=true;layer.remove();incoming.style.visibility=priorVisibility;push.cancel();busy=false;root.classList.remove('page-transitioning');if(uiPageSlideCleanup===finish)uiPageSlideCleanup=null;if(completed&&trigger==='tap')uiRollNumbers(root,new Map(),false,true);};uiPageSlideCleanup=finish;
+  try{performance.mark('dagongren.page.slide',{detail:{from,to,direction:delta,duration,trigger,sharedTrack:true}});}catch{}
+  push.finished.then(()=>finish(true),()=>finish(false));
  };
  root.addEventListener('pointerdown',event=>{
   if(event.pointerType==='touch'&&event.target.closest?.('.profile-chart-panel'))return;
@@ -325,5 +298,6 @@ export function installPageSwipe(root,api){
  },{passive:false});
  root.addEventListener('touchcancel',()=>{if(gesture?.touch)reset();},{passive:true});
  root.addEventListener('click',event=>{if(event.isTrusted&&Date.now()<blockedUntil){event.preventDefault();event.stopImmediatePropagation();}},true);
+ reset.navigate=to=>{const from=api.current(),views=['home','calendar','records','settings'],a=views.indexOf(from),b=views.indexOf(to);if(a<0||b<0||a===b||api.blocked?.())return false;reset();uiPageSlideCleanup?.();change(from,to,Math.sign(b-a),0,'tap');return true;};
  return reset;
 }
