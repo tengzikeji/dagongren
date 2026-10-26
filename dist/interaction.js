@@ -69,7 +69,7 @@ export function renderStable(root,markup,view,motion=true,replayNumbers=false){
  fitCompanyNames(root);
  if(!uiResizeObserver&&typeof ResizeObserver==='function'){uiResizeObserver=new ResizeObserver(entries=>{const width=entries[0]?.contentRect.width;if(width&&width!==uiObservedWidth){uiObservedWidth=width;fitCompanyNames(root);}});uiResizeObserver.observe(root);}
  if(same){window.scrollTo({left:scrollX,top:scrollY,behavior:'instant'});for(const el of root.querySelectorAll('.profile-name-viewport')){const prior=scrolls.find(s=>s.key===uiKey(el,root));if(prior)el.scrollLeft=prior.left;}}
- if(!motion||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+ if(!motion||root.classList.contains('page-transitioning')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
  for(const node of root.querySelectorAll('.number')){
   const calendarAmount=Boolean(node.closest?.('.calendar-day')&&node.classList.contains('day-wage'));
   const chartAmount=node.hasAttribute?.('data-chart-number');
@@ -209,16 +209,18 @@ export function installCalendarSwipe(root,onShift){
  let gesture=null,blockedUntil=0;
  const reset=()=>{if(gesture){gesture.panel.classList.remove('is-swiping');uiClearDrag(gesture.panel.style,'--calendar-drag');}gesture=null;};
  const shift=(current,delta,offset)=>{
-  const oldGrid=current.panel.querySelector?.('.calendar-days'),outgoing=oldGrid?.cloneNode(true),oldMonth=current.panel.dataset?.calendarMonth;
+  const oldGrid=current.panel.querySelector?.('.calendar-days'),outgoing=oldGrid?.cloneNode(true),oldMonth=current.panel.dataset?.calendarMonth,oldHeight=oldGrid?.getBoundingClientRect().height;
   onShift(delta);
   const panel=root.querySelector?.('[data-calendar-swipe]'),viewport=panel?.querySelector('.calendar-grid-viewport'),incoming=viewport?.querySelector('.calendar-days');
   if(!outgoing||!incoming?.animate||!viewport||panel.dataset.calendarMonth===oldMonth||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.body.classList.contains('motion-off'))return;
   const width=viewport.getBoundingClientRect().width;if(!width)return;
+  const nextHeight=incoming.getBoundingClientRect().height;
+  const resizing=oldHeight&&oldHeight!==nextHeight?viewport.animate([{height:oldHeight+'px'},{height:nextHeight+'px'}],{duration:300,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'}):null;
   outgoing.classList.add('calendar-leaving');outgoing.setAttribute('aria-hidden','true');outgoing.inert=true;viewport.appendChild(outgoing);viewport.classList.add('calendar-month-switching');
   const options={duration:300,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'};
   const leaving=outgoing.animate([{transform:'translate3d('+offset+'px,0,0)'},{transform:'translate3d('+(-delta*width)+'px,0,0)'}],options);
   const entering=incoming.animate([{transform:'translate3d('+(delta*width+offset)+'px,0,0)'},{transform:'translate3d(0,0,0)'}],options);
-  let done=false;const finish=()=>{if(done)return;done=true;outgoing.remove();viewport.classList.remove('calendar-month-switching');leaving.cancel();entering.cancel();if(uiCalendarSlideCleanup===finish)uiCalendarSlideCleanup=null;};uiCalendarSlideCleanup=finish;
+  let done=false;const finish=()=>{if(done)return;done=true;outgoing.remove();viewport.classList.remove('calendar-month-switching');leaving.cancel();entering.cancel();resizing?.cancel();if(uiCalendarSlideCleanup===finish)uiCalendarSlideCleanup=null;};uiCalendarSlideCleanup=finish;
   try{performance.mark('dagongren.calendar.slide',{detail:{from:oldMonth,to:panel.dataset.calendarMonth,direction:delta,duration:300}});}catch{}
   Promise.all([leaving.finished,entering.finished]).catch(()=>{}).then(finish);
  };

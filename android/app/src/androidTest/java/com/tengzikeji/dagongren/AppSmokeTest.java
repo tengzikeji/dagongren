@@ -611,7 +611,7 @@ public class AppSmokeTest {
                     waitTrue(scenario,"!document.querySelector('.data-chart .number-roll-strip')");
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.data-chart [data-chart-number]')].every((e,i)=>e.textContent===window.__chartRoll.values[i])"));
                 }
-            evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();window.__mixRoll=(()=>{const n=[...document.querySelectorAll('.record-type-row strong .chart-number')];return n.length===12&&n.every(e=>e.querySelector('.number-roll-strip')||/^0(?:\\.0)?$/.test(e.textContent))})()");
+            evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();window.__mixRoll=(()=>{const n=[...document.querySelectorAll('.record-type-row strong .chart-number')];return n.length===12&&JSON.stringify(n.map(e=>e.getAttribute('aria-label')||e.textContent))===JSON.stringify(['0','0.0','0','0.0','1','50.0','0','0.0','0','0.0','1','50.0'])})()");
             assertEquals("true",evaluate(scenario,"window.__mixRoll"));
                 waitTrue(scenario,"!document.querySelector('.data-chart .number-roll-strip')");
             evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('[data-view=home]').click()");

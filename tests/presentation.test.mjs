@@ -104,3 +104,23 @@ test('安卓图表横滑在指针被取消后仍按完整触摸序列切页，�
   blocked=true;handlers.touchstart(touch(80,200,3000));handlers.touchmove(touch(300,200,3100));handlers.touchend(touch(300,200,3200,true));assert.equal(view,'settings');
  }finally{if(beforeWindow===undefined)delete globalThis.window;else globalThis.window=beforeWindow;if(beforeDocument===undefined)delete globalThis.document;else globalThis.document=beforeDocument;}
 });
+
+test('连续触摸移动每帧只更新一次，取消手势后不留下延迟位移',()=>{
+ const beforeRAF=globalThis.requestAnimationFrame,beforeCancel=globalThis.cancelAnimationFrame;
+ const pending=new Map();let next=0,writes=0;
+ try{
+  globalThis.requestAnimationFrame=fn=>{pending.set(++next,fn);return next;};
+  globalThis.cancelAnimationFrame=id=>pending.delete(id);
+  const f=swipeFixture('calendar');f.panel.style.setProperty=()=>writes++;
+  installCalendarSwipe(f.root,()=>{});
+  f.handlers.pointerdown(f.event(1000,300,100));
+  for(let i=0;i<50;i++)f.handlers.pointermove(f.event(1001+i,280-i,100));
+  assert.equal(pending.size,1);assert.equal(writes,0);
+  const frame=[...pending.values()][0];pending.clear();frame();assert.equal(writes,1);
+  f.handlers.pointermove(f.event(1100,180,100));assert.equal(pending.size,1);
+  f.handlers.pointercancel();assert.equal(pending.size,0);assert.equal(f.classes.has('is-swiping'),false);
+ }finally{
+  if(beforeRAF===undefined)delete globalThis.requestAnimationFrame;else globalThis.requestAnimationFrame=beforeRAF;
+  if(beforeCancel===undefined)delete globalThis.cancelAnimationFrame;else globalThis.cancelAnimationFrame=beforeCancel;
+ }
+});
