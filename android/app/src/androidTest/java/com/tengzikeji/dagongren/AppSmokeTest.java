@@ -45,9 +45,14 @@ public class AppSmokeTest {
     private boolean withActivity(java.util.function.Consumer<MainActivity> action) {
         java.util.concurrent.atomic.AtomicBoolean found=new java.util.concurrent.atomic.AtomicBoolean(false);
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+            MainActivity selected=null;
             for(android.app.Activity activity:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED)){
-                if(activity instanceof MainActivity){found.set(true);action.accept((MainActivity)activity);break;}
+                if(activity instanceof MainActivity&&!activity.isFinishing()){
+                    if(selected==null)selected=(MainActivity)activity;
+                    if(activity.hasWindowFocus()){selected=(MainActivity)activity;break;}
+                }
             }
+            if(selected!=null){found.set(true);action.accept(selected);}
         });
         return found.get();
     }
@@ -387,7 +392,8 @@ public class AppSmokeTest {
             paintedScreenshot(scenario,"startup-home");
             device.pressHome();
             target.startActivity(new android.content.Intent(target,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
-            waitReady(scenario);dismissEmulatorLauncherAnr();
+            waitTrue(scenario,"Boolean(document.querySelector('.view-home'))&&!document.querySelector('.launch-page')&&!document.getElementById('app').inert");
+            awaitInputWindow(scenario);dismissEmulatorLauncherAnr();
             assertEquals("true",evaluate(scenario,"performance.getEntriesByName('dagongren.home.self-check').length===1&&localStorage.getItem('dagongren.paybook.v1')===window.__selfCheckBook"));
         } finally {
             withActivity(activity->activity.finish());
@@ -538,6 +544,7 @@ public class AppSmokeTest {
                 assertEquals("\""+theme+"\"",evaluate(scenario,"document.body.dataset.theme"));
             assertEquals(expectedThemeBook,evaluate(scenario,"localStorage.getItem('dagongren.paybook.v1')"));
             assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('.view-settings')).touchAction.includes('pan-y')"));
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.theme-gauge>svg,.theme-orbit>svg,.mix-orbit>svg')].every(e=>e.getBoundingClientRect().height>=70)"));
             evaluate(scenario,"document.querySelector('.profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 paintedScreenshot(scenario,"theme-"+theme+"-profile");
                 swipeRegion(scenario,".employment-progress",-1);

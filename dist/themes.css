@@ -206,3 +206,27 @@ body[data-theme=neon] .calendar-day.today .day-wage.wage-loss{color:#ff9aa6}
 body[data-theme=neon] .calendar-day.today .day-wage.wage-neutral{color:#a1b3ba}
 
 .profile-chart-panel,.profile-chart-panel *{touch-action:pan-y pinch-zoom}
+
+/* SVG viewBox determines the chart's height instead of the app icon default. */
+.theme-gauge>svg{display:block;width:100%;height:auto;aspect-ratio:240/142}
+.theme-orbit>svg,.mix-orbit>svg{display:block;width:100%;height:auto;aspect-ratio:1}
+body[data-theme=neon] .quick-action>strong{color:#bbddd5}
+body[data-theme=neon] .record-launcher{color:#b1c9cf}
+body[data-theme=neon] .cloud-button{background:#16353f;color:#b8e4d8;border-color:#355b62;box-shadow:none}
+body[data-theme=paper] .balance-hero .balance-heading>button,
+body[data-theme=paper] .balance-hero .balance-caption>button,
+body[data-theme=paper] .balance-hero .balance-primary>strong>small{color:#765336}
+body[data-theme=paper] .balance-hero .hero-data-strip>button>span,
+body[data-theme=paper] .balance-hero .hero-data-strip>button>span small{color:#786750}
+body[data-theme=paper] .balance-hero .balance-label>small{color:#7d6c55;background:#eee0ca}
+body[data-theme=neon] .modal-v2 .modal-header,
+body[data-theme=paper] .modal-v2 .modal-header,
+body[data-theme=forest] .modal-v2 .modal-header{min-height:90px;padding-bottom:16px;overflow:visible}
+body[data-theme=neon] .modal-v2 .modal-actions.modal-footer{background:#102630;border-color:#294650}
+body[data-theme=paper] .modal-v2 .modal-header,
+body[data-theme=paper] .modal-v2 .modal-actions.modal-footer{background:#fffbf2;border-color:#dfd0b9}
+body[data-theme=forest] .modal-v2 .modal-header,
+body[data-theme=forest] .modal-v2 .modal-actions.modal-footer{background:#fcfff9;border-color:#d4e1cc}
+body[data-theme=neon] .modal-footer>.btn-primary{background:#6ce7cc;color:#102b2a;box-shadow:none}
+body[data-theme=paper] .modal-footer>.btn-primary{background:#9f5938;color:#fff;box-shadow:none}
+body[data-theme=forest] .modal-footer>.btn-primary{background:#3c7956;color:#fff;box-shadow:none}
