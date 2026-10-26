@@ -141,8 +141,8 @@ jobs:
         if: always()
         run: |
           if ! command -v ffmpeg >/dev/null; then
-            sudo apt-get update -qq
-            sudo apt-get install -y ffmpeg
+            timeout 90s sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 update -qq || true
+            timeout 120s sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 install -y ffmpeg || true
           fi
       - name: Review launch transition frames
         if: always()
@@ -158,6 +158,9 @@ jobs:
           marker=next((m for log in logs if (m:=re.search(r'ABSORBING_SECOND=([0-9.]+)',log.read_text(errors='replace')))),None)
           center=float(marker.group(1)) if marker else 10.0
           seconds=[max(0,center+offset) for offset in [-2,-1,-.5,0,.12,.25,.4,.55,.7,.85,1.1,1.5,2,3]]
+          glare=next((m for log in logs if (m:=re.search(r'GLARE_SECOND=([0-9.]+)',log.read_text(errors='replace')))),None)
+          if glare:seconds+= [max(0,float(glare.group(1))+offset) for offset in [0,.15,.3,.45,.6,.75,.9,1.1]]
+          seconds=sorted(set(round(second,3) for second in seconds))
           tiles=[]
           print('LAUNCH_REVIEW:',len(videos),'videos; playback at',center,'seconds; ffmpeg:',bool(ffmpeg))
           if videos and ffmpeg:

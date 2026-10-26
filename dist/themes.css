@@ -230,3 +230,5 @@ body[data-theme=forest] .modal-v2 .modal-actions.modal-footer{background:#fcfff9
 body[data-theme=neon] .modal-footer>.btn-primary{background:#6ce7cc;color:#102b2a;box-shadow:none}
 body[data-theme=paper] .modal-footer>.btn-primary{background:#9f5938;color:#fff;box-shadow:none}
 body[data-theme=forest] .modal-footer>.btn-primary{background:#3c7956;color:#fff;box-shadow:none}
+
+.balance-hero .hero-startup-glare{position:absolute;inset:-12%;z-index:6;pointer-events:none;display:block;background:linear-gradient(135deg,transparent 34%,rgba(255,255,255,.12)42%,rgba(255,255,255,.88)49%,rgba(255,255,255,.98)50%,rgba(255,255,255,.78)52%,rgba(255,255,255,.13)60%,transparent 68%);mix-blend-mode:screen;filter:blur(.3px);will-change:transform,opacity;transform:translate3d(-105%,-105%,0);opacity:0}

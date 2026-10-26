@@ -1,4 +1,4 @@
-let uiHomeSelfCheckDone=false;
+let uiHomeSelfCheckDone=false,uiHomeGlareDone=false;
 let uiRenderedView='',uiRenderedTheme='',uiRollCleanups=[],uiActiveChoice=null,uiResizeObserver=null,uiObservedWidth=0,uiCalendarSlideCleanup=null,uiPageSlideCleanup=null;
 const uiEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function uiKey(node,root){
@@ -85,6 +85,18 @@ export function renderStable(root,markup,view,motion=true,replayNumbers=false){
   timeout=setTimeout(finish,Math.max(...plan.map(x=>x.delay+x.duration))+60);uiRollCleanups.push(finish);
  }
 }
+function playHomeStartupGlare(root,motion=true){
+ if(uiHomeGlareDone||!motion||document.body.classList.contains('motion-off')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.querySelector('.launch-page')||root.inert||document.visibilityState==='hidden')return false;
+ const hero=root.querySelector('.view-home .balance-hero');if(!hero?.animate)return false;
+ uiHomeGlareDone=true;
+ const glare=document.createElement('span');glare.className='hero-startup-glare';glare.setAttribute('aria-hidden','true');hero.appendChild(glare);
+ const duration=1000,frames=[{offset:0,transform:'translate3d(-105%,-105%,0)',opacity:0},{offset:.22,opacity:1},{offset:.78,opacity:1},{offset:1,transform:'translate3d(105%,105%,0)',opacity:0}];
+ const sweep=glare.animate(frames,{duration,easing:'cubic-bezier(.25,.1,.35,1)',fill:'both'});let finished=false,timer;
+ const done=()=>{if(finished)return;finished=true;clearTimeout(timer);glare.remove();sweep.cancel();try{performance.mark('dagongren.home.glare.complete');}catch{}};
+ timer=setTimeout(done,duration+100);sweep.finished.then(done,done);
+ try{performance.mark('dagongren.home.glare',{detail:{runs:1,afterSelfCheck:performance.getEntriesByName('dagongren.home.self-check.complete').length===1,direction:'top-left-to-bottom-right',from:frames[0].transform,to:frames.at(-1).transform,duration,at:Date.now(),rolling:hero.querySelectorAll('.number-roll-strip').length}});}catch{}
+ return true;
+}
 export function replayHomeData(root,motion=true){
  if(uiHomeSelfCheckDone||!motion||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.querySelector('.launch-page')||root.inert||!root.querySelector('.view-home'))return false;
  uiHomeSelfCheckDone=true;
@@ -97,6 +109,14 @@ export function replayHomeData(root,motion=true){
  }
  for(const number of numbers)number.animate?.([{opacity:1},{opacity:.65,offset:.35},{opacity:1}],{duration:420,easing:'ease-out'});
  try{performance.mark('dagongren.home.self-check',{detail:{runs:1,afterLaunch:!document.querySelector('.launch-page')&&!root.inert,numbers:numbers.length,numberWheels:home.querySelectorAll('.number-roll-strip').length,charts:charts.length,duration:1400}});}catch{}
+ const ownedRolls=[...uiRollCleanups],finite=(home.getAnimations?.({subtree:true})||[]).filter(animation=>animation.effect?.getTiming().iterations!==Infinity);
+ const finished=finite.length?Promise.allSettled(finite.map(animation=>animation.finished)):new Promise(resolve=>setTimeout(resolve,1400));
+ finished.then(()=>{
+  for(const finish of ownedRolls)finish();
+  if(root.querySelector('.view-home')!==home||root.inert)return;
+  try{performance.mark('dagongren.home.self-check.complete',{detail:{rolling:home.querySelectorAll('.number-roll-strip').length}});}catch{}
+  playHomeStartupGlare(root,motion);
+ });
  return true;
 }
 export function closeChoicePicker(){

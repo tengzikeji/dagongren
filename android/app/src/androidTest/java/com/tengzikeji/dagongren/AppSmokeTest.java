@@ -389,12 +389,17 @@ public class AppSmokeTest {
             evaluate(scenario,"window.__selfCheckValues=[...document.querySelectorAll('.view-home .number')].map(e=>e.getAttribute('aria-label')||e.textContent);window.__selfCheckBook=localStorage.getItem('dagongren.paybook.v1')");
             waitTrue(scenario,"!document.querySelector('.view-home .number-roll-strip')");
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.view-home .number')].every((e,i)=>e.textContent===window.__selfCheckValues[i])"));
+            waitTrue(scenario,"performance.getEntriesByName('dagongren.home.self-check.complete').length===1&&performance.getEntriesByName('dagongren.home.glare').length===1");
+            assertEquals("true",evaluate(scenario,"(()=>{const complete=performance.getEntriesByName('dagongren.home.self-check.complete')[0],glare=performance.getEntriesByName('dagongren.home.glare')[0];return complete.detail.rolling===0&&glare.startTime>=complete.startTime&&glare.detail.afterSelfCheck&&glare.detail.rolling===0&&glare.detail.runs===1&&glare.detail.direction==='top-left-to-bottom-right'&&glare.detail.from==='translate3d(-105%,-105%,0)'&&glare.detail.to==='translate3d(105%,105%,0)'&&glare.detail.duration===1000})()"));
+            double glareSecond=(Double.parseDouble(evaluate(scenario,"performance.getEntriesByName('dagongren.home.glare')[0].detail.at"))-recordingStarted)/1000.0;
+            android.util.Log.i("DagongrenLaunchReview","GLARE_SECOND="+glareSecond);
+            waitTrue(scenario,"performance.getEntriesByName('dagongren.home.glare.complete').length===1&&!document.querySelector('.hero-startup-glare')");
             paintedScreenshot(scenario,"startup-home");
             device.pressHome();
             target.startActivity(new android.content.Intent(target,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
             waitTrue(scenario,"Boolean(document.querySelector('.view-home'))&&!document.querySelector('.launch-page')&&!document.getElementById('app').inert");
             awaitInputWindow(scenario);dismissEmulatorLauncherAnr();
-            assertEquals("true",evaluate(scenario,"performance.getEntriesByName('dagongren.home.self-check').length===1&&localStorage.getItem('dagongren.paybook.v1')===window.__selfCheckBook"));
+            assertEquals("true",evaluate(scenario,"performance.getEntriesByName('dagongren.home.self-check').length===1&&performance.getEntriesByName('dagongren.home.glare').length===1&&performance.getEntriesByName('dagongren.home.glare.complete').length===1&&localStorage.getItem('dagongren.paybook.v1')===window.__selfCheckBook"));
         } finally {
             withActivity(activity->activity.finish());
             recording.join(35000);
