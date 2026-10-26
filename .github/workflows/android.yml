@@ -74,12 +74,12 @@ jobs:
       - name: Prepare installable APK
         run: |
           mkdir -p artifacts
-          cp android/app/build/outputs/apk/release/app-release.apk artifacts/dagongren-1.2.1.apk
+          cp android/app/build/outputs/apk/release/app-release.apk artifacts/dagongren-1.2.2.apk
           cd artifacts
-          sha256sum dagongren-1.2.1.apk > SHA256SUMS.txt
+          sha256sum dagongren-1.2.2.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: dagongren-1.2.1-apk
+          name: dagongren-1.2.2-apk
           path: artifacts/
           retention-days: 30
           if-no-files-found: error
@@ -115,7 +115,7 @@ jobs:
                           print((failure.text or '')[:12000])
               except Exception:
                   pass
-          wanted = ['startup-interface', 'record-year-picker', 'cleanup-range-cards', 'entry-filter-contrast', 'calendar-stable', 'cleanup-cloud-option', 'keyboard-centered', 'startup-home']
+          wanted = ['charts-home', 'charts-records', 'charts-profile', 'charts-calendar', 'calendar-four-weeks', 'calendar-five-weeks', 'calendar-six-weeks', 'cleanup-cloud-option']
           root = Path('android/app/build/reports')
           found = []
           for name in wanted:
@@ -201,7 +201,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: dagongren-1.2.1-apk
+          name: dagongren-1.2.2-apk
           path: artifacts
       - name: Publish signed release from verified main
         env:
@@ -210,4 +210,4 @@ jobs:
           cd artifacts
           sha256sum -c SHA256SUMS.txt
           cd ..
-          gh release create v1.2.1 artifacts/dagongren-1.2.1.apk artifacts/SHA256SUMS.txt --target "$GITHUB_SHA" --title "打工人 1.2.1" --notes-file .github/release-notes/1.2.1.md
+          gh release create v1.2.2 artifacts/dagongren-1.2.2.apk artifacts/SHA256SUMS.txt --target "$GITHUB_SHA" --title "打工人 1.2.2" --notes-file .github/release-notes/1.2.2.md

@@ -75,6 +75,51 @@ public class AppSmokeTest {
         Thread.sleep(100);
         screenshot(name);
     }
+
+    private void selectCalendarMonth(ActivityScenario<MainActivity> scenario,String month) throws Exception {
+        evaluate(scenario,"document.querySelector('[data-action=month-picker]').click();const year=Number('"+month+"'.slice(0,4));for(let n=0;n<25;n++){const current=parseInt(document.querySelector('.month-year span').textContent);if(current===year)break;document.querySelector('[data-action=picker-year][data-delta=\"'+(current>year?'-1':'1')+'\"]').click();}document.querySelector('[data-action=choose-month][data-month=\""+month+"\"]').click()");
+    }
+    @Test public void cycleWagesChartsAndAdaptiveCalendarMatchLedger() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            evaluate(scenario,"const defaults={salaryCents:600001,company:'周期图表验收',joinDate:'2026-09-21',periodMode:'custom',periodStartDay:21,payday:25,motion:true};const r=()=>({...defaults,leaves:[],overtime:[],subsidies:[],deductions:[],advances:[],payments:[]});const sept=r(),oct=r();sept.payments=[{id:'p',date:'2026-10-22',amountCents:200000,periodStart:'2026-09-21',periodEnd:'2026-10-20'}];sept.advances=[{id:'a',date:'2026-10-22',amountCents:100000,periodStart:'2026-09-21',periodEnd:'2026-10-20'}];oct.leaves=[{id:'l',date:'2026-10-22',days:.5,deduct:true}];oct.overtime=[{id:'o',date:'2026-10-23',mode:'custom',amountCents:8000}];oct.subsidies=[{id:'s',date:'2026-10-23',amountCents:20000,category:'餐补'}];oct.deductions=[{id:'d',date:'2026-10-24',amountCents:3000,category:'住宿费'}];localStorage.setItem('dagongren.paybook.v1',JSON.stringify({version:2,defaults,months:{'2026-09':sept,'2026-10':oct},excludedMonths:[],sync:{auto:false,nativeVersion:1,pending:0,logs:[]}}))");
+            scenario.recreate();waitReady(scenario);
+            waitTrue(scenario,"Boolean(document.querySelector('.settlement-chart .chart-ring-fill'))");
+            assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth"));
+            paintedScreenshot(scenario,"charts-home");
+            evaluate(scenario,"document.querySelector('[data-view=records]').click();document.querySelector('.month-pay-card[data-period^=\"2026-09-21|\"]').click();document.querySelector('.period-component-list .sum').click()");
+            assertEquals("600001",evaluate(scenario,"Number(document.querySelector('.metric-total').dataset.total)"));
+            evaluate(scenario,"globalThis.dagongrenBack();document.querySelector('[data-view=records]').click()");
+            waitTrue(scenario,"Boolean(document.querySelector('.annual-chart .wage-plot'))");
+            paintedScreenshot(scenario,"charts-records");
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click()");
+            waitTrue(scenario,"document.querySelectorAll('.record-mix-bar .mix-segment').length===6");
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.mix-segment')].reduce((n,e)=>n+Number(e.dataset.count),0)===6"));
+            paintedScreenshot(scenario,"charts-profile");
+            evaluate(scenario,"document.querySelector('[data-view=calendar]').click()");
+            selectCalendarMonth(scenario,"2021-02");
+            assertEquals("28",evaluate(scenario,"document.querySelector('.calendar-days').children.length"));
+            evaluate(scenario,"window.__fourWeekHeight=document.querySelector('.calendar-days').getBoundingClientRect().height;document.querySelector('.calendar-panel').scrollIntoView({block:'start'})");
+            paintedScreenshot(scenario,"calendar-four-weeks");
+            selectCalendarMonth(scenario,"2024-02");
+            assertEquals("35",evaluate(scenario,"document.querySelector('.calendar-days').children.length"));
+            evaluate(scenario,"document.querySelector('.calendar-panel').scrollIntoView({block:'start'})");
+            paintedScreenshot(scenario,"calendar-five-weeks");
+            selectCalendarMonth(scenario,"2026-08");
+            assertEquals("42",evaluate(scenario,"document.querySelector('.calendar-days').children.length"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('.calendar-days').getBoundingClientRect().height>window.__fourWeekHeight*1.4"));
+            evaluate(scenario,"document.querySelector('.calendar-panel').scrollIntoView({block:'start'})");
+            paintedScreenshot(scenario,"calendar-six-weeks");
+            selectCalendarMonth(scenario,"2026-10");
+            waitTrue(scenario,"document.querySelectorAll('.daily-chart .chart-bar').length>0");
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.daily-chart .chart-bar')].reduce((n,e)=>n+Number(e.dataset.amount),0)===Math.round(Number(document.querySelector('.calendar-summary button strong').textContent.replace(/[^0-9.-]/g,''))*100)"));
+            evaluate(scenario,"document.querySelector('.daily-chart').scrollIntoView({block:'start'})");
+            paintedScreenshot(scenario,"charts-calendar");
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('[data-view=home]').click()");
+            assertEquals("\"none\"",evaluate(scenario,"getComputedStyle(document.querySelector('.chart-ring-fill')).animationName"));
+        }
+    }
+
     private String rollingLayoutCheck(String selector) {
         return "(()=>{const numbers=[...document.querySelectorAll('"+selector+"')];return numbers.length===2&&numbers.some(n=>n.querySelectorAll('.number-roll-slot').length>1)&&numbers.every(n=>{const slots=[...n.querySelectorAll('.number-roll-slot')];return slots.length>0&&slots.every(s=>getComputedStyle(s).display==='inline-block'&&getComputedStyle(s).fontSize===getComputedStyle(n).fontSize&&Math.abs(s.getBoundingClientRect().top-slots[0].getBoundingClientRect().top)<1)})})()";
     }
@@ -262,7 +307,7 @@ public class AppSmokeTest {
             evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
             waitTrue(scenario,"!document.querySelector('.number-roll-strip')");
             evaluate(scenario,"document.querySelector('[data-view=calendar]').click();window.__calendarHeight=document.querySelector('.calendar-days').getBoundingClientRect().height;for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
-            assertEquals("42",evaluate(scenario,"document.querySelector('.calendar-days').children.length"));
+            assertEquals("true",evaluate(scenario,"(()=>{const m=document.querySelector('[data-calendar-month]').dataset.calendarMonth,[y,n]=m.split('-').map(Number),first=(new Date(Date.UTC(y,n-1,1)).getUTCDay()+6)%7,days=new Date(Date.UTC(y,n,0)).getUTCDate();return document.querySelector('.calendar-days').children.length===Math.ceil((first+days)/7)*7})()"));
             assertEquals("true",evaluate(scenario,"Math.abs(document.querySelector('.calendar-days').getBoundingClientRect().height-window.__calendarHeight)<1"));
             assertEquals("0",evaluate(scenario,"document.querySelectorAll('.calendar-day .number-roll-strip').length"));
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.calendar-day[data-date]')].every(e=>Number(e.dataset.date.slice(8))===Number(e.querySelector('.day-number').childNodes[0].nodeValue))"));

@@ -54,9 +54,15 @@ export function payPeriodForDate(date,settings={}) {
   let dueDate=dateInMonth(end.slice(0,7),payday);if(dueDate<=end)dueDate=dateInMonth(shiftMonth(end.slice(0,7),1),payday);
   return {start,end,dueDate,anchor};
 }
-export function calculate(month,record,asOf=chinaDate()) {
+export function salaryRateForDate(date,salaryCents,settings={}) {
+  const period=payPeriodForDate(date,settings),divisor=Math.round((Date.parse(period.end+'T00:00:00Z')-Date.parse(period.start+'T00:00:00Z'))/86400000)+1;
+  return {...period,divisor,dailyCents:cents(Number(salaryCents),'固定工资')/divisor};
+}
+export function calculate(month,record,asOf=chinaDate(),settings=record,rounding=new Map()) {
   if(!validMonth(month)||!validDate(asOf))throw new Error('计薪日期无效');
-  const salaryCents=cents(Number(record.salaryCents),'月薪'),divisor=daysInMonth(month),joinDate=record.joinDate||month+'-01';
+  const salaryCents=cents(Number(record.salaryCents),'月薪'),monthDays=daysInMonth(month),joinDate=record.joinDate||month+'-01',custom=settings.periodMode==='custom';
+  const reference=asOf.startsWith(month)?asOf:month+'-'+monthDays,rate=salaryRateForDate(reference,salaryCents,settings),divisor=rate.divisor,rates=[];
+  for(let date=month+'-01';date.startsWith(month+'-');){const value=salaryRateForDate(date,salaryCents,settings),to=value.end<month+'-'+monthDays?value.end:month+'-'+monthDays;rates.push({...value,from:date,to});date=shiftDay(to,1);}
   if(!validDate(joinDate))throw new Error('入职日期无效');
   const leaves=list(record,'leaves'),seen=new Set(),overtime=list(record,'overtime'),otIds=new Set();
   for(const item of leaves){if(!validDate(item.date)||!item.date.startsWith(month+'-')||![.5,1].includes(item.days)||seen.has(item.date)||(item.deduct!==undefined&&typeof item.deduct!=='boolean'))throw new Error('请假记录无效或重复');seen.add(item.date);}
@@ -69,21 +75,31 @@ export function calculate(month,record,asOf=chinaDate()) {
   }
   const cash=[...list(record,'advances'),...wagePayments(record)],cashIds=new Set();for(const item of cash){validCash(item);if(cashIds.has(item.id))throw new Error('收款编号重复');cashIds.add(item.id);}
   let accruedDays=0,leaveDays=0,holidayLeaveDays=0,adjustedLeaveDays=0,deductLeaveDays=0,previousNet=0,previousGross=0,baseCents=0,overtimeCents=0,subsidyCents=0,wageDeductionCents=0;const daily=[];
-  for(let day=1;day<=divisor;day++){
+  for(let day=1;day<=monthDays;day++){
     const date=month+'-'+String(day).padStart(2,'0');if(date<joinDate||date>asOf)continue;
     accruedDays++;const leave=leaves.find(x=>x.date===date);
     if(leave){leaveDays+=leave.days;if(isStatutory(date))holidayLeaveDays+=leave.days;if(isAdjustedDay(date))adjustedLeaveDays+=leave.days;if(leaveDeducts(leave,record))deductLeaveDays+=leave.days;}
-    const gross=Math.round(salaryCents*accruedDays/divisor),net=Math.round(salaryCents*(accruedDays-deductLeaveDays)/divisor),ot=overtime.filter(x=>x.date===date).reduce((n,item)=>n+overtimeAmount(item),0),subsidy=subsidies.filter(x=>x.date===date).reduce((n,x)=>n+x.amountCents,0),deduction=deductions.filter(x=>x.date===date).reduce((n,x)=>n+x.amountCents,0);
-    daily.push({date,amountCents:net-previousNet+ot+subsidy-deduction,grossCents:gross-previousGross,leaveDeductionCents:gross-previousGross-(net-previousNet),overtimeCents:ot,subsidyCents:subsidy,wageDeductionCents:deduction});previousNet=net;previousGross=gross;baseCents=gross;overtimeCents+=ot;subsidyCents+=subsidy;wageDeductionCents+=deduction;
+    const dailyRate=salaryRateForDate(date,salaryCents,settings);
+    let gross,net;
+    if(custom){
+      // Keep cent rounding cumulative within one company, salary and pay period, including across months.
+      const key=JSON.stringify([dailyRate.start,record.company||'',salaryCents,joinDate]),state=rounding.get(key)||{days:0,leave:0,gross:0,net:0};
+      state.days++;if(leave&&leaveDeducts(leave,record))state.leave+=leave.days;
+      const nextGross=Math.round(salaryCents*state.days/dailyRate.divisor),nextNet=Math.round(salaryCents*(state.days-state.leave)/dailyRate.divisor);
+      gross=previousGross+nextGross-state.gross;net=previousNet+nextNet-state.net;
+      Object.assign(state,{gross:nextGross,net:nextNet});rounding.set(key,state);
+    }else{gross=Math.round(salaryCents*accruedDays/divisor);net=Math.round(salaryCents*(accruedDays-deductLeaveDays)/divisor);}
+    const ot=overtime.filter(x=>x.date===date).reduce((n,item)=>n+overtimeAmount(item),0),subsidy=subsidies.filter(x=>x.date===date).reduce((n,x)=>n+x.amountCents,0),deduction=deductions.filter(x=>x.date===date).reduce((n,x)=>n+x.amountCents,0);
+    daily.push({date,amountCents:net-previousNet+ot+subsidy-deduction,grossCents:gross-previousGross,leaveDeductionCents:gross-previousGross-(net-previousNet),overtimeCents:ot,subsidyCents:subsidy,wageDeductionCents:deduction,divisor:dailyRate.divisor,dailyCents:dailyRate.dailyCents,periodStart:dailyRate.start,periodEnd:dailyRate.end});previousNet=net;previousGross=gross;baseCents=gross;overtimeCents+=ot;subsidyCents+=subsidy;wageDeductionCents+=deduction;
   }
   const expectedCents=previousNet+overtimeCents+subsidyCents-wageDeductionCents,advanceCents=list(record,'advances').filter(x=>x.date<=asOf).reduce((n,x)=>n+x.amountCents,0),paymentCents=wagePayments(record).filter(x=>x.date<=asOf).reduce((n,x)=>n+x.amountCents,0),receivedCents=advanceCents+paymentCents,remainingCents=Math.max(0,expectedCents-receivedCents);
-  return {salaryCents,divisor,dailyCents:salaryCents/divisor,joinDate,accruedDays,leaveDays,holidayLeaveDays,adjustedLeaveDays,deductLeaveDays,baseCents,deductionCents:baseCents-previousNet,overtimeCents,subsidyCents,wageDeductionCents,expectedCents,advanceCents,paymentCents,receivedCents,remainingCents,deductionCarryCents:Math.max(0,-expectedCents),excessCents:Math.max(0,receivedCents-Math.max(0,expectedCents)),plannedLeaveDays:leaves.reduce((n,x)=>n+x.days,0),daily,status:remainingCents?(receivedCents?'partial':'unpaid'):expectedCents<0?'offset':asOf>=month+'-'+divisor?'paid':accruedDays?'current':'future'};
+  return {salaryCents,divisor,dailyCents:salaryCents/divisor,rates,joinDate,accruedDays,leaveDays,holidayLeaveDays,adjustedLeaveDays,deductLeaveDays,baseCents,deductionCents:baseCents-previousNet,overtimeCents,subsidyCents,wageDeductionCents,expectedCents,advanceCents,paymentCents,receivedCents,remainingCents,deductionCarryCents:Math.max(0,-expectedCents),excessCents:Math.max(0,receivedCents-Math.max(0,expectedCents)),plannedLeaveDays:leaves.reduce((n,x)=>n+x.days,0),daily,status:remainingCents?(receivedCents?'partial':'unpaid'):expectedCents<0?'offset':asOf>=month+'-'+monthDays?'paid':accruedDays?'current':'future'};
 }
 export function calculateBook(months,settings,asOf=chinaDate()) {
-  const byMonth={},chunks=[],receipts=[],periods=new Map();
+  const byMonth={},chunks=[],receipts=[],periods=new Map(),rounding=new Map();
   const periodFor=(date,company)=>{const range=payPeriodForDate(date,settings),id=range.start+'|'+encodeURIComponent(company);if(!periods.has(id))periods.set(id,{...range,id,company,expectedCents:0,remainingCents:0,receivedCents:0,advanceCents:0,paymentCents:0,unappliedCents:0,deductionCarryCents:0,baseCents:0,deductionCents:0,overtimeCents:0,subsidyCents:0,wageDeductionCents:0,accruedDays:0});return periods.get(id);};
   for(const [month,r] of Object.entries(months).sort(([a],[b])=>a.localeCompare(b))){
-    const value=calculate(month,r,asOf),company=r.company||'';byMonth[month]={...value,receivedCents:0,advanceCents:0,paymentCents:0,remainingCents:0,excessCents:0,deductionCarryCents:0,settlementCents:0};
+    const value=calculate(month,r,asOf,settings,rounding),company=r.company||'';byMonth[month]={...value,receivedCents:0,advanceCents:0,paymentCents:0,remainingCents:0,excessCents:0,deductionCarryCents:0,settlementCents:0};
     for(const item of value.daily){const p=periodFor(item.date,company),chunk={...item,month,company,periodId:p.id,settlementCents:Math.max(0,item.amountCents),remainingCents:Math.max(0,item.amountCents),deductionCarryCents:0,adjustmentOffsets:[]};chunks.push(chunk);p.expectedCents+=item.amountCents;p.accruedDays++;for(const key of ['baseCents','deductionCents','overtimeCents','subsidyCents','wageDeductionCents'])p[key]+=item[{baseCents:'grossCents',deductionCents:'leaveDeductionCents'}[key]||key];}
     for(const [kind,items] of [['advance',list(r,'advances')],['payment',wagePayments(r)]])for(const item of items){
       if(item.date>asOf)continue;

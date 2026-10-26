@@ -46,20 +46,20 @@ test('云端一并清理先核对数量，确认前两端均不修改',async()=>
 test('一并清理仅删除所选月份，保留双方范围外记录及各自设置',async()=>{
  const local=seed(),remote=seed();local.months['2026-09']={...copy(local.months['2026-10']),subsidies:[{...entry('local-outside'),date:'2026-09-20'}]};remote.months['2026-08']={...copy(remote.months['2026-10']),subsidies:[{...entry('remote-outside'),date:'2026-08-20'}]};remote.defaults.company='云端原设置';
  const s={book:remote,version:1},a=device(s,local);
- try{await a.sync.reviewCleanup({scope:'month',month:'2026-10'});s.book.months['2026-08'].subsidies[0].note='确认期间新增备注';s.version++;assert.equal(await a.sync.confirmCleanup(),true);assert.equal(a.get().months['2026-10'],undefined);assert.equal(s.book.months['2026-10'],undefined);assert.equal(s.book.months['2026-08'].subsidies[0].note,'确认期间新增备注');assert.equal(a.get().months['2026-09'].subsidies[0].id,'local-outside');assert.equal(s.book.months['2026-08'].subsidies[0].id,'remote-outside');assert.equal(s.book.defaults.company,'云端原设置');assert.equal(a.get().defaults.company,'测试公司');assert.equal(a.get().sync.auto,false);assert.equal(a.get().sync.pendingCleanup,undefined);}
+ try{await a.sync.reviewCleanup({scope:'month',month:'2026-10'});s.book.months['2026-08'].subsidies[0].note='确认期间新增备注';s.version++;assert.equal(await a.sync.confirmCleanup(),true);assert.equal(a.get().months['2026-10'],undefined);assert.equal(s.book.months['2026-10'],undefined);assert.equal(s.book.months['2026-08'].subsidies[0].note,'确认期间新增备注');assert.equal(a.get().months['2026-09'].subsidies[0].id,'local-outside');assert.equal(s.book.months['2026-08'].subsidies[0].id,'remote-outside');assert.equal(s.book.defaults.company,'云端原设置');assert.equal(a.get().defaults.company,'测试公司');assert.equal(a.get().sync.auto,true);assert.equal(a.get().sync.pendingCleanup,undefined);}
  finally{a.sync.dispose();}
 });
 test('一并清理确认前所选云端数据发生变化时保留两端',async()=>{
  const s={book:seed(),version:1},a=device(s);try{await a.sync.reviewCleanup({scope:'month',month:'2026-10'});s.book.months['2026-10'].subsidies.push(entry('new'));s.version++;assert.equal(await a.sync.confirmCleanup(),false);assert.equal(a.writes(),0);assert.ok(a.get().months['2026-10']);assert.equal(s.book.months['2026-10'].subsidies[0].id,'new');}finally{a.sync.dispose();}
 });
 test('云端清理遇到条件版本竞争时不重试覆盖，本机仍保留',async()=>{
- const s={book:seed(),version:1},a=device(s);try{await a.sync.reviewCleanup({scope:'month',month:'2026-10'});s.onWrite=()=>{s.onWrite=null;s.book.months['2026-10'].subsidies.push(entry('racer'));s.version++;};assert.equal(await a.sync.confirmCleanup(),false);assert.equal(a.writes(),1);assert.ok(a.get().months['2026-10']);assert.equal(s.book.months['2026-10'].subsidies[0].id,'racer');assert.equal(a.get().sync.auto,false);assert.ok(a.get().sync.pendingCleanup);}finally{a.sync.dispose();}
+ const s={book:seed(),version:1},a=device(s);try{await a.sync.reviewCleanup({scope:'month',month:'2026-10'});s.onWrite=()=>{s.onWrite=null;s.book.months['2026-10'].subsidies.push(entry('racer'));s.version++;};assert.equal(await a.sync.confirmCleanup(),false);assert.equal(a.writes(),1);assert.ok(a.get().months['2026-10']);assert.equal(s.book.months['2026-10'].subsidies[0].id,'racer');assert.equal(a.get().sync.auto,true);assert.ok(a.get().sync.pendingCleanup);}finally{a.sync.dispose();}
 });
 test('云端写入成功但回包丢失时核验内容后再清本机',async()=>{
  const s={book:seed(),version:1,loseWriteReply:true},a=device(s);try{await a.sync.reviewCleanup({scope:'month',month:'2026-10'});assert.equal(await a.sync.confirmCleanup(),true);assert.equal(a.writes(),1);assert.equal(a.reads(),3);assert.equal(a.get().months['2026-10'],undefined);assert.equal(s.book.months['2026-10'],undefined);}finally{a.sync.dispose();}
 });
 test('云端已清理但本机保存失败时暂停同步，重新核对可完成本机清理',async()=>{
- const s={book:seed(),version:1},a=device(s);try{await a.sync.reviewCleanup({scope:'month',month:'2026-10'});s.onWrite=()=>{s.onWrite=null;a.failStorage('dagongren.paybook.v1');};assert.equal(await a.sync.confirmCleanup(),false);assert.ok(a.get().months['2026-10']);assert.equal(s.book.months['2026-10'],undefined);assert.ok(a.get().sync.pendingCleanup);assert.equal(a.get().sync.auto,false);a.failStorage('');await a.sync.reviewCleanup(a.get().sync.pendingCleanup.options);assert.equal(await a.sync.confirmCleanup(),true);assert.equal(a.get().months['2026-10'],undefined);assert.equal(a.get().sync.pendingCleanup,undefined);}finally{a.sync.dispose();}
+ const s={book:seed(),version:1},a=device(s);try{await a.sync.reviewCleanup({scope:'month',month:'2026-10'});s.onWrite=()=>{s.onWrite=null;a.failStorage('dagongren.paybook.v1');};assert.equal(await a.sync.confirmCleanup(),false);assert.ok(a.get().months['2026-10']);assert.equal(s.book.months['2026-10'],undefined);assert.ok(a.get().sync.pendingCleanup);assert.equal(a.get().sync.auto,true);a.failStorage('');await a.sync.reviewCleanup(a.get().sync.pendingCleanup.options);assert.equal(await a.sync.confirmCleanup(),true);assert.equal(a.get().months['2026-10'],undefined);assert.equal(a.get().sync.pendingCleanup,undefined);}finally{a.sync.dispose();}
 });
 test('云端读取失败时不清理本机，也不提交写入',async()=>{
  const s={book:seed(),version:1,readError:'连接暂不可用'},a=device(s);try{await a.sync.reviewCleanup({scope:'month',month:'2026-10'});assert.ok(a.get().months['2026-10']);assert.equal(a.writes(),0);assert.equal(await a.sync.confirmCleanup(),undefined);}finally{a.sync.dispose();}
@@ -71,7 +71,7 @@ test('另一台未修改的设备拉取清理结果时不会恢复已清月份',
 });
 test('重启后未确认的清理若两端均为空，可核对后解除待处理状态',async()=>{
  const initial=seed();initial.months={};initial.excludedMonths=['2026-10'];initial.sync={nativeVersion:1,auto:true,pendingCleanup:{id:'interrupted',options:{scope:'month',month:'2026-10'}}};const s={book:{...seed(),months:{},excludedMonths:['2026-10']},version:1},a=device(s,initial);
- try{assert.equal(a.get().sync.auto,false);await a.sync.reviewCleanup(a.get().sync.pendingCleanup.options);assert.equal(a.get().sync.pendingCleanup,undefined);assert.equal(a.get().sync.auto,false);assert.equal(a.writes(),0);}finally{a.sync.dispose();}
+ try{assert.equal(a.get().sync.auto,true);await a.sync.reviewCleanup(a.get().sync.pendingCleanup.options);assert.equal(a.get().sync.pendingCleanup,undefined);assert.equal(a.get().sync.auto,true);assert.equal(a.writes(),0);}finally{a.sync.dispose();}
 });
 
 test('云端清理成功后进程中断，重启保持本机与暂停状态且可核对完成',async()=>{
@@ -79,7 +79,22 @@ test('云端清理成功后进程中断，重启保持本机与暂停状态且�
  try{
   await a.sync.reviewCleanup({scope:'month',month:'2026-10'});s.onWrite=()=>{s.onWrite=null;a.failStorage('dagongren.paybook.v1');};assert.equal(await a.sync.confirmCleanup(),false);
   const persisted=JSON.parse(a.storage.get('dagongren.paybook.v1'));assert.ok(persisted.sync.pendingCleanup);assert.ok(persisted.months['2026-10']);a.sync.dispose();
-  const migrated=migrateBook(persisted,defaults,'2026-10-25');ensureAccrualMonths(migrated,'2026-10-25');restarted=device(s,migrated);await restarted.flush(500);assert.equal(restarted.reads(),0);assert.equal(restarted.writes(),0);assert.equal(restarted.get().sync.auto,false);assert.ok(restarted.get().months['2026-10']);
+  const migrated=migrateBook(persisted,defaults,'2026-10-25');ensureAccrualMonths(migrated,'2026-10-25');restarted=device(s,migrated);await restarted.flush(500);assert.equal(restarted.reads(),0);assert.equal(restarted.writes(),0);assert.equal(restarted.get().sync.auto,true);assert.ok(restarted.get().months['2026-10']);
   await restarted.sync.reviewCleanup(restarted.get().sync.pendingCleanup.options);assert.equal(await restarted.sync.confirmCleanup(),true);assert.equal(restarted.get().months['2026-10'],undefined);assert.equal(restarted.get().sync.pendingCleanup,undefined);assert.ok(restarted.get().excludedMonths.includes('2026-10'));
  }finally{a.sync.dispose();restarted?.sync.dispose();}
+});
+
+test('一并清理后原来开启的自动同步继续上传新修改，不恢复已清月份',async()=>{
+ const initial=seed();initial.months['2026-09']={...copy(initial.months['2026-10']),joinDate:'2026-09-01'};initial.defaults.joinDate='2026-09-01';
+ const s={book:copy(initial),version:1},a=device(s,initial);
+ try{await a.sync.reviewCleanup({scope:'month',month:'2026-10'});assert.equal(await a.sync.confirmCleanup(),true);assert.equal(a.get().sync.auto,true);assert.equal(a.get().sync.pausedByCleanup,false);a.get().months['2026-09'].subsidies.push({...entry('after-cleanup'),date:'2026-09-20'});a.sync.schedule();await a.flush(2500);assert.equal(s.book.months['2026-09'].subsidies[0].id,'after-cleanup');assert.equal(s.book.months['2026-10'],undefined);assert.equal(a.modal(),'');}finally{a.sync.dispose();}
+});
+test('一并清理保留原来关闭的自动同步开关，取消和云端失败也不改开关',async()=>{
+ for(const auto of [true,false]){
+  const initial=seed();initial.sync={auto};const s={book:seed(),version:1},a=device(s,initial);
+  try{
+   await a.sync.reviewCleanup({scope:'month',month:'2026-10'});a.sync.cancelCleanupReview();assert.equal(a.get().sync.auto,auto);assert.ok(a.get().months['2026-10']);
+   await a.sync.reviewCleanup({scope:'month',month:'2026-10'});assert.equal(await a.sync.confirmCleanup(),true);assert.equal(a.get().sync.auto,auto);assert.equal(a.get().sync.pausedByCleanup,false);
+  }finally{a.sync.dispose();}
+ }
 });
