@@ -155,3 +155,6 @@
 @media(max-width:360px){.cycle-toolbar{flex-wrap:wrap}.cycle-toolbar .month-control{flex-basis:100%;justify-content:space-between}.cycle-toolbar .month-settings{margin-left:auto}.cycle-display{font-size:12px}}
 
 .choice-header>div{flex:1;min-width:0}.choice-close{margin-left:auto;flex-shrink:0;font-size:23px;line-height:1}
+
+/* Sign colors belong to the net wage, independent of holiday and leave backgrounds. */
+.calendar-day .day-wage.wage-income{color:#15805a}.calendar-day .day-wage.wage-loss{color:#c7424b}.calendar-day .day-wage.wage-neutral{color:#7b899e}.calendar-day.today .day-wage{background:#fff;border-radius:4px;padding:0 3px}.calendar-source-note>span>strong{display:block;font-size:11px;font-weight:550;color:#4d6588}.calendar-source-note>span>small{display:block;font-size:10px}.calendar-help{font-size:12px;line-height:1.9;color:#63728c;margin-bottom:18px}.calendar-help h3{font-size:14px;color:#294567;margin:18px 0 7px}.calendar-help h3:first-child{margin-top:0}.calendar-help p+p{margin-top:7px}

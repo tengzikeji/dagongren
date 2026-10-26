@@ -127,3 +127,10 @@ console.log('Passed: all prior wage, leave, pay-period, cash, sync, cleanup, and
  const d=clone(fixture);d.defaults.periodMode='calendar';const ui=boot(d);ui.click('choose-month',{month:'2026-09'});assert.equal(ui.evaluate('__check.homeAccount().start'),'2026-09-01');assert.equal(ui.evaluate('__check.homeAccount().end'),'2026-09-30');assert.equal(ui.evaluate('__check.homeAccount().expectedCents'),200000);ui.click('shift-month',{delta:'1'});assert.equal(ui.evaluate('__check.homeAccount().start'),'2026-10-01');
 }
 console.log('Passed 1.2.3: cycle-aligned home balances/drilldowns, short months/cross-year selection, whole natural months, independent calendar selection, page return, compact profile switch and cleanup label.');
+
+{
+ const d=clone(fixture);d.defaults={...d.defaults,periodMode:'calendar',salaryCents:310000,joinDate:'2026-10-01'};d.months={'2026-10':{...d.defaults,leaves:[{id:'zero',date:'2026-10-03',days:1,deduct:true}],overtime:[],subsidies:[],deductions:[{id:'negative',date:'2026-10-02',amountCents:30000,category:'住宿费'}],advances:[],payments:[],payment:null}};
+ const ui=boot(d);ui.click('nav',{view:'calendar'});const html=ui.el('app').innerHTML;assert.match(html,/class="day-wage number wage-income">100.00/);assert.match(html,/class="day-wage number wage-loss">-200.00/);assert.match(html,/class="day-wage number wage-neutral">0.00/);assert.match(html,/class="day-wage number wage-neutral">—/);assert.match(html,/日历使用说明/);
+ ui.click('calendar-sources');const help=ui.el('modal-root').innerHTML;for(const text of ['不是当天实际收到的工资','4、5或6行','当月总天数','完整工资周期','未来日期不提前计薪','修改默认开关不会改动旧记录'])assert.ok(help.includes(text),text);ui.click('calendar-rights');assert.doesNotMatch(ui.el('modal-root').innerHTML,/本测试版|name=\"accterm\"/);
+}
+console.log('Passed signed calendar wages and corrected calendar usage/rights descriptions.');

@@ -179,6 +179,30 @@ public class AppSmokeTest {
         }
     }
 
+    @Test public void signedCalendarAmountsAndUsageStayAccurate() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            evaluate(scenario,"var signedDefaults={salaryCents:310000,company:'日历颜色验收',joinDate:'2026-10-01',periodMode:'calendar',periodStartDay:1,payday:15,motion:false};var signedRecord={...signedDefaults,leaves:[{id:'zero',date:'2026-10-03',days:1,deduct:true}],overtime:[],subsidies:[],deductions:[{id:'negative',date:'2026-10-02',amountCents:30000,category:'住宿费'}],advances:[],payments:[],payment:null};localStorage.setItem('dagongren.paybook.v1',JSON.stringify({version:2,defaults:signedDefaults,months:{'2026-10':signedRecord},excludedMonths:[],sync:{auto:false,nativeVersion:1,pending:0,logs:[]}}))");
+            scenario.recreate();waitReady(scenario);
+            evaluate(scenario,"document.querySelector('[data-view=calendar]').click()");
+            selectCalendarMonth(scenario,"2026-10");
+            assertEquals("true",evaluate(scenario,"(()=>{const cell=date=>document.querySelector('.calendar-day[data-date=\"'+date+'\"] .day-wage'),rgb=e=>getComputedStyle(e).color.match(/[0-9.]+/g).map(Number),p=cell('2026-10-01'),n=cell('2026-10-02'),z=cell('2026-10-03'),f=cell('2026-10-31'),pc=rgb(p),nc=rgb(n);return Number(p.textContent)===100&&Number(n.textContent)===-200&&Number(z.textContent)===0&&f.textContent==='—'&&pc[1]>pc[0]&&pc[1]>pc[2]&&nc[0]>nc[1]&&nc[0]>nc[2]&&getComputedStyle(z).color===getComputedStyle(f).color&&z.classList.contains('wage-neutral')})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const today=document.querySelector('.calendar-day.today .day-wage');const c=getComputedStyle(today).color.match(/[0-9.]+/g).map(Number);return c[1]>c[0]&&c[1]>c[2]})()"));
+            assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth"));
+            evaluate(scenario,"document.querySelector('.calendar-panel').scrollIntoView({block:'start'})");
+            paintedScreenshot(scenario,"calendar-signed-wages");
+            evaluate(scenario,"document.querySelector('[data-action=calendar-sources]').click()");
+            assertEquals("true",evaluate(scenario,"(()=>{const t=document.querySelector('.modal-body').textContent;return t.includes('不是当天实际收到的工资')&&t.includes('4、5或6行')&&t.includes('完整工资周期')&&t.includes('未来日期不提前计薪')&&t.includes('修改默认开关不会改动旧记录')})()"));
+            paintedScreenshot(scenario,"calendar-usage");
+            evaluate(scenario,"document.querySelector('[data-action=calendar-rights]').click()");
+            assertEquals("true",evaluate(scenario,"!document.querySelector('.modal-body').textContent.includes('本测试版')&&!document.querySelector('[name=accterm]')"));
+            evaluate(scenario,"document.querySelector('.modal-back').click()");
+            assertEquals("\"日历使用说明\"",evaluate(scenario,"document.getElementById('modal-title').textContent"));
+            evaluate(scenario,"document.querySelector('.modal-close').click()");
+            waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.calendar-panel'))");
+        }
+    }
+
     private String rollingLayoutCheck(String selector) {
         return "(()=>{const numbers=[...document.querySelectorAll('"+selector+"')];return numbers.length===2&&numbers.some(n=>n.querySelectorAll('.number-roll-slot').length>1)&&numbers.every(n=>{const slots=[...n.querySelectorAll('.number-roll-slot')];return slots.length>0&&slots.every(s=>getComputedStyle(s).display==='inline-block'&&getComputedStyle(s).fontSize===getComputedStyle(n).fontSize&&Math.abs(s.getBoundingClientRect().top-slots[0].getBoundingClientRect().top)<1)})})()";
     }
