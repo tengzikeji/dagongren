@@ -49,7 +49,7 @@ public final class MainActivity extends Activity {
         if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(splash->{
             systemSplashDelivered=true;dismissSystemSplash=splash::remove;
             if(launchSurfacePrepared)completeLaunchSurface();
-            else splash.postDelayed(this::completeLaunchSurface,2000);
+            else splash.postDelayed(this::prepareLaunchSurface,1200);
         });
 
         refreshAppearance();
@@ -130,8 +130,14 @@ public final class MainActivity extends Activity {
         if(webView!=null)webView.evaluateJavascript("globalThis.dagongrenSystemTheme && globalThis.dagongrenSystemTheme("+systemIsDark()+");",null);
     }
 
+    private void prepareLaunchSurface(){
+        if(webView==null||isDestroyed()||launchSurfacePrepared)return;
+        webView.postVisualStateCallback(1,new WebView.VisualStateCallback(){
+            @Override public void onComplete(long requestId){launchSurfacePrepared=true;completeLaunchSurface();}
+        });
+    }
+
     private void completeLaunchSurface(){
-        launchSurfacePrepared=true;
         if(!systemSplashDelivered)return;
         if(dismissSystemSplash!=null){dismissSystemSplash.run();dismissSystemSplash=null;}
         if(!launchNotified&&webView!=null&&!isDestroyed()){
@@ -165,7 +171,7 @@ public final class MainActivity extends Activity {
     }
     public final class NativeFiles {
         @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
-        @JavascriptInterface public void introReady(){runOnUiThread(MainActivity.this::completeLaunchSurface);}
+        @JavascriptInterface public void introReady(){runOnUiThread(MainActivity.this::prepareLaunchSurface);}
         @JavascriptInterface public boolean systemDark(){return systemIsDark();}
         @JavascriptInterface public void themeStyle(String mode){
             if(!"system".equals(mode)&&!"light".equals(mode)&&!"dark".equals(mode))return;

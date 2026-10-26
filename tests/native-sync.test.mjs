@@ -38,7 +38,7 @@ test('错误格式不能覆盖本机',()=>{
  for(const value of [{},{format:'other',book:wages()},{format:'dagongren.webdav.v1',book:{...wages(),version:3}}])assert.throws(()=>validateRemoteEnvelope(value));
  assert.equal(validateRemoteEnvelope({format:'dagongren.webdav.v1',book:wages()}).version,2);
 });
-function fixture(initial,readResponse,writeResponse={}){
+function fixture(initial,readResponse,writeResponse={},hooks={}){
  let current=initial,modal='',messages=[],calls=[],writes=0,renders=0,onRead=null;
  const stored=new Map(),elements={};
  globalThis.localStorage={getItem:key=>stored.get(key)||null,setItem:(key,value)=>stored.set(key,value)};
@@ -52,7 +52,7 @@ function fixture(initial,readResponse,writeResponse={}){
    else globalThis.dagongrenNativeResult(id,{ok:true,data:{}});
   });}
  };
- const api={getBook:()=>current,replaceBook:next=>{current=next},defaults,today:()=> '2026-10-24',storageBlocked:()=>false,persist:()=>{},render:()=>{renders++},toast:message=>messages.push(message),showModal:(title,body)=>{modal=title+body},closeModal:()=>{modal=''},esc:x=>String(x)};
+ const api={getBook:()=>current,replaceBook:next=>{current=next},defaults,today:()=> '2026-10-24',storageBlocked:()=>false,persist:()=>{},render:()=>{renders++},toast:message=>messages.push(message),showModal:(title,body)=>{modal=title+body},closeModal:()=>{modal=''},esc:x=>String(x),...hooks};
  const sync=installNativeSync(api);
  return {sync,get:()=>current,messages,calls,stored,writes:()=>writes,renders:()=>renders,modal:()=>modal,onRead:fn=>{onRead=fn}};
 }
@@ -110,4 +110,14 @@ test('关闭自动同步后，在途读取不再上传或弹出冲突框',async(
  const initial=wages();initial.sync={nativeVersion:1,auto:true,pending:2};const f=fixture(initial,{exists:false});
  try{f.onRead(()=>f.sync.handleClick('toggle-auto'));await f.sync.run('normal',true);assert.equal(f.get().sync.auto,false);assert.equal(f.writes(),0);assert.equal(f.get().sync.pending,2);assert.equal(f.modal(),'');}
  finally{f.sync.dispose();}
+});
+
+test('云端清理先完成弹窗入场，再更新原弹窗，等待时不能确认',async()=>{
+ let release,shown=0,updated=0,body='';const painted=new Promise(resolve=>release=resolve),book=wages();
+ const f=fixture(book,{exists:true,etag:'"one"',envelope:{format:'dagongren.webdav.v2',book:snapshotBook(book)}},{},{afterModalOpen:()=>painted,showModal:(title,html)=>{shown++;body=html},updateModal:(title,html)=>{updated++;body=html}});
+ try{const review=f.sync.reviewCleanup({scope:'month',month:'2026-10'});assert.equal(shown,1);assert.match(body,/cloud-cleanup-loading/);assert.match(body,/native-cleanup-confirm" disabled/);await new Promise(resolve=>setImmediate(resolve));assert.equal(updated,0);assert.equal(f.writes(),0);assert.equal(await f.sync.confirmCleanup(),undefined);release();await review;assert.equal(shown,1);assert.equal(updated,1);assert.doesNotMatch(body,/cloud-cleanup-loading/);assert.doesNotMatch(body,/native-cleanup-confirm" disabled/);assert.equal(f.writes(),0);assert.ok(f.get().months['2026-10']);}finally{release();f.sync.dispose();}
+});
+test('核对弹窗入场期间取消，快速云端响应不会重新弹窗或清理记录',async()=>{
+ let release,updates=0;const painted=new Promise(resolve=>release=resolve),book=wages(),f=fixture(book,{exists:true,etag:'"one"',envelope:{format:'dagongren.webdav.v2',book:snapshotBook(book)}},{},{afterModalOpen:()=>painted,updateModal:()=>updates++});
+ try{const review=f.sync.reviewCleanup({scope:'month',month:'2026-10'});await new Promise(resolve=>setImmediate(resolve));assert.equal(f.sync.cancelCleanupReview(),true);release();await review;assert.equal(updates,0);assert.equal(f.writes(),0);assert.equal(await f.sync.confirmCleanup(),undefined);assert.ok(f.get().months['2026-10']);}finally{release();f.sync.dispose();}
 });

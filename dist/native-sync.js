@@ -123,17 +123,19 @@ export function installNativeSync(api){
   if(!online()){api.toast('当前离线，未清理任何记录。联网后再核对云端范围。');return;}
   if(api.storageBlocked()){api.toast('本机存储不可用，未清理任何记录。');return;}
   const epoch=++cleanupEpoch;cleanupReview=null;cleanupRetryOptions={...options,target:'both'};busy=true;clearTimeout(timer);clearTimeout(pollTimer);
-  const title='确认清理本机及云端？';
-  api.showModal(title,'<p id="cloud-cleanup-loading" class="field-note" role="status">正在读取云端账本，准备核对范围…</p><div class="modal-actions"><button class="btn btn-plain" data-action="modal-back">取消</button></div>',true);
+  const title='确认清理本机及云端？',e=api.esc;
+  const reviewBody=plan=>'<div class="cloud-cleanup-review" '+(!plan?'id="cloud-cleanup-loading" aria-busy="true"':'')+'><div class="notice">将清理两端账本中相同范围的记录。默认工资设置、连接配置及范围外的记录保留。</div><div class="detail-line"><span>清理范围</span><strong>'+e(cleanupRange(cleanupRetryOptions))+'</strong></div><div class="detail-line"><span>本机记录</span><strong>'+(plan?e(cleanupCount(plan.local)):'正在核对…')+'</strong></div><div class="detail-line"><span>云端记录</span><strong>'+(plan?e(cleanupCount(plan.cloud)):'正在核对…')+'</strong></div><div class="detail-line"><span>云端账号</span><strong>'+e(config.username||'当前已配置账号')+'</strong></div><p class="field-note">仅处理当前配置的打工人账本；'+e(config.path||'当前账本路径')+'。确认前会再次检查版本。清理完成后，自动同步开关保持原选择。</p></div><div class="error" id="cloud-cleanup-error" role="alert"></div><div class="modal-actions"><button class="btn btn-plain" data-action="modal-back">取消</button><button id="cloud-cleanup-confirm" class="btn btn-danger" data-action="native-cleanup-confirm" '+(!plan?'disabled':'')+'>确认清理</button></div>';
+  api.showModal(title,reviewBody(null),true);
   try{
-   const remote=await request('read');if(epoch!==cleanupEpoch||disposed)return;requireRemoteVersion(remote);
+   const response=request('read').then(data=>({data}),error=>({error}));
+   await api.afterModalOpen?.();const result=await response;if(epoch!==cleanupEpoch||disposed)return;if(result.error)throw result.error;const remote=result.data;requireRemoteVersion(remote);
    const local=snapshotBook(db()),remoteBook=remoteCleanupBook(remote),prepared=buildPairedCleanup(local,remoteBook,cleanupRetryOptions,requestPrefix+'-review-'+(++sequence));
    if(!prepared.plan.local.months&&!prepared.plan.cloud.months){
     if(db().sync.pendingCleanup){const settled={...db(),sync:{...db().sync,pausedByCleanup:false,cleanupTarget:'both',pending:0}};delete settled.sync.pendingCleanup;localStorage.setItem('dagongren.paybook.v1',JSON.stringify(settled));api.replaceBook(settled);api.closeModal();if(api.cleanupComplete)api.cleanupComplete('两端所选范围均无记录，已完成核对。自动同步开关保持原选择。');else api.toast('两端所选范围均无记录，已完成核对。');}
     else{api.closeModal();api.toast('所选范围没有可清理记录。');}return;
    }
-   cleanupReview={options:{...cleanupRetryOptions},plan:prepared.plan};const e=api.esc;
-   api.showModal(title,'<div class="notice">将清理两端账本中相同范围的记录。默认工资设置、连接配置及范围外的记录保留。</div><div class="detail-line"><span>清理范围</span><strong>'+e(cleanupRange(cleanupReview.options))+'</strong></div><div class="detail-line"><span>本机记录</span><strong>'+e(cleanupCount(prepared.plan.local))+'</strong></div><div class="detail-line"><span>云端记录</span><strong>'+e(cleanupCount(prepared.plan.cloud))+'</strong></div><div class="detail-line"><span>云端账号</span><strong>'+e(config.username||'当前已配置账号')+'</strong></div><p class="field-note">仅处理当前配置的打工人账本；'+e(config.path||'当前账本路径')+'。确认前会再次检查版本。清理完成后，自动同步开关保持原选择。</p><div class="error" id="cloud-cleanup-error" role="alert"></div><div class="modal-actions"><button class="btn btn-plain" data-action="modal-back">取消</button><button id="cloud-cleanup-confirm" class="btn btn-danger" data-action="native-cleanup-confirm">确认清理</button></div>',true);
+   cleanupReview={options:{...cleanupRetryOptions},plan:prepared.plan};
+   (api.updateModal||api.showModal)(title,reviewBody(prepared.plan),true);
   }catch(error){if(epoch===cleanupEpoch){cleanupReview=null;api.closeModal();api.toast(error.message||'无法读取云端账本，未清理任何记录。');}}
   finally{busy=false;api.render();armPoll();}
  }
