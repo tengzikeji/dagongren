@@ -22,7 +22,11 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class AppSmokeTest {
     @org.junit.Rule public final org.junit.rules.Timeout perTestTimeout=org.junit.rules.Timeout.seconds(300);
+    private long originalIdleTimeout;
+    @org.junit.After public void restoreAnimationTestEnvironment(){androidx.test.uiautomator.Configurator.getInstance().setWaitForIdleTimeout(originalIdleTimeout);}
     @Before public void enableAnimationTestEnvironment() throws Exception {
+        originalIdleTimeout=androidx.test.uiautomator.Configurator.getInstance().getWaitForIdleTimeout();
+        androidx.test.uiautomator.Configurator.getInstance().setWaitForIdleTimeout(250);
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         device.wakeUp();
         dismissEmulatorLauncherAnr();
@@ -88,14 +92,15 @@ public class AppSmokeTest {
     }
     private void paintedScreenshot(ActivityScenario<MainActivity> scenario,String name) throws Exception {
         dismissEmulatorLauncherAnr();
-        evaluate(scenario,"window.__upgradePaintReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>{window.__upgradePaintReady=true;}))");
-        waitTrue(scenario,"window.__upgradePaintReady===true");
-        CountDownLatch frame=new CountDownLatch(1);
-        withActivity(activity->((WebView)activity.findViewById(R.id.web_view)).postVisualStateCallback(1,new WebView.VisualStateCallback(){@Override public void onComplete(long requestId){frame.countDown();}}));
-        assertTrue("WebView frame was not committed",frame.await(10,TimeUnit.SECONDS));
-        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).waitForIdle(1000);
-        Thread.sleep(450);
-        screenshot(name);
+        waitTrue(scenario,"!document.querySelector('.data-chart .number-roll-strip,.calendar-day .number-roll-strip')");
+        evaluate(scenario,"window.__captureInfiniteAnimations=document.getAnimations().filter(a=>a.playState==='running'&&a.effect?.getTiming().iterations===Infinity);for(const a of window.__captureInfiniteAnimations)a.pause();window.__upgradePaintReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>{window.__upgradePaintReady=true;}))");
+        try{
+            waitTrue(scenario,"window.__upgradePaintReady===true");
+            CountDownLatch frame=new CountDownLatch(1);
+            withActivity(activity->((WebView)activity.findViewById(R.id.web_view)).postVisualStateCallback(1,new WebView.VisualStateCallback(){@Override public void onComplete(long requestId){frame.countDown();}}));
+            assertTrue("WebView frame was not committed",frame.await(10,TimeUnit.SECONDS));
+            screenshot(name);
+        }finally{evaluate(scenario,"for(const a of window.__captureInfiniteAnimations||[])a.play();window.__captureInfiniteAnimations=[]");}
     }
 
     private void selectCalendarMonth(ActivityScenario<MainActivity> scenario,String month) throws Exception {

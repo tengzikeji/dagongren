@@ -95,6 +95,7 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
           script: bash .github/scripts/run-device-tests.sh
       - name: Render emulator preview for review
