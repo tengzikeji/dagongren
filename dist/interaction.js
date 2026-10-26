@@ -4,7 +4,7 @@ let uiRenderedView='',uiRenderedTheme='',uiRollCleanups=[],uiActiveChoice=null,u
 const uiEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function uiKey(node,root){
  const metric=node.closest?.('[data-metric]');
- if(metric)return ['metric',metric.dataset.metric,metric.dataset.scope||'all',metric.dataset.ref||''].join(':');
+ if(metric){const group=node.closest?.('.balance-hero,.calendar-summary,.ledger-overview,.month-account,.annual-board,.settlement-chart,.today-insight');return ['metric',group?.classList?.[0]||metric.dataset.ref||'',metric.dataset.metric,metric.dataset.scope||'all'].join(':');}
  const date=node.closest?.('.calendar-day[data-date]')?.dataset.date;
  if(date)return 'day-wage:'+date;
  const parts=[];for(let n=node;n&&n!==root;n=n.parentElement)parts.unshift(n.tagName+':'+[...n.parentElement.children].indexOf(n));return parts.join('/');
@@ -99,7 +99,7 @@ export function playHomeStartupGlare(root,motion=true){
  const hero=root.querySelector('.view-home .balance-hero');if(!hero?.animate)return false;
  uiHomeGlareDone=true;
  const glare=document.createElement('span');glare.className='hero-startup-glare';glare.setAttribute('aria-hidden','true');hero.appendChild(glare);
- const duration=680,from='translate3d(0,0,0) skewX(-18deg)',to='translate3d('+Math.round(hero.clientWidth*1.6)+'px,0,0) skewX(-18deg)';
+ const duration=680,from='translate3d(0,0,0) skewX(-25deg)',to='translate3d('+Math.round(hero.clientWidth*1.6)+'px,0,0) skewX(-25deg)';
  const sweep=glare.animate([{offset:0,transform:from,opacity:0},{offset:.18,opacity:.65},{offset:.82,opacity:.65},{offset:1,transform:to,opacity:0}],{duration,easing:'cubic-bezier(.2,.55,.35,1)',fill:'both'});
  let finished=false,timer;const done=()=>{if(finished)return;finished=true;clearTimeout(timer);glare.remove();sweep.cancel();try{performance.mark('dagongren.home.glare.complete');}catch{}};
  timer=setTimeout(done,duration+100);sweep.finished.then(done,done);

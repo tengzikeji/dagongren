@@ -2,7 +2,7 @@
 set +e
 adb shell settings put secure show_ime_with_hard_keyboard 1
 mkdir -p android/app/build/reports/screenshots
-adb logcat -v time TestRunner:I AndroidRuntime:E chromium:E '*:S' > android/app/build/reports/device-progress.log 2>&1 &
+adb logcat -v time TestRunner:I DagongrenMotion:I AndroidRuntime:E chromium:E '*:S' > android/app/build/reports/device-progress.log 2>&1 &
 device_log_pid=$!
 timeout --signal=TERM --kill-after=30s 18m gradle -p android --no-daemon connectedReleaseAndroidTest
 result=$?
