@@ -167,3 +167,8 @@
 #app.page-transitioning .data-chart *,#app.page-transitioning .data-chart{animation:none!important}
 .motion-off .workspace .content,.motion-off .calendar-days{transform:none!important}
 @media(prefers-reduced-motion:reduce){#app.is-paging .workspace .content,.calendar-panel.is-swiping .calendar-days{transform:none!important}}
+
+/* Update charts from their current value without rebuilding or replaying them. */
+.chart-ring-fill{transition:stroke-dasharray .44s cubic-bezier(.2,.65,.25,1)}
+.chart-bar{transition:y .44s ease,height .44s ease}
+.record-type-fill,.mix-segment{transition:width .44s ease}
