@@ -153,12 +153,12 @@ public class AppSmokeTest {
             for(String main:new String[]{"home","calendar","records","settings"}){
                 evaluate(scenario,"document.querySelector('[data-view="+main+"]').click();document.querySelector('[data-action=record-entry]').click();document.querySelector('[data-kind=subsidy]').click();document.getElementById('adjustment-note').value='保留上层草稿';document.querySelector('.select-trigger').click()");
                 waitTrue(scenario,"Boolean(document.querySelector('.choice-sheet'))");
-                awaitInputWindow(scenario);assertTrue("System Back input was not delivered",device.pressBack());
+                pressAppBack(scenario);
                 waitTrue(scenario,"!document.querySelector('.choice-sheet')&&Boolean(document.getElementById('subsidy-form'))");
                 assertEquals("\"保留上层草稿\"",evaluate(scenario,"document.getElementById('adjustment-note').value"));
                 evaluate(scenario,"document.querySelector('.modal-back').click()");
                 waitTrue(scenario,"document.getElementById('modal-title').textContent==='记一笔'");
-                awaitInputWindow(scenario);assertTrue("System Back input was not delivered",device.pressBack());
+                pressAppBack(scenario);
                 waitTrue(scenario,"!document.querySelector('.modal')&&!document.getElementById('app').inert");
                 assertEquals("\""+main+"\"",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view"));
                 evaluate(scenario,"document.querySelector('[data-action=record-entry]').click();document.querySelector('[data-kind=subsidy]').click();document.querySelector('.select-trigger').click();document.querySelector('.choice-close').click()");
@@ -166,13 +166,13 @@ public class AppSmokeTest {
                 assertEquals("\""+main+"\"",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view"));
             }
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-view=sync]').click();document.querySelector('[data-action=connection-settings]').click()");
-            awaitInputWindow(scenario);assertTrue("System Back input was not delivered",device.pressBack());waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.sync-hero'))");
-            awaitInputWindow(scenario);assertTrue("System Back input was not delivered",device.pressBack());waitTrue(scenario,"Boolean(document.querySelector('.profile-card'))");
+            pressAppBack(scenario);waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.sync-hero'))");
+            pressAppBack(scenario);waitTrue(scenario,"Boolean(document.querySelector('.profile-card'))");
             evaluate(scenario,"document.querySelector('[data-view=sync]').click();document.querySelector('[data-action=connection-settings]').click();document.querySelector('.modal-close').click()");
             waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.profile-card'))");
             evaluate(scenario,"document.querySelector('[data-action=open-cleanup]').click();document.querySelector('[data-action=review-cleanup]').click()");
             assertEquals("\"确认清理\"",evaluate(scenario,"document.querySelector('[data-action=confirm-cleanup]').textContent"));
-            awaitInputWindow(scenario);assertTrue("System Back input was not delivered",device.pressBack());waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.cleanup-panel'))");
+            pressAppBack(scenario);waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.cleanup-panel'))");
             evaluate(scenario,"document.querySelector('[data-action=review-cleanup]').click();document.querySelector('.modal-close').click()");
             waitTrue(scenario,"!document.querySelector('.modal')&&Boolean(document.querySelector('.profile-card'))");
             paintedScreenshot(scenario,"menus-return-profile");
@@ -370,6 +370,11 @@ public class AppSmokeTest {
     private void swipeCalendar(ActivityScenario<MainActivity> scenario,int direction) throws Exception {
         swipeRegion(scenario,".calendar-days",direction);
     }
+    private void pressAppBack(ActivityScenario<MainActivity> scenario) throws Exception {
+        awaitInputWindow(scenario);
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+    }
+
     private void awaitInputWindow(ActivityScenario<MainActivity> scenario) throws Exception {
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         String expected=InstrumentationRegistry.getInstrumentation().getTargetContext().getPackageName();
