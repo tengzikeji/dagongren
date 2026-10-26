@@ -53,9 +53,11 @@ export function renderStable(root,markup,view,motion=true){
  fitCompanyNames(root);
  if(!uiResizeObserver&&typeof ResizeObserver==='function'){uiResizeObserver=new ResizeObserver(entries=>{const width=entries[0]?.contentRect.width;if(width&&width!==uiObservedWidth){uiObservedWidth=width;fitCompanyNames(root);}});uiResizeObserver.observe(root);}
  if(same){window.scrollTo({left:scrollX,top:scrollY,behavior:'instant'});for(const el of root.querySelectorAll('.profile-name-viewport')){const prior=scrolls.find(s=>s.key===uiKey(el,root));if(prior)el.scrollLeft=prior.left;}}
- if(!same||!motion||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+ if(!motion||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
  for(const node of root.querySelectorAll('.number')){
-  const old=oldNumbers.get(uiKey(node,root)),numeric=uiNumericText(node);if(!old||!numeric)continue;
+  const calendarAmount=Boolean(node.closest?.('.calendar-day')&&node.classList.contains('day-wage'));
+  if(!same&&!calendarAmount)continue;
+  const old=oldNumbers.get(uiKey(node,root))??(calendarAmount?'':null),numeric=uiNumericText(node);if(old===null||!numeric)continue;
   const {text,match}=numeric,original=text.nodeValue,target=match[0],plan=numberRollPlan(old,target);if(!plan.length)continue;
   const finalText=node.textContent,fragment=document.createDocumentFragment(),wrapper=document.createElement('span');wrapper.className='number-roll';wrapper.setAttribute('aria-hidden','true');const tracking=getComputedStyle(node).letterSpacing;wrapper.style.setProperty('--number-tracking',tracking==='normal'?'0px':tracking);let digitIndex=0;
   for(const char of target){
@@ -243,7 +245,7 @@ export function installPageSwipe(root,api){
   if(!gesture.drag&&Math.abs(dy)>14&&Math.abs(dy)>Math.abs(dx)*1.1){reset();return;}
   if(Math.abs(dx)>16&&Math.abs(dx)>Math.abs(dy)*1.35)gesture.drag=true;
   gesture.dx=dx;
-  if(gesture.drag){if(event.cancelable)event.preventDefault();root.classList.add('is-paging');root.style.setProperty('--page-drag',Math.max(-110,Math.min(110,dx*.45))+'px');}
+  if(gesture.drag){if(event.cancelable)event.preventDefault();if(!root.hasPointerCapture?.(event.pointerId))root.setPointerCapture?.(event.pointerId);root.classList.add('is-paging');root.style.setProperty('--page-drag',Math.max(-110,Math.min(110,dx*.45))+'px');}
  },{passive:false});
  root.addEventListener('pointerup',event=>{
   if(!gesture||event.pointerId!==gesture.id)return;

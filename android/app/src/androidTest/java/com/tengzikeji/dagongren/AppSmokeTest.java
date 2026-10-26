@@ -425,6 +425,7 @@ public class AppSmokeTest {
             evaluate(scenario,"document.querySelector('[data-view=calendar]').click();window.__calendarHeight=document.querySelector('.calendar-days').getBoundingClientRect().height;for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
             assertEquals("true",evaluate(scenario,"(()=>{const m=document.querySelector('[data-calendar-month]').dataset.calendarMonth,[y,n]=m.split('-').map(Number),first=(new Date(Date.UTC(y,n-1,1)).getUTCDay()+6)%7,days=new Date(Date.UTC(y,n,0)).getUTCDate();return document.querySelector('.calendar-days').children.length===Math.ceil((first+days)/7)*7})()"));
             assertEquals("true",evaluate(scenario,"Math.abs(document.querySelector('.calendar-days').getBoundingClientRect().height-window.__calendarHeight)<1"));
+            waitTrue(scenario,"!document.querySelector('.calendar-day .number-roll-strip')");
             assertEquals("0",evaluate(scenario,"document.querySelectorAll('.calendar-day .number-roll-strip').length"));
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.calendar-day[data-date]')].every(e=>Number(e.dataset.date.slice(8))===Number(e.querySelector('.day-number').childNodes[0].nodeValue))"));
             assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=calendar-today]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();"+rollingLayoutCheck(".calendar-summary .number")));
@@ -488,6 +489,74 @@ public class AppSmokeTest {
             device.executeShellCommand("settings put global window_animation_scale 0");
             device.executeShellCommand("settings put global transition_animation_scale 0");
             device.executeShellCommand("settings put global animator_duration_scale 0");
+        }
+    }
+
+
+    @Test public void themesPersistAndEmploymentChartAcceptsRealPageSwipes() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            evaluate(scenario,"var themeNow=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),themeMonth=themeNow.slice(0,7),themeDefaults={salaryCents:600000,company:'主题验收 · 工资账本',joinDate:themeMonth.slice(0,4)+'-01-01',periodMode:'calendar',periodStartDay:1,payday:15,motion:true};var themeRecord={...themeDefaults,leaves:[],overtime:[],subsidies:[{id:'s',date:themeMonth+'-01',amountCents:20000,category:'餐补'}],deductions:[],advances:[],payments:[{id:'p',date:themeMonth+'-01',amountCents:100000}],payment:null};localStorage.setItem('dagongren.paybook.v1',JSON.stringify({version:2,defaults:themeDefaults,months:{[themeMonth]:themeRecord},excludedMonths:[],sync:{auto:false,nativeVersion:1,pending:0,logs:[]}}))");
+            scenario.recreate();waitReady(scenario);
+            String expectedThemeBook=evaluate(scenario,"localStorage.getItem('dagongren.paybook.v1')");
+            for(String theme:new String[]{"classic","neon","paper","forest"}){
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=theme-settings]').click()");
+            assertEquals("true",evaluate(scenario,"document.querySelectorAll('.theme-option').length===4"));
+                if(theme.equals("classic"))paintedScreenshot(scenario,"theme-picker");
+                evaluate(scenario,"document.querySelector('[data-action=choose-theme][data-theme="+theme+"]').click()");
+                assertEquals("\""+theme+"\"",evaluate(scenario,"document.body.dataset.theme"));
+            assertEquals(expectedThemeBook,evaluate(scenario,"localStorage.getItem('dagongren.paybook.v1')"));
+            assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('.view-settings')).touchAction.includes('pan-y')"));
+            evaluate(scenario,"document.querySelector('.profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
+                paintedScreenshot(scenario,"theme-"+theme+"-profile");
+                swipeRegion(scenario,".employment-progress",-1);
+                waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'&&!document.getElementById('app').classList.contains('page-transitioning')");
+            assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth"));
+                paintedScreenshot(scenario,"theme-"+theme+"-records");
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=profile-chart]').click()");
+            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.record-mix-chart'))&&document.querySelectorAll('.record-type-row').length===6&&document.querySelectorAll('.profile-chart-panel').length===1"));
+            evaluate(scenario,"document.querySelector('.record-mix-chart').scrollIntoView({block:'start',behavior:'instant'})");
+                paintedScreenshot(scenario,"theme-"+theme+"-mix");
+            evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();document.querySelector('[data-view=home]').click();window.scrollTo({top:0,behavior:'instant'})");
+            assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth&&Boolean(document.querySelector('.settlement-chart'))"));
+                paintedScreenshot(scenario,"theme-"+theme+"-home");
+            evaluate(scenario,"document.querySelector('[data-view=calendar]').click();document.querySelector('[data-action=calendar-today]').click()");
+            assertEquals("true",evaluate(scenario,"(()=>{const e=document.querySelector('.calendar-day.today .day-wage'),s=getComputedStyle(e);return s.backgroundColor==='rgba(0, 0, 0, 0)'&&s.backgroundImage==='none'&&s.paddingLeft==='0px'&&s.paddingRight==='0px'})()"));
+            assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth"));
+            evaluate(scenario,"document.querySelector('.calendar-panel').scrollIntoView({block:'start',behavior:'instant'})");
+                paintedScreenshot(scenario,"theme-"+theme+"-calendar");
+            evaluate(scenario,"document.querySelector('.daily-chart').scrollIntoView({block:'start',behavior:'instant'})");
+                paintedScreenshot(scenario,"theme-"+theme+"-daily");
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=company-settings]').click()");
+            assertEquals("true",evaluate(scenario,"document.querySelector('#company-name').value==='主题验收 · 工资账本'&&document.documentElement.scrollWidth<=innerWidth"));
+                paintedScreenshot(scenario,"theme-"+theme+"-form");
+            evaluate(scenario,"document.querySelector('.modal-close').click();document.querySelector('[data-action=toggle-motion]').click()");
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.profile-chart-panel *')].every(e=>getComputedStyle(e).animationName==='none')"));
+            evaluate(scenario,"document.querySelector('[data-action=toggle-motion]').click()");
+                expectedThemeBook=evaluate(scenario,"localStorage.getItem('dagongren.paybook.v1')");
+                scenario.recreate();waitReady(scenario);
+                assertEquals("\""+theme+"\"",evaluate(scenario,"document.body.dataset.theme"));
+            assertEquals(expectedThemeBook,evaluate(scenario,"localStorage.getItem('dagongren.paybook.v1')"));
+            }
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme=classic]').click()");
+        }
+    }
+
+
+    @Test public void calendarDayAmountsRollAndLandWithoutMovingDates() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            evaluate(scenario,"document.querySelector('[data-action=salary-settings]').click();document.getElementById('salary').value='6000';document.querySelector('.modal-footer button[type=submit]').click();document.querySelector('[data-view=calendar]').click();window.__dayRollCheck=(()=>{const cells=[...document.querySelectorAll('.calendar-day[data-date]')],rolling=cells.filter(e=>e.querySelector('.number-roll-strip'));return {rolling:rolling.length,stable:cells.every(e=>!e.querySelector('.day-number .number-roll')&&!e.querySelector('.lunar-label .number-roll')),wheels:rolling.every(e=>[...e.querySelectorAll('.number-roll-strip')].every(s=>Number(s.style.getPropertyValue('--roll-steps'))>=30)),rows:rolling.every(e=>{const slots=[...e.querySelectorAll('.number-roll-slot')],base=slots[0]?.getBoundingClientRect().top;return slots.every(s=>getComputedStyle(s).display==='inline-block'&&Math.abs(s.getBoundingClientRect().top-base)<1)}),values:rolling.map(e=>({date:e.dataset.date,amount:e.querySelector('.day-wage').getAttribute('aria-label')}))}})()");
+            assertEquals("true",evaluate(scenario,"window.__dayRollCheck.rolling>0&&window.__dayRollCheck.stable&&window.__dayRollCheck.wheels&&window.__dayRollCheck.rows"));
+            waitTrue(scenario,"!document.querySelector('.calendar-day .number-roll-strip')");
+            assertEquals("true",evaluate(scenario,"window.__dayRollCheck.values.every(x=>document.querySelector('.calendar-day[data-date=\"'+x.date+'\"] .day-wage').textContent===x.amount)"));
+            evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click();window.__rapidCalendarRoll=Boolean(document.querySelector('.calendar-day .number-roll-strip'))");
+            assertEquals("true",evaluate(scenario,"window.__rapidCalendarRoll"));
+            waitTrue(scenario,"!document.querySelector('.calendar-day .number-roll-strip')");
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.calendar-day[data-date]')].every(e=>Number(e.querySelector('.day-number').childNodes[0].nodeValue)===Number(e.dataset.date.slice(8)))"));
+            paintedScreenshot(scenario,"calendar-rolling-settled");
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('[data-view=calendar]').click()");
+            assertEquals("true",evaluate(scenario,"!document.querySelector('.calendar-day .number-roll-strip')"));
         }
     }
 

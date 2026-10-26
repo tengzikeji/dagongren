@@ -3,14 +3,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const output = path.resolve(root, './preview/dagongren-preview.html');
-const names=['index.html','style.css','design-v1.css','upgrade.css','calendar-rights.js','calendar-data.js','calendar.js','payroll.js','charts.js','data-tools.js','sync-tools.js','sync-merge.js','cloud-cleanup.js','native-sync.js','interaction.js','holiday-updates.js','app.js','icon.svg'];
+const names=['index.html','style.css','design-v1.css','upgrade.css','themes.css','themes.js','theme-charts.js','calendar-rights.js','calendar-data.js','calendar.js','payroll.js','charts.js','data-tools.js','sync-tools.js','sync-merge.js','cloud-cleanup.js','native-sync.js','interaction.js','holiday-updates.js','app.js','icon.svg'];
 const values=await Promise.all(names.map(file=>fs.readFile(path.join(root,'dist',file),'utf8')));
 const files=Object.fromEntries(names.map((name,i)=>[name,values[i]]));
-const shell=files['index.html'],css=files['style.css']+'\n'+files['design-v1.css']+'\n'+files['upgrade.css'],icon=files['icon.svg'];
-const logic=['calendar-rights.js','calendar-data.js','calendar.js','payroll.js','charts.js','data-tools.js','sync-tools.js','sync-merge.js','cloud-cleanup.js','native-sync.js','interaction.js','holiday-updates.js','app.js'].map(name=>files[name].replace(/^import[^\n]+\n/gm,'').replaceAll('export function ','function ')).join('\n');
+const shell=files['index.html'],css=files['style.css']+'\n'+files['design-v1.css']+'\n'+files['upgrade.css']+'\n'+files['themes.css'],icon=files['icon.svg'];
+const logic=['themes.js','theme-charts.js','calendar-rights.js','calendar-data.js','calendar.js','payroll.js','charts.js','data-tools.js','sync-tools.js','sync-merge.js','cloud-cleanup.js','native-sync.js','interaction.js','holiday-updates.js','app.js'].map(name=>files[name].replace(/^import[^\n]+\n/gm,'').replaceAll('export function ','function ')).join('\n');
 const embedded = shell
   .replace('<link rel="stylesheet" href="./design-v1.css">','')
   .replace('<link rel="stylesheet" href="./upgrade.css">','')
+  .replace('<link rel="stylesheet" href="./themes.css">','')
   .replace('<link rel="icon" href="./icon.svg" type="image/svg+xml">', '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,'+encodeURIComponent(icon)+'">')
   .replace('<link rel="stylesheet" href="./style.css">', '<style>'+css+'</style>')
   .replace('<script type="module" src="./app.js"></script>', '<script>\n(()=>{\n'+logic.replace(/<\/script/gi,'<\\/script')+'\n})();\n</script>');
