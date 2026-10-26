@@ -154,9 +154,9 @@ jobs:
           videos=list(root.rglob('startup-transition.mp4'))
           ffmpeg=shutil.which('ffmpeg')
           logs=list(Path('android/app/build/outputs/androidTest-results').rglob('*coldStartup*.txt'))
-          marker=next((m for log in logs if (m:=re.search(r'PLAYING_SECOND=([0-9.]+)',log.read_text(errors='replace')))),None)
+          marker=next((m for log in logs if (m:=re.search(r'ABSORBING_SECOND=([0-9.]+)',log.read_text(errors='replace')))),None)
           center=float(marker.group(1)) if marker else 10.0
-          seconds=[max(0,center+offset) for offset in [-2,-1,-.5,0,.3,.6,.9,1.2,1.5,2,3,4]]
+          seconds=[max(0,center+offset) for offset in [-2,-1,-.5,0,.12,.25,.4,.55,.7,.85,1.1,1.5,2,3]]
           tiles=[]
           print('LAUNCH_REVIEW:',len(videos),'videos; playback at',center,'seconds; ffmpeg:',bool(ffmpeg))
           if videos and ffmpeg:
