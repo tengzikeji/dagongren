@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 const html=fs.readFileSync(new URL('../preview/dagongren-preview.html',import.meta.url),'utf8'),inner=html.match(/srcdoc="([\s\S]*?)"><\/iframe>/)[1].replaceAll('&quot;','"').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&'),script=inner.match(/<script>([\s\S]*)<\/script>/)[1],clone=x=>JSON.parse(JSON.stringify(x));
-function boot(initial,theme='classic') {
+function boot(initial,theme='system') {
  const listeners={},elements={},saved=new Map([...(initial?[['dagongren.paybook.v1',JSON.stringify(initial)]]:[]),['dagongren.theme.v1',theme]]),timers=new Map(),blobs=[],downloads=[],clock={now:Date.parse('2026-10-22T04:00:00Z')};let id=0,timerId=0,failWrites=false;
  function el(name){return elements[name]??={innerHTML:'',textContent:'',value:'',style:{},classList:{add(){},remove(){},toggle(){},contains(){return false}},querySelector(){return {focus(){},insertAdjacentHTML(){}}},querySelectorAll(){return []}};}
  class ClockDate extends Date{constructor(...args){super(...(args.length?args:[clock.now]));}static now(){return clock.now;}}
@@ -130,14 +130,14 @@ console.log('Passed 1.2.3: cycle-aligned home balances/drilldowns, short months/
 
 {
  const d=clone(fixture);d.defaults={...d.defaults,periodMode:'calendar',salaryCents:310000,joinDate:'2026-10-01'};d.months={'2026-10':{...d.defaults,leaves:[{id:'zero',date:'2026-10-03',days:1,deduct:true}],overtime:[],subsidies:[],deductions:[{id:'negative',date:'2026-10-02',amountCents:30000,category:'住宿费'}],advances:[],payments:[],payment:null}};
- const ui=boot(d);ui.click('nav',{view:'calendar'});const html=ui.el('app').innerHTML;assert.match(html,/class="day-wage number wage-income">100.00/);assert.match(html,/class="day-wage number wage-loss">-200.00/);assert.match(html,/class="day-wage number wage-neutral">0.00/);assert.match(html,/class="day-wage number wage-neutral">—/);assert.match(html,/日历使用说明/);
+ const ui=boot(d);ui.click('nav',{view:'calendar'});const html=ui.el('app').innerHTML;assert.match(html,/class="day-wage wage-income" data-static-number>100.00/);assert.match(html,/class="day-wage wage-loss" data-static-number>-200.00/);assert.match(html,/class="day-wage wage-neutral" data-static-number>0.00/);assert.match(html,/class="day-wage wage-neutral" data-static-number>—/);assert.match(html,/日历使用说明/);
  ui.click('calendar-sources');const help=ui.el('modal-root').innerHTML;for(const text of ['不是当天实际收到的工资','4、5或6行','当月总天数','完整工资周期','未来日期不提前计薪','修改默认开关不会改动旧记录'])assert.ok(help.includes(text),text);ui.click('calendar-rights');assert.doesNotMatch(ui.el('modal-root').innerHTML,/本测试版|name=\"accterm\"/);
 }
 console.log('Passed signed calendar wages and corrected calendar usage/rights descriptions.');
 
 {
  const ui=boot(fixture),before=ui.data();ui.click('nav',{view:'settings'});ui.click('theme-settings');assert.match(ui.el('modal-root').innerHTML,/主题设置/);
- for(const theme of ['neon','paper','forest','classic']){ui.click('choose-theme',{theme});assert.equal(ui.theme(),theme);assert.deepEqual(ui.data(),before);ui.click('nav',{view:'home'});assert.match(ui.el('app').innerHTML,/收款进度/);ui.click('nav',{view:'settings'});assert.match(ui.el('app').innerHTML,/主题设置/);const reload=boot(ui.data(),ui.theme());reload.click('nav',{view:'settings'});reload.click('theme-settings');assert.ok(reload.el('modal-root').innerHTML.includes('data-theme="'+theme+'" aria-pressed="true"'));}
- ui.failWrites();ui.click('choose-theme',{theme:'neon'});assert.equal(ui.theme(),'classic');assert.match(ui.el('toast').textContent,/无法保存/);
+ for(const theme of ['dark','light','system']){ui.click('choose-theme',{theme});assert.equal(ui.theme(),theme);assert.deepEqual(ui.data(),before);ui.click('nav',{view:'home'});assert.match(ui.el('app').innerHTML,/收款进度/);ui.click('nav',{view:'settings'});assert.match(ui.el('app').innerHTML,/主题设置/);const reload=boot(ui.data(),ui.theme());reload.click('nav',{view:'settings'});reload.click('theme-settings');assert.ok(reload.el('modal-root').innerHTML.includes('data-theme="'+theme+'" aria-pressed="true"'));}
+ ui.failWrites();ui.click('choose-theme',{theme:'dark'});assert.equal(ui.theme(),'system');assert.match(ui.el('toast').textContent,/无法保存/);
 }
-console.log('Passed 1.3.0: four independent theme layouts/charts, device-only persistence, unchanged wages and records, restart restoration and storage-failure handling.');
+console.log('Passed 1.3.1: system/light/dark appearance, device-only persistence, unchanged wages and records, restart restoration and storage-failure handling.');

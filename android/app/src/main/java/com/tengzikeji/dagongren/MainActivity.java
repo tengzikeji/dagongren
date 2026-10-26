@@ -3,6 +3,7 @@ package com.tengzikeji.dagongren;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -32,6 +33,7 @@ public final class MainActivity extends Activity {
     private static final String HOME="https://appassets.androidplatform.net/assets/www/index.html";
     private static final int SAVE_FILE=7101;
     private WebView webView;
+    private boolean darkAppearance;
     private CredentialVault vault;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final ExecutorService calendarWorker=Executors.newSingleThreadExecutor();
@@ -50,9 +52,9 @@ public final class MainActivity extends Activity {
             else splash.postDelayed(this::completeLaunchSurface,2000);
         });
 
+        refreshAppearance();
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(Color.rgb(243,246,251));
+        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(appearanceColor());
         if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
         root.setOnApplyWindowInsetsListener((v,insets)->{
             if(Build.VERSION.SDK_INT>=30){
@@ -75,7 +77,7 @@ public final class MainActivity extends Activity {
             }
         });
         webView=new WebView(this);webView.setId(R.id.web_view);
-        webView.setBackgroundColor(Color.rgb(243,246,251));
+        webView.setBackgroundColor(appearanceColor());
         WebSettings settings=webView.getSettings();
         settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
@@ -105,9 +107,27 @@ public final class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new NativeFiles(),"AndroidFiles");
         root.addView(webView,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
-        setContentView(root);root.requestApplyInsets();
+        setContentView(root);root.requestApplyInsets();applyAppearance();
         if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
         webView.loadUrl(HOME);
+    }
+
+    private boolean systemIsDark(){return (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES;}
+    private int appearanceColor(){return darkAppearance?Color.rgb(16,24,39):Color.rgb(243,245,249);}
+    private void refreshAppearance(){
+        String mode=getSharedPreferences("appearance",MODE_PRIVATE).getString("mode","system");
+        darkAppearance="dark".equals(mode)||("system".equals(mode)&&systemIsDark());
+    }
+    @SuppressWarnings("deprecation") private void applyAppearance(){
+        int color=appearanceColor();
+        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(color));
+        getWindow().getDecorView().setBackgroundColor(color);getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
+        getWindow().getDecorView().setSystemUiVisibility(darkAppearance?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        if(webView!=null){webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
+    }
+    @Override public void onConfigurationChanged(Configuration config){
+        super.onConfigurationChanged(config);refreshAppearance();applyAppearance();
+        if(webView!=null)webView.evaluateJavascript("globalThis.dagongrenSystemTheme && globalThis.dagongrenSystemTheme("+systemIsDark()+");",null);
     }
 
     private void completeLaunchSurface(){
@@ -146,14 +166,16 @@ public final class MainActivity extends Activity {
     public final class NativeFiles {
         @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
         @JavascriptInterface public void introReady(){runOnUiThread(MainActivity.this::completeLaunchSurface);}
-        @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{
-            int color=Color.rgb(243,246,251);
-            getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(color));getWindow().getDecorView().setBackgroundColor(color);
-            getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
-            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-            if(webView!=null){webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
-            if(!active)launchIntro=false;
-        });}
+        @JavascriptInterface public boolean systemDark(){return systemIsDark();}
+        @JavascriptInterface public void themeStyle(String mode){
+            if(!"system".equals(mode)&&!"light".equals(mode)&&!"dark".equals(mode))return;
+            runOnUiThread(()->{
+                android.content.SharedPreferences preferences=getSharedPreferences("appearance",MODE_PRIVATE);
+                if(!mode.equals(preferences.getString("mode","system")))preferences.edit().putString("mode",mode).apply();
+                boolean previous=darkAppearance;refreshAppearance();if(previous!=darkAppearance)applyAppearance();
+            });
+        }
+        @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{applyAppearance();if(!active)launchIntro=false;});}
         @JavascriptInterface public String status(){
             try{return CredentialVault.publicConfig(vault.load()).toString();}
             catch(Exception ignored){return "{\"configured\":false,\"error\":\"原连接配置无法读取，请重新配置。\"}";}

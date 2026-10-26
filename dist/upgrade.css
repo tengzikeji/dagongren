@@ -1,4 +1,4 @@
-.number{font-variant-numeric:tabular-nums}.number-roll-anchor{display:inline;white-space:nowrap}.number-roll{display:inline;white-space:nowrap}.number-roll-slot{position:relative;display:inline-block;width:1ch;height:1.15em;line-height:1.15;overflow:hidden;vertical-align:-.12em;text-align:center;letter-spacing:0}.number-roll-strip{display:block;animation:number-roll-cycle .9s cubic-bezier(.18,.65,.19,1) both;will-change:transform}.number-roll-strip>span{display:block;height:1.15em;line-height:1.15em}@keyframes number-roll-cycle{from{transform:translate3d(0,0,0)}to{transform:translate3d(0,calc(var(--roll-steps)*-1.15em),0)}}
+.number{font-variant-numeric:tabular-nums}.number-roll-anchor{display:inline;white-space:nowrap}.number-roll{display:inline;white-space:nowrap}.number-roll-slot{position:relative;display:inline-block;width:1ch;height:1.15em;line-height:1.15;overflow:hidden;vertical-align:-.12em;text-align:center;letter-spacing:0}.number-roll-strip{display:block;animation:number-roll-cycle .44s cubic-bezier(.2,.65,.25,1) both;will-change:transform}.number-roll-strip>span{display:block;height:1.15em;line-height:1.15em}@keyframes number-roll-cycle{from{transform:translate3d(0,0,0)}to{transform:translate3d(0,calc(var(--roll-steps)*-1.15em),0)}}
 #app.stable-query #view-content,#app.stable-query .panel,#app.stable-query .balance-hero,#app.stable-query .component,#app.stable-query .calendar-summary{animation:none!important}.balance-hero.data-updated{animation:none!important}
 .calendar-days{grid-auto-rows:80px}.calendar-day{height:80px;min-height:80px;overflow:hidden}.calendar-day .day-wage{display:block;height:18px;min-height:18px;max-height:18px;flex:0 0 18px;line-height:18px;letter-spacing:-.25px}.calendar-day .number-roll-anchor{line-height:18px}.calendar-day .number-roll-slot{letter-spacing:0}.calendar-day.empty{pointer-events:none}
 .modal.modal-v2{position:relative;border:1px solid #e5ecf5;box-shadow:0 26px 90px #0b1f432d}.modal-v2 .modal-header{gap:12px}.modal-v2 .modal-description{font-size:12px;line-height:1.75;color:#718098}.modal-v2 .field>label{font-size:13px;line-height:1.65;color:#233954}.modal-v2 .field-note{font-size:11px;line-height:1.8;color:#7b889b}.modal-v2 .notice{font-size:12px;line-height:1.85;border-radius:14px}.modal-v2 .modal-footer{gap:10px;border-top:1px solid #e9eef6;background:#fff}.modal-v2 .modal-footer>.btn{min-height:45px;border-radius:13px;font-size:13px}
@@ -158,3 +158,12 @@
 
 /* Sign colors belong to the net wage, independent of holiday and leave backgrounds. */
 .calendar-day .day-wage.wage-income{color:#15805a}.calendar-day .day-wage.wage-loss{color:#c7424b}.calendar-day .day-wage.wage-neutral{color:#7b899e}.calendar-day.today .day-wage{background:none;border-radius:0;padding:0}.calendar-source-note>span>strong{display:block;font-size:11px;font-weight:550;color:#4d6588}.calendar-source-note>span>small{display:block;font-size:10px}.calendar-help{font-size:12px;line-height:1.9;color:#63728c;margin-bottom:18px}.calendar-help h3{font-size:14px;color:#294567;margin:18px 0 7px}.calendar-help h3:first-child{margin-top:0}.calendar-help p+p{margin-top:7px}
+
+/* Fixed navigation stays outside moving content. */
+#app .workspace .content{transition:none}
+.page-swipe-layer{z-index:15}
+.page-swipe-layer .page-swipe-outgoing{contain:layout style}
+#app.is-paging .workspace .content,.calendar-panel.is-swiping .calendar-days{transition:none!important}
+#app.page-transitioning .data-chart *,#app.page-transitioning .data-chart{animation:none!important}
+.motion-off .workspace .content,.motion-off .calendar-days{transform:none!important}
+@media(prefers-reduced-motion:reduce){#app.is-paging .workspace .content,.calendar-panel.is-swiping .calendar-days{transform:none!important}}
