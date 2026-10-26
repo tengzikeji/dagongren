@@ -1,3 +1,4 @@
+let uiHomeSelfCheckDone=false;
 let uiRenderedView='',uiRenderedTheme='',uiRollCleanups=[],uiActiveChoice=null,uiResizeObserver=null,uiObservedWidth=0,uiCalendarSlideCleanup=null,uiPageSlideCleanup=null;
 const uiEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function uiKey(node,root){
@@ -48,7 +49,7 @@ export function chartNumberMarkup(markup){
   return opening+text.replace(/\d[\d,]*(?:\.\d+)?/g,value=>'<span class="number chart-number" data-chart-number>'+value+'</span>');
  }));
 }
-export function renderStable(root,markup,view,motion=true){
+export function renderStable(root,markup,view,motion=true,replayNumbers=false){
  markup=chartNumberMarkup(markup);
  uiCalendarSlideCleanup?.();if(uiRenderedView!==view)uiPageSlideCleanup?.();
  const template=document.createElement?.('template');if(!template?.content){root.innerHTML=markup;return;}
@@ -67,7 +68,7 @@ export function renderStable(root,markup,view,motion=true){
   const calendarAmount=Boolean(node.closest?.('.calendar-day')&&node.classList.contains('day-wage'));
   const chartAmount=node.hasAttribute?.('data-chart-number');
   if(!same&&!calendarAmount&&!chartAmount)continue;
-  const old=chartAmount&&themeChanged?'':oldNumbers.get(uiKey(node,root))??(calendarAmount||chartAmount?'':null),numeric=uiNumericText(node);if(old===null||!numeric)continue;
+  const old=replayNumbers||chartAmount&&themeChanged?'':oldNumbers.get(uiKey(node,root))??(calendarAmount||chartAmount?'':null),numeric=uiNumericText(node);if(old===null||!numeric)continue;
   const {text,match}=numeric,original=text.nodeValue,target=match[0],plan=numberRollPlan(old,target);if(!plan.length)continue;
   const finalText=node.textContent,fragment=document.createDocumentFragment(),wrapper=document.createElement('span');wrapper.className='number-roll';wrapper.setAttribute('aria-hidden','true');const tracking=getComputedStyle(node).letterSpacing;wrapper.style.setProperty('--number-tracking',tracking==='normal'?'0px':tracking);let digitIndex=0;
   for(const char of target){
@@ -83,6 +84,20 @@ export function renderStable(root,markup,view,motion=true){
   const finish=()=>{if(done)return;done=true;clearTimeout(timeout);if(anchor.isConnected)anchor.replaceWith(document.createTextNode(original));if(priorLabel===null)node.removeAttribute('aria-label');else node.setAttribute('aria-label',priorLabel);};
   timeout=setTimeout(finish,Math.max(...plan.map(x=>x.delay+x.duration))+60);uiRollCleanups.push(finish);
  }
+}
+export function replayHomeData(root,motion=true){
+ if(uiHomeSelfCheckDone||!motion||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.querySelector('.launch-page')||root.inert||!root.querySelector('.view-home'))return false;
+ uiHomeSelfCheckDone=true;
+ for(const finish of uiRollCleanups)finish();uiRollCleanups=[];
+ renderStable(root,root.innerHTML,'home',true,true);
+ const home=root.querySelector('.view-home'),numbers=[...home.querySelectorAll('.number')],charts=[...home.querySelectorAll('.data-chart')];
+ for(const chart of charts){
+  for(const animation of chart.getAnimations?.({subtree:true})||[]){const target=animation.effect?.target;if(target?.closest?.('.number-roll')||animation.effect?.getTiming().iterations===Infinity)continue;animation.cancel();animation.play();}
+  chart.animate?.([{transform:'translateY(0)'},{transform:'translateY(-3px)',offset:.4},{transform:'translateY(0)'}],{duration:460,easing:'ease-out'});
+ }
+ for(const number of numbers)number.animate?.([{opacity:1},{opacity:.65,offset:.35},{opacity:1}],{duration:420,easing:'ease-out'});
+ try{performance.mark('dagongren.home.self-check',{detail:{runs:1,afterLaunch:!document.querySelector('.launch-page')&&!root.inert,numbers:numbers.length,numberWheels:home.querySelectorAll('.number-roll-strip').length,charts:charts.length,duration:1400}});}catch{}
+ return true;
 }
 export function closeChoicePicker(){
  if(!uiActiveChoice)return false;const {panel,children,trigger,modal}=uiActiveChoice;uiActiveChoice=null;panel.remove();modal.classList.remove('choosing');
@@ -127,7 +142,7 @@ export function enhanceModalChoices(root){
   });
  }
 }
-export function playBrandIntro(enabled=true){
+export function playBrandIntro(enabled=true,onComplete=null){
  const bridge=globalThis.AndroidFiles,app=document.getElementById('app');
  const releaseNative=()=>{try{bridge?.introReady?.();}catch{}};
  if(!enabled||!document.body.appendChild||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||bridge?.shouldPlayIntro?.()===false){bridge?.introStyle?.(false);releaseNative();return;}
@@ -136,7 +151,7 @@ export function playBrandIntro(enabled=true){
  page.innerHTML='<div class="launch-grid" aria-hidden="true"></div><header class="launch-header"><span class="launch-app-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="18" height="14" rx="4"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12a22 22 0 0 0 18 0M12 11v5"/></svg></span><div><strong>打工人</strong><span>工作有迹 · 收入有数</span></div><span class="launch-edition">工资账本</span></header><div class="launch-copy"><span class="launch-eyebrow"><i></i> 认真工作，从容生活</span><h2>每一份努力<br>都有清晰的记录<span>。</span></h2><p>把工作的付出，记成生活的底气。</p></div><div class="launch-art" aria-hidden="true"><div class="launch-orbit orbit-one"><i></i></div><div class="launch-orbit orbit-two"><i></i></div><div class="launch-ledger"><div class="launch-ledger-top"><span><i></i> 我的工资账本</span><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="4"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></div><div class="launch-value"><span>¥</span><div class="launch-value-line"></div><span class="launch-value-dot"></span></div><div class="launch-ledger-divider"></div><div class="launch-ledger-bottom"><div><span>每一天的付出</span><b>都清清楚楚</b></div><div class="launch-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><span class="launch-card-sheen"></span></div><div class="launch-chip"><svg viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"/></svg><span>属于你的每一笔</span></div></div><footer class="launch-status"><span class="launch-status-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="6" y="10" width="12" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></span><span>本机账本已就绪<small>安心记录每一天</small></span><span class="launch-ready"><i></i><i></i><i></i></span></footer>';
  document.body.classList.add('intro-playing');document.body.appendChild(page);if(app)app.inert=true;
  const transitions=[];let started=false,finished=false,opening=false,timer,fallback;const priorOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
- const done=()=>{if(finished)return;finished=true;clearTimeout(timer);clearTimeout(fallback);for(const transition of transitions)transition.cancel();if(app)app.classList.add('stable-query');page.remove();document.body.classList.remove('intro-playing','intro-opening');document.body.style.overflow=priorOverflow;if(app)app.inert=false;bridge?.introStyle?.(false);if(globalThis.dagongrenLaunchReady===start)delete globalThis.dagongrenLaunchReady;document.removeEventListener('visibilitychange',hidden);};
+ const done=()=>{if(finished)return;finished=true;clearTimeout(timer);clearTimeout(fallback);for(const transition of transitions)transition.cancel();if(app)app.classList.add('stable-query');page.remove();document.body.classList.remove('intro-playing','intro-opening');document.body.style.overflow=priorOverflow;if(app)app.inert=false;bridge?.introStyle?.(false);if(globalThis.dagongrenLaunchReady===start)delete globalThis.dagongrenLaunchReady;document.removeEventListener('visibilitychange',hidden);if(started&&opening&&document.visibilityState!=='hidden')requestAnimationFrame(()=>requestAnimationFrame(()=>onComplete?.()));};
  const open=()=>{if(opening||finished)return;opening=true;
   const targets=[...document.querySelectorAll('.bottom-nav [data-view="home"],.side-nav [data-view="home"]')],home=targets.find(node=>{const r=node.getBoundingClientRect();return r.width>0&&r.height>0;}),bounds=home?.getBoundingClientRect(),width=window.innerWidth,height=window.innerHeight;
   const target={x:bounds?bounds.left+bounds.width/2:width/8,y:bounds?bounds.top+bounds.height/2:height-28};
@@ -243,6 +258,7 @@ export function installPageSwipe(root,api){
   Promise.all([leaving.finished,entering.finished]).catch(()=>{}).then(finish);
  };
  root.addEventListener('pointerdown',event=>{
+  if(event.pointerType==='touch'&&event.target.closest?.('.profile-chart-panel'))return;
   if(gesture)reset();
   if(busy||event.isPrimary===false||event.button>0||api.blocked?.()||!['home','calendar','records','settings'].includes(api.current()))return;
   if(event.target.closest?.('[data-calendar-swipe],.profile-name-viewport,.entry-filters,.month-control,.record-year-trigger,input,textarea,select,.select-trigger,[role=dialog]'))return;
@@ -250,7 +266,7 @@ export function installPageSwipe(root,api){
   gesture={id:event.pointerId,x:event.clientX,y:event.clientY,dx:0,time:event.timeStamp,drag:false,view:api.current()};
  },{passive:true});
  root.addEventListener('pointermove',event=>{
-  if(!gesture||event.pointerId!==gesture.id)return;
+  if(!gesture||gesture.touch||event.pointerId!==gesture.id)return;
   const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
   if(!gesture.drag&&Math.abs(dy)>14&&Math.abs(dy)>Math.abs(dx)*1.1){reset();return;}
   if(Math.abs(dx)>16&&Math.abs(dx)>Math.abs(dy)*1.35)gesture.drag=true;
@@ -258,13 +274,34 @@ export function installPageSwipe(root,api){
   if(gesture.drag){if(event.cancelable)event.preventDefault();if(!root.hasPointerCapture?.(event.pointerId))root.setPointerCapture?.(event.pointerId);root.classList.add('is-paging');root.style.setProperty('--page-drag',Math.max(-110,Math.min(110,dx*.45))+'px');}
  },{passive:false});
  root.addEventListener('pointerup',event=>{
-  if(!gesture||event.pointerId!==gesture.id)return;
+  if(!gesture||gesture.touch||event.pointerId!==gesture.id)return;
   const from=gesture.view,dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
   const delta=calendarSwipeDelta(dx,dy,event.timeStamp-gesture.time),drag=gesture.drag||Boolean(delta),target=pageSwipeTarget(from,delta),offset=Math.max(-110,Math.min(110,dx*.45));
   if(drag){blockedUntil=Date.now()+250;if(event.cancelable)event.preventDefault();}
   reset();if(target)change(from,target,delta,offset);
  },{passive:false});
- root.addEventListener('pointercancel',reset,{passive:true});
+ root.addEventListener('pointercancel',()=>{if(!gesture?.touch)reset();},{passive:true});
+ root.addEventListener('touchstart',event=>{
+  if(!event.target.closest?.('.profile-chart-panel'))return;
+  if(gesture)reset();
+  if(busy||event.touches.length!==1||api.blocked?.()||api.current()!=='settings')return;
+  const touch=event.touches[0],width=document.documentElement.clientWidth;if(touch.clientX<18||touch.clientX>width-18)return;
+  gesture={id:touch.identifier,touch:true,x:touch.clientX,y:touch.clientY,dx:0,time:event.timeStamp,drag:false,view:api.current()};
+ },{passive:true});
+ root.addEventListener('touchmove',event=>{
+  if(!gesture?.touch)return;const touch=[...event.touches].find(item=>item.identifier===gesture.id);if(!touch||event.touches.length!==1){reset();return;}
+  const dx=touch.clientX-gesture.x,dy=touch.clientY-gesture.y;
+  if(!gesture.drag&&Math.abs(dy)>14&&Math.abs(dy)>Math.abs(dx)*1.1){reset();return;}
+  if(Math.abs(dx)>16&&Math.abs(dx)>Math.abs(dy)*1.35)gesture.drag=true;
+  gesture.dx=dx;if(gesture.drag){if(event.cancelable)event.preventDefault();root.classList.add('is-paging');root.style.setProperty('--page-drag',Math.max(-110,Math.min(110,dx*.45))+'px');}
+ },{passive:false});
+ root.addEventListener('touchend',event=>{
+  if(!gesture?.touch)return;const touch=[...event.changedTouches].find(item=>item.identifier===gesture.id);if(!touch)return;
+  const from=gesture.view,dx=touch.clientX-gesture.x,dy=touch.clientY-gesture.y,delta=calendarSwipeDelta(dx,dy,event.timeStamp-gesture.time),target=pageSwipeTarget(from,delta),offset=Math.max(-110,Math.min(110,dx*.45));
+  if(gesture.drag||delta){blockedUntil=Date.now()+250;if(event.cancelable)event.preventDefault();}
+  reset();if(target)change(from,target,delta,offset);
+ },{passive:false});
+ root.addEventListener('touchcancel',()=>{if(gesture?.touch)reset();},{passive:true});
  root.addEventListener('click',event=>{if(event.isTrusted&&Date.now()<blockedUntil){event.preventDefault();event.stopImmediatePropagation();}},true);
  return reset;
 }

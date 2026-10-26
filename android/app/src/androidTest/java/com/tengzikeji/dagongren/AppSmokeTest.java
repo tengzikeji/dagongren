@@ -373,7 +373,16 @@ public class AppSmokeTest {
             assertEquals("false",evaluate(scenario,"document.getElementById('app').inert"));
             assertEquals("\"none\"",evaluate(scenario,"getComputedStyle(document.getElementById('view-content')).animationName"));
             assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.bottom-nav'))"));
+            waitTrue(scenario,"performance.getEntriesByName('dagongren.home.self-check').length===1");
+            assertEquals("true",evaluate(scenario,"(()=>{const e=performance.getEntriesByName('dagongren.home.self-check')[0],launch=performance.getEntriesByName('dagongren.launch.absorbing').at(-1);return e.detail.runs===1&&e.detail.afterLaunch&&e.detail.numbers>0&&e.detail.numberWheels>0&&e.detail.charts>0&&e.startTime>=launch.startTime+launch.detail.duration})()"));
+            evaluate(scenario,"window.__selfCheckValues=[...document.querySelectorAll('.view-home .number')].map(e=>e.getAttribute('aria-label')||e.textContent);window.__selfCheckBook=localStorage.getItem('dagongren.paybook.v1')");
+            waitTrue(scenario,"!document.querySelector('.view-home .number-roll-strip')");
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.view-home .number')].every((e,i)=>e.textContent===window.__selfCheckValues[i])"));
             paintedScreenshot(scenario,"startup-home");
+            device.pressHome();
+            target.startActivity(new android.content.Intent(target,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+            waitReady(scenario);dismissEmulatorLauncherAnr();
+            assertEquals("true",evaluate(scenario,"performance.getEntriesByName('dagongren.home.self-check').length===1&&localStorage.getItem('dagongren.paybook.v1')===window.__selfCheckBook"));
         } finally {
             withActivity(activity->activity.finish());
             recording.join(35000);
@@ -416,7 +425,7 @@ public class AppSmokeTest {
         evaluate(scenario,"document.querySelector('"+selector+"').scrollIntoView({block:'center',behavior:'instant'})");
         awaitInputWindow(scenario);
         Thread.sleep(250);
-        evaluate(scenario,"window.__pointerEvents=[];if(!window.__pointerEventsInstalled){window.__pointerEventsInstalled=true;for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])document.addEventListener(type,e=>{if(window.__pointerEvents.length<80)window.__pointerEvents.push({type:e.type,x:e.clientX,y:e.clientY,t:e.timeStamp,target:e.target.tagName});},true);}");
+        evaluate(scenario,"window.__pointerEvents=[];if(!window.__pointerEventsInstalled){window.__pointerEventsInstalled=true;for(const type of ['pointerdown','pointermove','pointerup','pointercancel','touchstart','touchmove','touchend','touchcancel'])document.addEventListener(type,e=>{if(window.__pointerEvents.length<80)window.__pointerEvents.push({type:e.type,x:e.clientX??e.touches?.[0]?.clientX??e.changedTouches?.[0]?.clientX,y:e.clientY??e.touches?.[0]?.clientY??e.changedTouches?.[0]?.clientY,t:e.timeStamp,target:e.target.tagName});},true);}");
         JSONObject rect=new JSONObject(new org.json.JSONTokener(evaluate(scenario,"JSON.stringify((()=>{const node=document.querySelector('"+selector+"'),r=node.getBoundingClientRect(),header=node.closest('[data-calendar-swipe]')?.querySelector('.calendar-panel-header')?.getBoundingClientRect(),top=Math.max(8,r.top,header?.bottom||0),bottom=Math.min(r.bottom,visualViewport.height-100);if(bottom-top<8)throw Error('Swipe region is outside visible page');return window.__lastSwipeTarget={left:Math.max(12,r.left),top,width:Math.min(r.right,innerWidth-12)-Math.max(12,r.left),bottom,y:top+(bottom-top)*.6}})())")).nextValue().toString());
         int[] origin=new int[2];float[] density=new float[1];
         assertTrue("App window is not resumed before swipe",withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(origin);density[0]=activity.getResources().getDisplayMetrics().density;}));

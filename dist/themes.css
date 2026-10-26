@@ -200,3 +200,9 @@ body[data-theme=neon] :is(.modal-footer,.choice-header,.modal-header){background
 .data-chart .chart-number{display:inline;font:inherit;line-height:inherit;color:inherit;white-space:nowrap;margin:0;padding:0}
 
 .annual-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:12px 0}.annual-totals>div{min-width:0}.annual-totals>div>span{font-size:10px;color:var(--muted)}.annual-totals strong{display:block;font-size:17px!important;overflow-wrap:anywhere;margin-top:4px}
+
+body[data-theme=neon] .calendar-day.today .day-wage.wage-income{color:#7ce4b6}
+body[data-theme=neon] .calendar-day.today .day-wage.wage-loss{color:#ff9aa6}
+body[data-theme=neon] .calendar-day.today .day-wage.wage-neutral{color:#a1b3ba}
+
+.profile-chart-panel,.profile-chart-panel *{touch-action:pan-y pinch-zoom}

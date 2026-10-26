@@ -1,7 +1,7 @@
 import {themeCatalog,resolveTheme,themePicker} from './themes.js';
 import {settlementChart,dailyWageChart,annualWageChart,profileChart} from './charts.js';
 import {createCalendarUpdater} from './holiday-updates.js';
-import {renderStable,enhanceModalChoices,closeChoicePicker,playBrandIntro,installCalendarSwipe,installPageSwipe} from './interaction.js';
+import {renderStable,enhanceModalChoices,closeChoicePicker,playBrandIntro,replayHomeData,installCalendarSwipe,installPageSwipe} from './interaction.js';
 import {calendarRights} from './calendar-rights.js';
 import {calendarDay,calendarCoverage} from './calendar.js';
 import { daysInMonth, validMonth, validDate, holiday, makeupWorkday, datesBetween, calculate, formatMoney, statutoryDates, isStatutory, isAdjustedDay, overtimeAmount, wagePayments, chinaDate, shiftDay, leaveDeducts, calculateBook, migrateBook, ensureAccrualMonths, payPeriodForDate, rebuildAccrualFromJoin, salaryRateForDate } from './payroll.js';
@@ -862,7 +862,7 @@ calendarUpdater=createCalendarUpdater({fetchYear:nativeSync?year=>nativeSync.fet
 ensureAccrualMonths(db,today);persist();
 calendarUpdater.refresh(Number(today.slice(0,4)));
 render();
-playBrandIntro(db.defaults.motion!==false);
+playBrandIntro(db.defaults.motion!==false,()=>{if(view==='home'){render();replayHomeData(app,db.defaults.motion!==false);}});
 installPageSwipe(app,{current:()=>view,blocked:()=>Boolean(modalRoot.firstElementChild),navigate:next=>app.querySelector('.bottom-nav [data-view="'+next+'"]')?.click()});
 installCalendarSwipe(app,delta=>app.querySelector('[data-action=shift-month][data-delta="'+delta+'"]')?.click());
 setTimeout(refreshAccrualDay,60000);
