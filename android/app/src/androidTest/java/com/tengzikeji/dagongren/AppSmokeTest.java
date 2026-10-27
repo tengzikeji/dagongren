@@ -365,8 +365,12 @@ public class AppSmokeTest {
         // Leave the instrumentation activity before recording a real launch from Home.
         device.pressHome();device.waitForIdle(2000);dismissEmulatorLauncherAnr();
         device.executeShellCommand("mkdir -p /sdcard/Download/dagongren-test");
-        long recordingStarted=System.currentTimeMillis();
         Thread recording=new Thread(()->{try{device.executeShellCommand("screenrecord --size 720x1280 --bit-rate 2000000 --time-limit 30 /sdcard/Download/dagongren-test/startup-transition.mp4");}catch(Exception ignored){}},"startup-recording");recording.setDaemon(true);recording.start();
+        // Wait for the recorder to capture the launcher before starting the app.
+        long readyDeadline=System.currentTimeMillis()+10000;String recordingPid="";
+        while(recording.isAlive()&&System.currentTimeMillis()<readyDeadline){recordingPid=device.executeShellCommand("pidof screenrecord").trim();if(!recordingPid.isEmpty())break;Thread.sleep(100);}
+        assertFalse("Startup screen recording did not start",recordingPid.isEmpty());
+        long recordingStarted=System.currentTimeMillis();Thread.sleep(700);
         ActivityScenario<MainActivity> scenario=null;
         android.content.Context target=InstrumentationRegistry.getInstrumentation().getTargetContext();
         target.startActivity(new android.content.Intent(target,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK));
