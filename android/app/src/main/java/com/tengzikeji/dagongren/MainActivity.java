@@ -33,28 +33,34 @@ public final class MainActivity extends Activity {
     private static final String HOME="https://appassets.androidplatform.net/assets/www/index.html";
     private static final int SAVE_FILE=7101;
     private WebView webView;
+    private FrameLayout launchCover,launchAmbientClip;
+    private View launchAmbientBand;
+    private android.animation.ObjectAnimator launchAmbient;
+    private boolean launchAmbientStarted;
+    private static final int LAUNCH_COLOR=Color.rgb(16,30,61);
     private boolean darkAppearance;
+    private android.animation.ValueAnimator launchTransition;
+    private final android.graphics.drawable.ColorDrawable windowCanvas=new android.graphics.drawable.ColorDrawable(LAUNCH_COLOR);
     private CredentialVault vault;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final ExecutorService calendarWorker=Executors.newSingleThreadExecutor();
     private byte[] pendingFile;
     private Boolean reportedKeyboard;
     private volatile boolean launchIntro=true;
-    private boolean systemSplashDelivered=Build.VERSION.SDK_INT<31,launchSurfacePrepared=false,launchNotified=false;
-    private Runnable dismissSystemSplash;
+    private boolean launchSurfacePrepared=false,launchNotified=false;
+    private boolean firstLaunchFramePresented,firstLaunchDrawn,launchFadeStarted;
+    private boolean systemSplashGone=Build.VERSION.SDK_INT<31;
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
-        super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;systemSplashDelivered=Build.VERSION.SDK_INT<31||state!=null;
-        if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(splash->{
-            systemSplashDelivered=true;dismissSystemSplash=splash::remove;
-            if(launchSurfacePrepared)completeLaunchSurface();
-            else splash.postDelayed(this::prepareLaunchSurface,1200);
-        });
-
+        super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;
         refreshAppearance();
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(appearanceColor());
+        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(launchIntro?LAUNCH_COLOR:appearanceColor());
+        if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(window->{
+            window.remove();systemSplashGone=true;
+            root.post(()->{startLaunchIntro(root);if(launchSurfacePrepared)completeLaunchSurface();});
+        });
         if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
         root.setOnApplyWindowInsetsListener((v,insets)->{
             if(Build.VERSION.SDK_INT>=30){
@@ -76,8 +82,71 @@ public final class MainActivity extends Activity {
                 reportKeyboard(root.getRootView().getHeight()-visibleFrame.bottom>getResources().getDisplayMetrics().density*150);
             }
         });
+        if(launchIntro){
+            launchCover=new FrameLayout(this);launchCover.setTag("dagongren-launch-page");launchCover.setBackgroundColor(LAUNCH_COLOR);launchCover.setAlpha(.1f);
+            android.widget.ImageView scene=new android.widget.ImageView(this);scene.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            try(java.io.InputStream image=getAssets().open("www/launch-scene.webp")){scene.setImageBitmap(android.graphics.BitmapFactory.decodeStream(image));}
+            catch(java.io.IOException missing){throw new IllegalStateException("Launch scene missing",missing);}
+            launchCover.addView(scene,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
+            launchAmbientClip=new FrameLayout(this);launchAmbientClip.setTag("dagongren-launch-ambient");launchAmbientClip.setClipToOutline(true);
+            launchAmbientClip.setOutlineProvider(new android.view.ViewOutlineProvider(){
+                @Override public void getOutline(View view,android.graphics.Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),Math.min(view.getWidth(),view.getHeight())*.11f);}
+            });
+            launchAmbientBand=new View(this);launchAmbientBand.setRotation(-18f);
+            launchAmbientBand.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,new int[]{Color.TRANSPARENT,Color.argb(7,195,220,255),Color.argb(15,195,220,255),Color.TRANSPARENT}));
+            launchAmbientClip.addView(launchAmbientBand,new FrameLayout.LayoutParams(1,1));
+            launchCover.addView(launchAmbientClip,new FrameLayout.LayoutParams(1,1));
+            launchCover.addOnLayoutChangeListener((view,left,top,right,bottom,oldLeft,oldTop,oldRight,oldBottom)->{
+                if(right-left!=oldRight-oldLeft||bottom-top!=oldBottom-oldTop)layoutLaunchAmbient(right-left,bottom-top);
+            });
+            root.addView(launchCover,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
+        }
+        setContentView(root);root.requestApplyInsets();applyAppearance();
+        if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
+        if(launchCover!=null){
+            root.getViewTreeObserver().addOnDrawListener(new android.view.ViewTreeObserver.OnDrawListener(){
+                private boolean submitted;
+                @Override public void onDraw(){if(submitted)return;submitted=true;firstLaunchDrawn=true;firstLaunchFramePresented=launchCover!=null&&launchCover.getAlpha()>0f&&webView==null;
+                    root.post(()->{
+                        root.getViewTreeObserver().removeOnDrawListener(this);
+                        if(systemSplashGone)startLaunchIntro(root);
+                        else root.postDelayed(()->startLaunchIntro(root),500);
+                    });}
+            });
+        }else root.post(()->{if(!isDestroyed())initializeWebView(root);});
+    }
+
+    private void startLaunchIntro(FrameLayout root){
+        if(!firstLaunchDrawn||launchFadeStarted||isDestroyed())return;
+        launchFadeStarted=true;
+        // Begin only after the system window leaves, so it cannot hide an already bright scene.
+        if(launchCover!=null){startLaunchAmbient();launchCover.animate().alpha(1f).setDuration(380).start();}
+        // Keep WebView setup out of the first fade; the fallback above avoids waiting forever.
+        root.postDelayed(()->{if(!isDestroyed())initializeWebView(root);},400);
+    }
+
+    private void layoutLaunchAmbient(int width,int height){
+        if(launchAmbientClip==null||launchAmbientBand==null||width<=0||height<=0)return;
+        float scale=Math.min(width/393f,height/777f),originX=(width-393f*scale)/2f,originY=(height-777f*scale)/2f;
+        int clipWidth=Math.max(1,Math.round(345f*scale)),clipHeight=Math.max(1,Math.round(210f*scale));
+        FrameLayout.LayoutParams clip=new FrameLayout.LayoutParams(clipWidth,clipHeight);
+        clip.leftMargin=Math.round(originX+24f*scale);clip.topMargin=Math.round(originY+428.4375f*scale);launchAmbientClip.setLayoutParams(clip);
+        FrameLayout.LayoutParams band=new FrameLayout.LayoutParams(Math.max(1,Math.round(140f*scale)),clipHeight*2);
+        band.topMargin=-clipHeight/2;launchAmbientBand.setLayoutParams(band);
+    }
+    private void startLaunchAmbient(){
+        if(launchCover==null||launchAmbientClip==null||launchAmbientBand==null||isDestroyed()||!android.animation.ValueAnimator.areAnimatorsEnabled()||!getSharedPreferences("appearance",MODE_PRIVATE).getBoolean("motionEnabled",true))return;
+        if(launchAmbient!=null)launchAmbient.cancel();
+        float bandWidth=Math.max(1,launchAmbientBand.getLayoutParams().width),clipWidth=Math.max(1,launchAmbientClip.getLayoutParams().width);
+        launchAmbient=android.animation.ObjectAnimator.ofFloat(launchAmbientBand,View.TRANSLATION_X,-bandWidth,clipWidth+bandWidth);
+        launchAmbient.setDuration(1900);launchAmbient.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+        launchAmbient.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());launchAmbientStarted=true;launchAmbient.start();
+    }
+    private void stopLaunchAmbient(){if(launchAmbient!=null){launchAmbient.cancel();launchAmbient=null;}}
+
+    private void initializeWebView(FrameLayout root){
         webView=new WebView(this);webView.setId(R.id.web_view);
-        webView.setBackgroundColor(appearanceColor());
+        webView.setBackgroundColor(launchIntro?LAUNCH_COLOR:appearanceColor());
         WebSettings settings=webView.getSettings();
         settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
@@ -106,9 +175,7 @@ public final class MainActivity extends Activity {
         });
         webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new NativeFiles(),"AndroidFiles");
-        root.addView(webView,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
-        setContentView(root);root.requestApplyInsets();applyAppearance();
-        if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
+        root.addView(webView,0,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
         webView.loadUrl(HOME);
     }
 
@@ -118,12 +185,24 @@ public final class MainActivity extends Activity {
         String mode=getSharedPreferences("appearance",MODE_PRIVATE).getString("mode","system");
         darkAppearance="dark".equals(mode)||("system".equals(mode)&&systemIsDark());
     }
-    @SuppressWarnings("deprecation") private void applyAppearance(){
-        int color=appearanceColor();
-        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(color));
+    private void applyAppearance(){
+        if(launchTransition!=null){launchTransition.cancel();launchTransition=null;}
+        paintAppearance(launchIntro?LAUNCH_COLOR:appearanceColor(),launchIntro||darkAppearance);
+    }
+    @SuppressWarnings("deprecation") private void paintAppearance(int color,boolean darkBars){
+        windowCanvas.setColor(color);getWindow().setBackgroundDrawable(windowCanvas);
         getWindow().getDecorView().setBackgroundColor(color);getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
-        getWindow().getDecorView().setSystemUiVisibility(darkAppearance?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        getWindow().getDecorView().setSystemUiVisibility(darkBars?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         if(webView!=null){webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
+    }
+    private void fadeLaunchAppearance(int duration){
+        if(!launchIntro||isDestroyed())return;
+        if(launchTransition!=null)launchTransition.cancel();
+        launchTransition=android.animation.ValueAnimator.ofArgb(LAUNCH_COLOR,appearanceColor());
+        launchTransition.setDuration(Math.max(0,Math.min(1000,duration)));
+        launchTransition.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+        launchTransition.addUpdateListener(animation->{if(!isDestroyed())paintAppearance((Integer)animation.getAnimatedValue(),darkAppearance||animation.getAnimatedFraction()<.6f);});
+        launchTransition.start();
     }
     @Override public void onConfigurationChanged(Configuration config){
         super.onConfigurationChanged(config);refreshAppearance();applyAppearance();
@@ -137,9 +216,18 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private boolean launchCoverFading;
     private void completeLaunchSurface(){
-        if(!systemSplashDelivered)return;
-        if(dismissSystemSplash!=null){dismissSystemSplash.run();dismissSystemSplash=null;}
+        if(launchNotified||launchCoverFading||isDestroyed())return;
+        if(launchCover!=null){
+            FrameLayout cover=launchCover;launchCover=null;launchCoverFading=true;
+            cover.animate().alpha(0f).setDuration(220).withEndAction(()->{
+                stopLaunchAmbient();if(cover.getParent() instanceof FrameLayout)((FrameLayout)cover.getParent()).removeView(cover);
+                launchAmbientClip=null;launchAmbientBand=null;launchCoverFading=false;notifyLaunchSurface();
+            }).start();
+        }else notifyLaunchSurface();
+    }
+    private void notifyLaunchSurface(){
         if(!launchNotified&&webView!=null&&!isDestroyed()){
             launchNotified=true;
             webView.evaluateJavascript("globalThis.dagongrenLaunchReady && globalThis.dagongrenLaunchReady();",null);
@@ -147,6 +235,9 @@ public final class MainActivity extends Activity {
     }
 
     public boolean isLaunchSurfaceReady(){return launchNotified;}
+    public boolean isFirstLaunchFramePresented(){return firstLaunchFramePresented;}
+    public boolean wasLaunchAmbientStarted(){return launchAmbientStarted;}
+    public boolean isNativeMotionEnabled(){return getSharedPreferences("appearance",MODE_PRIVATE).getBoolean("motionEnabled",true);}
 
     private void reportKeyboard(boolean visible){
         if(webView==null||Boolean.valueOf(visible).equals(reportedKeyboard))return;
@@ -159,6 +250,7 @@ public final class MainActivity extends Activity {
         try{startActivity(new Intent(Intent.ACTION_VIEW,uri));}catch(android.content.ActivityNotFoundException ignored){notice("手机上没有可用浏览器。");}
     }
     private void handleBack(){
+        if(webView==null){moveTaskToBack(true);return;}
         webView.evaluateJavascript("Boolean(globalThis.dagongrenBack && globalThis.dagongrenBack())",value->{if(!"true".equals(value))moveTaskToBack(true);});
     }
     @Override @SuppressWarnings("deprecation") public void onBackPressed(){handleBack();}
@@ -171,7 +263,13 @@ public final class MainActivity extends Activity {
     }
     public final class NativeFiles {
         @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
-        @JavascriptInterface public void introReady(){runOnUiThread(MainActivity.this::prepareLaunchSurface);}
+        @JavascriptInterface public boolean nativeLaunchPage(){return launchIntro;}
+        @JavascriptInterface public void motionStyle(boolean enabled){
+            android.content.SharedPreferences preferences=getSharedPreferences("appearance",MODE_PRIVATE);
+            if(!preferences.contains("motionEnabled")||preferences.getBoolean("motionEnabled",true)!=enabled)preferences.edit().putBoolean("motionEnabled",enabled).apply();
+            if(!enabled)runOnUiThread(MainActivity.this::stopLaunchAmbient);
+        }
+        @JavascriptInterface public void introReady(){runOnUiThread(()->{if(launchNotified&&webView!=null&&!isDestroyed())webView.evaluateJavascript("globalThis.dagongrenLaunchReady && globalThis.dagongrenLaunchReady();",null);else prepareLaunchSurface();});}
         @JavascriptInterface public boolean systemDark(){return systemIsDark();}
         @JavascriptInterface public void themeStyle(String mode){
             if(!"system".equals(mode)&&!"light".equals(mode)&&!"dark".equals(mode))return;
@@ -181,7 +279,8 @@ public final class MainActivity extends Activity {
                 boolean previous=darkAppearance;refreshAppearance();if(previous!=darkAppearance)applyAppearance();
             });
         }
-        @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{applyAppearance();if(!active)launchIntro=false;});}
+        @JavascriptInterface public void introTransition(int duration){runOnUiThread(()->fadeLaunchAppearance(duration));}
+        @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{if(!active)launchIntro=false;applyAppearance();});}
         @JavascriptInterface public String status(){
             try{return CredentialVault.publicConfig(vault.load()).toString();}
             catch(Exception ignored){return "{\"configured\":false,\"error\":\"原连接配置无法读取，请重新配置。\"}";}
@@ -255,6 +354,6 @@ public final class MainActivity extends Activity {
     @Override protected void onResume(){super.onResume();if(webView!=null)webView.onResume();}
     @Override protected void onPause(){if(webView!=null)webView.onPause();super.onPause();}
     @Override protected void onDestroy(){
-        worker.shutdownNow();calendarWorker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
+        stopLaunchAmbient();if(launchTransition!=null){launchTransition.cancel();launchTransition=null;}worker.shutdownNow();calendarWorker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
     }
 }
