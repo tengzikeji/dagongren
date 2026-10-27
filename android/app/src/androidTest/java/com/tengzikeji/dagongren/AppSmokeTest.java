@@ -237,7 +237,8 @@ public class AppSmokeTest {
             resetBook(scenario);
             assertEquals("4",evaluate(scenario,"document.querySelectorAll('.bottom-nav button').length"));
             assertEquals("0",evaluate(scenario,"JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.salaryCents"));
-            evaluate(scenario,"document.querySelector('[data-action=salary-settings]').click()");
+            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.view-home [data-action=home-current]'))&&!document.querySelector('.view-home [data-action=salary-settings]')"));
+            evaluate(scenario,"document.querySelector('.bottom-nav [data-view=settings]').click();document.querySelector('.view-settings [data-action=salary-settings]').click()");
             assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.modal-footer button[form=salary-form]'))"));
             evaluate(scenario,"document.querySelector('#salary-form [name=salary]').value='6500';document.querySelector('.modal-footer button[type=submit]').click()");
             assertEquals("650000",evaluate(scenario,"JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.salaryCents"));
