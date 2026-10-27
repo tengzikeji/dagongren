@@ -42,8 +42,8 @@ def main():
         raise ValueError('Supply a shard report directory or --single and a report file')
     root = Path(sys.argv[1])
     reports = sorted(root.glob('device-test-*/instrumentation.txt'))
-    if len(reports) != 5:
-        raise ValueError(f'Expected 5 device shard reports, found {len(reports)}')
+    if len(reports) != 8:
+        raise ValueError(f'Expected 8 device shard reports, found {len(reports)}')
     passed = [name for path in reports for name in completed(path)]
     source = Path('android/app/src/androidTest/java/com/tengzikeji/dagongren/AppSmokeTest.java').read_text(encoding='utf-8')
     expected = re.findall(r'@Test\s+public\s+void\s+(\w+)\s*\(', source)
