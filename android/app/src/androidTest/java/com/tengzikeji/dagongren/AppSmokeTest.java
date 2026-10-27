@@ -373,12 +373,12 @@ public class AppSmokeTest {
         try{
             waitTrue(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1);if(!entry)return false;window.__launchObserved=entry.detail;if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='fading'){const rect=page.getBoundingClientRect(),style=getComputedStyle(page);window.__launchBlendSamples.push({opacity:Number(style.opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height,left:rect.left,top:rect.top,transform:style.transform,radius:style.borderRadius})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
             assertEquals("1",evaluate(scenario,"window.__launchObserved.surfaces"));
-            assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
-            assertEquals("true",evaluate(scenario,"window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='beta.1'&&Boolean(document.querySelector('.launch-ledger'))&&!document.querySelector('.launch-picture')"));
+            assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertTrue(activity.wasLaunchAmbientStarted());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
+            assertEquals("true",evaluate(scenario,"window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='beta.1'&&window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&Boolean(document.querySelector('.launch-ledger'))&&!document.querySelector('.launch-picture')"));
             assertEquals("false",evaluate(scenario,"window.__launchObserved.oldBrand"));
             assertEquals("true",evaluate(scenario,"window.__launchObserved.inert"));
             assertEquals("true",evaluate(scenario,"window.__launchObserved.animated&&['launch-soft-in','launch-line','launch-bar','launch-sheen','launch-orbit','launch-dot'].every(name=>window.__launchObserved.animationNames.includes(name))"));
-            assertEquals("true",evaluate(scenario,"(()=>{const created=performance.getEntriesByName('dagongren.launch.created')[0],painted=performance.getEntriesByName('dagongren.launch.painted')[0],render=performance.getEntriesByName('dagongren.app.render')[0],playing=performance.getEntriesByName('dagongren.launch.playing')[0];return !!created&&!!painted&&!!render&&created.startTime<=painted.startTime&&painted.startTime<render.startTime&&render.startTime<playing.startTime})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const created=performance.getEntriesByName('dagongren.launch.created')[0],painted=performance.getEntriesByName('dagongren.launch.painted')[0],render=performance.getEntriesByName('dagongren.app.render')[0],playing=performance.getEntriesByName('dagongren.launch.playing')[0];return !!created&&!!painted&&!!render&&created.startTime<=painted.startTime&&painted.startTime<=playing.startTime&&playing.startTime<render.startTime})()"));
             double playingSecond=(Double.parseDouble(evaluate(scenario,"window.__launchObserved.at"))-recordingStarted)/1000.0;
             android.util.Log.i("DagongrenLaunchReview","PLAYING_SECOND="+playingSecond);
             waitTrue(scenario,"window.__launchBlendSamples.some(frame=>frame.opacity>0&&frame.opacity<1&&frame.homeOpacity===1&&Math.abs(frame.width-innerWidth)<1&&Math.abs(frame.height-innerHeight)<1)");
@@ -708,7 +708,9 @@ public class AppSmokeTest {
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.theme-gauge>svg,.theme-orbit>svg,.mix-orbit>svg')].every(e=>e.getBoundingClientRect().height>=70)"));
             evaluate(scenario,"document.querySelector('.profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 paintedScreenshot(scenario,"theme-"+theme+"-profile");
-            evaluate(scenario,"document.querySelector('.app-copyright').scrollIntoView({block:'center',behavior:'instant'})");
+            evaluate(scenario,"document.querySelector('.app-info-footer').scrollIntoView({block:'center',behavior:'instant'})");
+            waitTrue(scenario,"!document.getElementById('toast').classList.contains('show')");
+            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.3-beta.4 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
                 paintedScreenshot(scenario,"theme-"+theme+"-copyright");
             evaluate(scenario,"document.querySelector('.profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 swipeRegion(scenario,".employment-progress",-1);

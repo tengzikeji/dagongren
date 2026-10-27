@@ -213,7 +213,7 @@ body[data-theme=dark] .calendar-day.has-entry{--date-border:#58759e}
 .calendar-day.empty{--date-bg:transparent}
 .calendar-day,.calendar-day:hover,.calendar-day:active,.calendar-day *{transition:none!important;filter:none;transform:none}
 
-.app-copyright{text-align:center;color:var(--muted,#7c90ad);padding:24px 12px 8px;font-size:11px;line-height:1.8;letter-spacing:.3px}.app-copyright p{margin:0}.app-copyright p+p{margin-top:4px}
+
 
 /* Restore the beta.1 launch composition and its independent animations. */
 .launch-page{position:fixed;inset:0;z-index:10000;overflow:hidden;background:#101e3d;color:#e5edf9;isolation:isolate}
@@ -254,3 +254,16 @@ body.intro-playing .launch-page,body.intro-playing[data-theme=dark] .launch-page
 .launch-page[data-phase=fading]{transform:none;border-radius:0;box-shadow:none;will-change:opacity;pointer-events:none}
 .launch-page :is(.launch-ledger,.launch-value-line,.launch-bars i,.launch-card-sheen,.launch-ready i){will-change:transform,opacity}
 @media(prefers-reduced-motion:reduce){.page-swipe-layer .swipe-boundary-arrow,.launch-page *{animation:none!important}}
+
+/* Identical native and web first frames dissolve into the live startup scene. */
+.launch-prelude{position:absolute;inset:0;width:100%;height:100%;z-index:10;display:block;pointer-events:none;user-select:none}
+
+/* Compact application information below the last settings card. */
+.app-info-footer{width:min(100%,380px);margin:0 auto;padding:10px 12px 4px;text-align:center;color:var(--muted,#7c90ad);font-size:11px;line-height:1.7;touch-action:pan-y pinch-zoom}
+.app-info-heading{display:flex;align-items:baseline;justify-content:center;gap:8px;flex-wrap:wrap}.app-info-heading strong{color:var(--ink,#1c3454);font-size:12px;font-weight:650}.app-info-heading span{font-size:11px}
+.app-info-storage{display:flex;justify-content:center;align-items:flex-start;gap:5px;margin:7px 0 0}.app-info-storage svg{width:12px;height:12px;margin-top:3px;flex-shrink:0}.app-info-storage span{max-width:100%;overflow-wrap:anywhere}
+.app-info-divider{height:1px;width:54px;margin:13px auto 10px;background:var(--line,#e2e8f0)}.app-info-owner,.app-info-phone{margin:0}.app-info-phone{margin-top:3px;font-variant-numeric:tabular-nums}
+
+/* Keep a restrained card highlight moving if the home data needs more time. */
+.launch-loading-sheen{position:absolute;inset:-40% -60%;background:linear-gradient(110deg,transparent 42%,#c3dcff09 49%,#c3dcff12 50%,transparent 58%);transform:translateX(-70%);pointer-events:none}
+.launch-page[data-phase] .launch-loading-sheen{animation:launch-sheen 1.9s 1.45s ease-in-out infinite both}

@@ -3,4 +3,5 @@ import {prepareBrandIntro} from './launch.js';
 const intro=prepareBrandIntro();
 globalThis.dagongrenIntro=intro;
 await intro.painted;
+await intro.beforeApp;
 await import('./app.js');
