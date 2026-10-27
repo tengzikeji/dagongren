@@ -829,12 +829,18 @@ public class AppSmokeTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
             evaluate(scenario,"window.__dragInput=(name,x,y,t,selector)=>{if(name==='pointerdown')window.__dragNode=document.querySelector(selector);const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:771,isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});window.__dragNode.dispatchEvent(e);};window.__nextFrames=()=>{window.__framesReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>window.__framesReady=true));};true");
-            evaluate(scenario,"window.__dragInput('pointerdown',300,100,0,'.topbar');window.__dragInput('pointermove',296,100,10)");
+            evaluate(scenario,"window.__dragInput('pointerdown',300,100,0,'.topbar')");
+            assertEquals("true",evaluate(scenario,"(()=>{const layer=document.querySelector('.page-swipe-layer');return !!layer&&getComputedStyle(layer).opacity==='0'&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'})()"));
+            evaluate(scenario,"window.__dragInput('pointermove',296,100,10)");
+            assertEquals("true",evaluate(scenario,"(()=>{const layer=document.querySelector('.page-swipe-layer'),track=layer?.querySelector('.page-swipe-track'),mark=performance.getEntriesByName('dagongren.page.activate').at(-1);return !!track&&getComputedStyle(layer).opacity==='1'&&track.children.length===2&&Math.abs(new DOMMatrix(getComputedStyle(track).transform).m41+4)<.6&&mark?.detail?.prepared===true})()"));
             nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.page-swipe-track')).transform).m41+4)<.6"));
             evaluate(scenario,"window.__dragInput('pointermove',280,100,35);window.__dragInput('pointerup',280,100,40)");
             waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='calendar'");
-            evaluate(scenario,"window.__thumbMonth=document.querySelector('[data-calendar-month]').dataset.calendarMonth;window.__dragInput('pointerdown',280,300,100,'.calendar-days');window.__dragInput('pointermove',276,300,110)");
+            evaluate(scenario,"window.__thumbMonth=document.querySelector('[data-calendar-month]').dataset.calendarMonth;window.__dragInput('pointerdown',280,300,100,'.calendar-days')");
+            assertEquals("true",evaluate(scenario,"(()=>{const track=document.querySelector('.calendar-swipe-track'),grid=document.querySelector('.calendar-grid-viewport>.calendar-days');return !!track&&getComputedStyle(track).opacity==='0'&&getComputedStyle(grid).visibility==='visible'})()"));
+            evaluate(scenario,"window.__dragInput('pointermove',276,300,110)");
+            assertEquals("true",evaluate(scenario,"(()=>{const track=document.querySelector('.calendar-swipe-track'),mark=performance.getEntriesByName('dagongren.calendar.activate').at(-1);return !!track&&getComputedStyle(track).opacity==='1'&&track.children.length===2&&Math.abs(new DOMMatrix(getComputedStyle(track).transform).m41+4)<.6&&mark?.detail?.prepared===true})()"));
             nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"!document.querySelector('.page-swipe-layer')&&Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.calendar-swipe-track')).transform).m41+4)<.6"));
             evaluate(scenario,"window.__dragInput('pointermove',260,300,135);window.__dragInput('pointerup',260,300,140)");

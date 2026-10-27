@@ -95,9 +95,20 @@ function uiRollNumbers(root,oldNumbers,same,motion,themeChanged=false,replayNumb
   const anchor=document.createElement('span');anchor.className='number-roll-anchor';anchor.appendChild(fragment);text.replaceWith(anchor);
   const priorLabel=node.getAttribute('aria-label');node.setAttribute('aria-label',finalText);let done=false,timeout;
   const finish=()=>{if(done)return;done=true;clearTimeout(timeout);uiRollingNodes.delete(node);uiRollCleanups=uiRollCleanups.filter(cleanup=>cleanup!==finish);if(anchor.isConnected)anchor.replaceWith(document.createTextNode(original));if(priorLabel===null)node.removeAttribute('aria-label');else node.setAttribute('aria-label',priorLabel);};
-  uiRollingNodes.set(node,{text:finalText,number:target,finish});
+  uiRollingNodes.set(node,{text:finalText,number:target,original,priorLabel,finish});
   timeout=setTimeout(finish,Math.max(...plan.map(x=>x.delay+x.duration))+60);uiRollCleanups.push(finish);
  }
+}
+// Prepare an inert page without ending any live number animation during a tap.
+function snapshotFinalNumbers(source){
+ const clone=source.cloneNode(true);if(!uiRollingNodes.size)return clone;
+ const live=[...source.querySelectorAll('.number')],copies=[...clone.querySelectorAll('.number')];
+ for(let i=0;i<live.length;i++){
+  const state=uiRollingNodes.get(live[i]),target=copies[i];if(!state||!target)continue;
+  target.querySelector('.number-roll-anchor')?.replaceWith(document.createTextNode(state.original));
+  if(state.priorLabel===null)target.removeAttribute('aria-label');else target.setAttribute('aria-label',state.priorLabel);
+ }
+ return clone;
 }
 export function playHomeStartupGlare(root,motion=true){
  if(uiHomeGlareDone||!motion||document.body.classList.contains('motion-off')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.querySelector('.launch-page')||root.inert||document.visibilityState==='hidden')return false;
@@ -156,5 +167,5 @@ export function enhanceModalChoices(root){
 }
 export function playBrandIntro(enabled=true,onComplete=null){return globalThis.dagongrenIntro?.play(enabled,onComplete);}
 
-export function installPageSwipe(root,api){return bindPageSwipe(root,{...api,fitPreview:fitCompanyNames,before(){for(const finish of [...uiRollCleanups])finish();api.before?.();},settled(completed,to){if(completed)uiRollNumbers(root,new Map(),false,true);api.settled?.(completed,to);}});}
+export function installPageSwipe(root,api){return bindPageSwipe(root,{...api,snapshot:snapshotFinalNumbers,fitPreview:fitCompanyNames,before(){for(const finish of [...uiRollCleanups])finish();api.before?.();},settled(completed,to){if(completed)uiRollNumbers(root,new Map(),false,true);api.settled?.(completed,to);}});}
 export function installCalendarSwipe(root,api){return bindCalendarSwipe(root,api);}
