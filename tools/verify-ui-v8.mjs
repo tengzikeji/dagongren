@@ -141,3 +141,8 @@ console.log('Passed signed calendar wages and corrected calendar usage/rights de
  ui.failWrites();ui.click('choose-theme',{theme:'dark'});assert.equal(ui.theme(),'system');assert.match(ui.el('toast').textContent,/无法保存/);
 }
 console.log('Passed 1.3.1: system/light/dark appearance, device-only persistence, unchanged wages and records, restart restoration and storage-failure handling.');
+
+{
+ for(const periodMode of ['calendar','custom']){const data=clone(fixture);data.defaults.periodMode=periodMode;for(const row of Object.values(data.months))row.periodMode=periodMode;const ui=boot(data),before=ui.data();ui.click('nav',{view:'home'});assert.match(ui.el('app').innerHTML,/data-action="home-current"/);if(periodMode==='calendar')ui.click('shift-month',{delta:'-1'});else ui.click('shift-home-period',{delta:'-1'});ui.click('home-current');assert.equal(ui.evaluate('__check.pageContext().selectedMonth'),'2026-10');const range=ui.evaluate('__check.homeAccount()');assert.ok(range.start<='2026-10-22'&&range.end>='2026-10-22');assert.deepEqual(ui.data(),before);}
+}
+console.log('Passed beta: return-to-current-month works for calendar and custom wage periods without rewriting the ledger.');

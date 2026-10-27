@@ -190,3 +190,37 @@
 .modal-overlay:has(.cloud-cleanup-review){backdrop-filter:none}
 .cloud-cleanup-review .detail-line{min-height:42px}
 .modal:has(.cloud-cleanup-review){will-change:transform,opacity}
+
+/* Continuous page planes include their own background, so edges always touch. */
+.page-swipe-layer{z-index:15;overflow:hidden;background:var(--bg,#f3f5f9)}
+.page-swipe-track{position:absolute;inset:0;will-change:transform}
+.page-swipe-track>.swipe-page{position:absolute;top:0;bottom:0;height:100%;overflow:hidden;background:var(--bg,#f3f5f9);contain:layout style}
+.swipe-page>.content{max-width:none;transition:none!important}
+.page-swipe-layer *,.page-swipe-layer *:before,.page-swipe-layer *:after,.calendar-swipe-track *{animation:none!important;transition:none!important}
+.calendar-grid-viewport{touch-action:pan-y pinch-zoom;background:var(--white,#fff)}
+.calendar-swipe-track{position:absolute;inset:0;will-change:transform;pointer-events:none}
+.calendar-swipe-track>.swipe-month{position:absolute;top:0;overflow:hidden;background:var(--white,#fff);contain:layout style}
+.swipe-month>.calendar-days{width:100%;margin:0;transform:none!important;transition:none!important}
+.bottom-nav.nav-following>button,.bottom-nav.nav-following svg{transition:none!important}
+.swipe-dragging{user-select:none}
+.swipe-boundary-label{position:absolute;top:45%;font-size:10px;color:var(--muted,#7c90ad);writing-mode:vertical-rl;letter-spacing:3px}
+
+/* Native window, native cover and web launch surface share one blue canvas. */
+.launch-page,body[data-theme=dark] .launch-page{background:#101e3d;color:#e5edf9}
+.launch-page .launch-grid{opacity:.22}
+.launch-page .launch-header strong,.launch-page .launch-copy h2,body[data-theme=dark] .launch-page .launch-copy h2{color:#e5edf9}
+.launch-page .launch-header>div>span,.launch-page .launch-copy p,.launch-page .launch-status small{color:#91a8cc}
+.launch-page .launch-eyebrow,.launch-page .launch-status>span:nth-child(2){color:#b1c8eb}
+.launch-page .launch-chip{background:#203452;color:#cbdfff;border-color:#42618a}
+.launch-page .launch-status{border-color:#365076}
+.launch-page .launch-status-icon{background:#1c3153}
+.launch-page .launch-ledger{border-color:#46628c;box-shadow:0 18px 34px #0002}
+.launch-page[data-phase=preparing] :is(.launch-header,.launch-copy,.launch-art,.launch-status){opacity:.35;transform:none}
+.launch-page[data-phase=playing] .launch-header{animation:launch-soft-in .28s ease-out both}
+.launch-page[data-phase=playing] .launch-copy{animation:launch-soft-in .32s .04s ease-out both}
+.launch-page[data-phase=playing] .launch-ledger{animation:launch-soft-in .38s .08s ease-out both}
+.launch-page[data-phase=playing] .launch-chip{animation:launch-soft-in .32s .3s ease-out both}
+.launch-page[data-phase=playing] .launch-status{animation:launch-soft-in .32s .3s ease-out both}
+@keyframes launch-soft-in{from{opacity:.35}to{opacity:1}}
+
+.launch-page[data-phase=preparing] :is(.launch-ledger,.launch-chip){opacity:.35;transform:none}

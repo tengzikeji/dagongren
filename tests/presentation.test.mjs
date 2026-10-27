@@ -21,111 +21,42 @@ test('大量金额连续切换时，每次落点只对应当次目标',()=>{
  for(let i=1;i<=200;i++){const next=((i*7919)%1000000/100).toFixed(2),plan=numberRollPlan(old,next);assert.equal(plan.map(w=>w.digits.at(-1)).join(''),next.replace(/\D/g,''));old=next;}
 });
 
-import {calendarSwipeDelta} from '../dist/interaction.js';
-test('日历左右滑动一次只切一个月，纵向滚动与轻触不切月份',()=>{
- assert.equal(calendarSwipeDelta(-100,5,300),1);
- assert.equal(calendarSwipeDelta(100,-10,400),-1);
- for(const args of [[10,1,100],[47,0,100],[50,100,200],[-80,70,200],[100,0,31000],[NaN,0,100],[100,Infinity,100]])assert.equal(calendarSwipeDelta(...args),0);
- assert.equal(calendarSwipeDelta(-300,0,1500),1);
- assert.equal(calendarSwipeDelta(-100,0,5000),1);
+import {swipeAxis,swipeDecision,swipeOffset,swipeVelocity,pageSwipeTarget,calendarSwipeDelta} from '../dist/interaction.js';
+test('横纵方向只初判一次，锁定后忽略另一轴的位移',()=>{
+ assert.equal(swipeAxis(3,4),'pending');assert.equal(swipeAxis(20,2),'x');assert.equal(swipeAxis(2,20),'y');
+ assert.equal(swipeAxis(20,400,'x'),'x');assert.equal(swipeAxis(400,20,'y'),'y');
+ assert.equal(swipeAxis(11,11),'pending');assert.equal(swipeAxis(25,24),'x');
 });
-
-import {pageSwipeTarget} from '../dist/interaction.js';
-test('主页面左右切换按首页、日历、明细、我的排序且不绕回',()=>{
- assert.equal(pageSwipeTarget('home',1),'calendar');
- assert.equal(pageSwipeTarget('calendar',1),'records');
- assert.equal(pageSwipeTarget('records',1),'settings');
- assert.equal(pageSwipeTarget('settings',-1),'records');
- assert.equal(pageSwipeTarget('records',-1),'calendar');
- assert.equal(pageSwipeTarget('calendar',-1),'home');
- assert.equal(pageSwipeTarget('home',-1),null);
- assert.equal(pageSwipeTarget('settings',1),null);
- assert.equal(pageSwipeTarget('cleanup',1),null);
- assert.equal(pageSwipeTarget('sync',-1),null);
- assert.equal(pageSwipeTarget('home',0),null);
+test('屏宽三分之一是慢拖切换边界，与绝对48像素无关',()=>{
+ for(const width of [320,360,393,400,768,1080]){assert.equal(swipeDecision(-width/3,width,0).complete,true);assert.equal(swipeDecision(width/3-.01,width,0).complete,false);assert.equal(swipeDecision(width/3,width,0).delta,-1);}
+ assert.equal(swipeDecision(-100,400,0).complete,false);
 });
-
-import {installCalendarSwipe,installPageSwipe} from '../dist/interaction.js';
-function swipeFixture(owner=''){
- const handlers={},classes=new Set(),variables=new Map(),style={setProperty:(k,v)=>variables.set(k,v),removeProperty:k=>variables.delete(k)},classList={add:x=>classes.add(x),remove:x=>classes.delete(x)};
- const panel={style,classList},root={style,classList,addEventListener:(name,fn)=>handlers[name]=fn,querySelector:()=>null};
- const target={closest:selector=>owner==='calendar'&&selector.includes('[data-calendar-swipe]')?panel:owner==='name'&&selector.includes('.profile-name-viewport')?panel:null};
- const event=(time,x,y)=>({pointerId:1,isPrimary:true,isTrusted:true,button:0,timeStamp:time,clientX:x,clientY:y,target,cancelable:true,preventDefault(){this.prevented=true},stopImmediatePropagation(){this.stopped=true}});
- return {root,panel,handlers,event,classes};
-}
-test('卡顿延迟处理触摸事件时，日历仍按真实事件时间切月份并阻止误点',()=>{
- const f=swipeFixture('calendar'),changes=[],oldNow=Date.now;let wall=1000;
- try{
-  Date.now=()=>wall;installCalendarSwipe(f.root,delta=>changes.push(delta));
-  f.handlers.pointerdown(f.event(1200,300,100));wall=100000;
-  f.handlers.pointermove(f.event(1260,200,102));wall=200000;
-  f.handlers.pointerup(f.event(1320,100,104));
-  assert.deepEqual(changes,[1]);
-  const ghost=f.event(1321,100,104);f.handlers.click(ghost);assert.equal(ghost.prevented,true);assert.equal(ghost.stopped,true);
-  const routed=f.event(1322,100,104);routed.isTrusted=false;f.handlers.click(routed);assert.notEqual(routed.prevented,true);
-  f.handlers.pointerdown(f.event(2000,200,100));f.handlers.pointermove(f.event(2030,204,180));f.handlers.pointerup(f.event(2100,204,200));
-  assert.deepEqual(changes,[1]);assert.equal(f.classes.has('is-swiping'),false);
- }finally{Date.now=oldNow;}
+test('快速轻扫速度阈值为800像素每秒，反向松手不能借速度切页',()=>{
+ assert.equal(swipeDecision(-40,400,-800).complete,true);assert.equal(swipeDecision(40,400,800).complete,true);
+ assert.equal(swipeDecision(-40,400,-799.9).complete,false);assert.equal(swipeDecision(-40,400,1000).complete,false);
+ assert.equal(swipeDecision(-150,400,1000).complete,true);
 });
-test('延迟触屏事件切主页面，日历、长名称和表单保持操作归属',()=>{
- const previousWindow=globalThis.window,previousDocument=globalThis.document,previousNow=Date.now;let wall=1000,view='home',editing=false;
- try{
-  globalThis.window={matchMedia:()=>({matches:true})};globalThis.document={documentElement:{clientWidth:400},body:{classList:{contains:()=>false}}};Date.now=()=>wall;
-  const api={current:()=>view,blocked:()=>editing,navigate:next=>view=next};
-  for(const [owner,from,expected] of [['','home','calendar'],['calendar','calendar','calendar'],['name','settings','settings']]){
-   view=from;const f=swipeFixture(owner);installPageSwipe(f.root,api);f.handlers.pointerdown(f.event(1000,300,100));wall+=100000;f.handlers.pointermove(f.event(1060,200,100));f.handlers.pointerup(f.event(1120,100,100));assert.equal(view,expected);
-  }
-  editing=true;view='records';const f=swipeFixture();installPageSwipe(f.root,api);f.handlers.pointerdown(f.event(1000,300,100));f.handlers.pointermove(f.event(1060,200,100));f.handlers.pointerup(f.event(1120,100,100));assert.equal(view,'records');
- }finally{Date.now=previousNow;if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;}
+test('纵向手势和无效输入始终不翻页',()=>{
+ for(const input of [[-300,400,1000,'y'],[0,400,800,'x'],[NaN,400,0,'x'],[-150,0,800,'x'],[-20,400,Infinity,'x']])assert.equal(swipeDecision(...input).complete,false);
 });
-
-test('浏览器合并移动帧时，按下与抬起坐标仍能识别有效横滑',()=>{
- const previousWindow=globalThis.window,previousDocument=globalThis.document;
- try{
-  globalThis.window={matchMedia:()=>({matches:true})};globalThis.document={documentElement:{clientWidth:400},body:{classList:{contains:()=>false}}};
-  const calendar=swipeFixture('calendar'),changes=[];installCalendarSwipe(calendar.root,delta=>changes.push(delta));
-  calendar.handlers.pointerdown(calendar.event(1000,300,100));calendar.handlers.pointerup(calendar.event(1120,100,102));assert.deepEqual(changes,[1]);
-  let view='home';const page=swipeFixture();installPageSwipe(page.root,{current:()=>view,navigate:next=>view=next});
-  page.handlers.pointerdown(page.event(2000,300,100));page.handlers.pointerup(page.event(2120,100,102));assert.equal(view,'calendar');
-  view='home';page.handlers.pointerdown(page.event(3000,200,100));page.handlers.pointerup(page.event(3120,205,103));assert.equal(view,'home');
-  page.handlers.pointerdown(page.event(4000,200,100));page.handlers.pointerup(page.event(4120,204,200));assert.equal(view,'home');
- }finally{if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;}
+test('释放速度取最后80毫秒，停住后释放不沿用先前的轻扫速度',()=>{
+ assert.equal(swipeVelocity([{x:300,t:0},{x:260,t:40}],40),-1000);
+ assert.equal(swipeVelocity([{x:300,t:0},{x:260,t:40},{x:260,t:200}],200),0);
+ assert.equal(swipeVelocity([{x:300,t:0},{x:100,t:60},{x:120,t:100},{x:150,t:140}],140),625);
+ assert.equal(swipeVelocity([],0),0);
 });
-
-test('安卓图表横滑在指针被取消后仍按完整触摸序列切页，竖滑和弹窗不误切',()=>{
- const beforeWindow=globalThis.window,beforeDocument=globalThis.document;let view='settings',blocked=false;
- try{
-  globalThis.window={matchMedia:()=>({matches:true})};globalThis.document={documentElement:{clientWidth:400},body:{classList:{contains:()=>false}}};
-  const handlers={},root={style:{setProperty(){},removeProperty(){}},classList:{add(){},remove(){}},addEventListener:(k,fn)=>handlers[k]=fn,querySelector:()=>null},panel={},target={closest:s=>s.includes('.profile-chart-panel')?panel:null};
-  installPageSwipe(root,{current:()=>view,blocked:()=>blocked,navigate:next=>view=next});
-  const touch=(x,y,time,end=false)=>({timeStamp:time,target,cancelable:true,preventDefault(){this.prevented=true},touches:end?[]:[{identifier:9,clientX:x,clientY:y}],changedTouches:[{identifier:9,clientX:x,clientY:y}]});
-  handlers.touchstart(touch(80,200,1000));const move=touch(160,200,1100);handlers.touchmove(move);assert.equal(move.prevented,true);handlers.pointercancel({pointerType:'touch'});handlers.touchend(touch(310,202,1300,true));assert.equal(view,'records');
-  view='settings';handlers.touchstart(touch(80,200,2000));handlers.touchmove(touch(82,280,2100));handlers.touchend(touch(82,330,2200,true));assert.equal(view,'settings');
-  blocked=true;handlers.touchstart(touch(80,200,3000));handlers.touchmove(touch(300,200,3100));handlers.touchend(touch(300,200,3200,true));assert.equal(view,'settings');
- }finally{if(beforeWindow===undefined)delete globalThis.window;else globalThis.window=beforeWindow;if(beforeDocument===undefined)delete globalThis.document;else globalThis.document=beforeDocument;}
+test('中间页面与月份1:1跟手，单次只允许一页；边界阻尼0.4倍',()=>{
+ for(const dx of [-250,-100,-13,13,100,250])assert.equal(swipeOffset(dx,393),dx);
+ assert.equal(swipeOffset(-900,393),-393);assert.equal(swipeOffset(900,393),393);
+ assert.equal(swipeOffset(100,393,true),40);assert.equal(swipeOffset(-100,393,true),-40);
 });
-
-test('连续触摸移动每帧只更新一次，取消手势后不留下延迟位移',()=>{
- const beforeRAF=globalThis.requestAnimationFrame,beforeCancel=globalThis.cancelAnimationFrame;
- const pending=new Map();let next=0,writes=0;
- try{
-  globalThis.requestAnimationFrame=fn=>{pending.set(++next,fn);return next;};
-  globalThis.cancelAnimationFrame=id=>pending.delete(id);
-  const f=swipeFixture('calendar');f.panel.style.setProperty=()=>writes++;
-  installCalendarSwipe(f.root,()=>{});
-  f.handlers.pointerdown(f.event(1000,300,100));
-  for(let i=0;i<50;i++)f.handlers.pointermove(f.event(1001+i,280-i,100));
-  assert.equal(pending.size,1);assert.equal(writes,0);
-  const frame=[...pending.values()][0];pending.clear();frame();assert.equal(writes,1);
-  f.handlers.pointermove(f.event(1100,180,100));assert.equal(pending.size,1);
-  f.handlers.pointercancel();assert.equal(pending.size,0);assert.equal(f.classes.has('is-swiping'),false);
- }finally{
-  if(beforeRAF===undefined)delete globalThis.requestAnimationFrame;else globalThis.requestAnimationFrame=beforeRAF;
-  if(beforeCancel===undefined)delete globalThis.cancelAnimationFrame;else globalThis.cancelAnimationFrame=beforeCancel;
- }
+test('主页面严格相邻且首末边界不循环',()=>{
+ assert.equal(pageSwipeTarget('home',1),'calendar');assert.equal(pageSwipeTarget('calendar',1),'records');assert.equal(pageSwipeTarget('records',1),'settings');
+ assert.equal(pageSwipeTarget('settings',-1),'records');assert.equal(pageSwipeTarget('records',-1),'calendar');assert.equal(pageSwipeTarget('calendar',-1),'home');
+ for(const [v,d] of [['home',-1],['settings',1],['calendar',2],['sync',1],['cleanup',-1]])assert.equal(pageSwipeTarget(v,d),null);
 });
-
-test('导航点击复用主页面推进，跳转方向正确且不干扰弹窗',()=>{
- const oldWindow=globalThis.window,oldDocument=globalThis.document;let view='home',blocked=false;
- try{globalThis.window={matchMedia:()=>({matches:true})};globalThis.document={documentElement:{clientWidth:400},body:{classList:{contains:()=>false}}};const f=swipeFixture(),controller=installPageSwipe(f.root,{current:()=>view,blocked:()=>blocked,navigate:next=>view=next});assert.equal(controller.navigate('settings'),true);assert.equal(view,'settings');assert.equal(controller.navigate('home'),true);assert.equal(view,'home');assert.equal(controller.navigate('home'),false);assert.equal(controller.navigate('sync'),false);blocked=true;assert.equal(controller.navigate('calendar'),false);assert.equal(view,'home');}finally{globalThis.window=oldWindow;globalThis.document=oldDocument;}
+test('合并移动事件仍按按下与松开距离判断，慢短滑与纵滑回到原月',()=>{
+ assert.equal(calendarSwipeDelta(-150,2,2000,400),1);assert.equal(calendarSwipeDelta(150,2,2000,400),-1);
+ assert.equal(calendarSwipeDelta(-40,2,40,400),1);assert.equal(calendarSwipeDelta(-100,2,2000,400),0);
+ assert.equal(calendarSwipeDelta(-200,300,200,400),0);assert.equal(calendarSwipeDelta(100,0,31000,400),0);
 });

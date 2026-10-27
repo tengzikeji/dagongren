@@ -33,6 +33,8 @@ public final class MainActivity extends Activity {
     private static final String HOME="https://appassets.androidplatform.net/assets/www/index.html";
     private static final int SAVE_FILE=7101;
     private WebView webView;
+    private FrameLayout launchCover;
+    private static final int LAUNCH_COLOR=Color.rgb(16,30,61);
     private boolean darkAppearance;
     private CredentialVault vault;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
@@ -49,12 +51,12 @@ public final class MainActivity extends Activity {
         if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(splash->{
             systemSplashDelivered=true;dismissSystemSplash=splash::remove;
             if(launchSurfacePrepared)completeLaunchSurface();
-            else splash.postDelayed(this::prepareLaunchSurface,1200);
+
         });
 
         refreshAppearance();
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(appearanceColor());
+        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(launchIntro?LAUNCH_COLOR:appearanceColor());
         if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
         root.setOnApplyWindowInsetsListener((v,insets)->{
             if(Build.VERSION.SDK_INT>=30){
@@ -77,7 +79,7 @@ public final class MainActivity extends Activity {
             }
         });
         webView=new WebView(this);webView.setId(R.id.web_view);
-        webView.setBackgroundColor(appearanceColor());
+        webView.setBackgroundColor(launchIntro?LAUNCH_COLOR:appearanceColor());
         WebSettings settings=webView.getSettings();
         settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
@@ -107,6 +109,16 @@ public final class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new NativeFiles(),"AndroidFiles");
         root.addView(webView,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
+        if(launchIntro){
+            launchCover=new FrameLayout(this);launchCover.setTag("dagongren-native-launch");launchCover.setBackgroundColor(LAUNCH_COLOR);
+            android.widget.ImageView logo=new android.widget.ImageView(this);logo.setImageResource(R.drawable.intro_wordmark);
+            int size=Math.round(240*getResources().getDisplayMetrics().density);
+            launchCover.addView(logo,new FrameLayout.LayoutParams(size,size,android.view.Gravity.CENTER));
+            android.widget.TextView caption=new android.widget.TextView(this);caption.setText("工作有迹 · 收入有数");caption.setTextSize(12);caption.setTextColor(Color.rgb(177,200,235));caption.setGravity(android.view.Gravity.CENTER);
+            FrameLayout.LayoutParams captionLayout=new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.WRAP_CONTENT,android.view.Gravity.BOTTOM);
+            captionLayout.bottomMargin=Math.round(48*getResources().getDisplayMetrics().density);launchCover.addView(caption,captionLayout);
+            root.addView(launchCover,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
+        }
         setContentView(root);root.requestApplyInsets();applyAppearance();
         if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
         webView.loadUrl(HOME);
@@ -119,10 +131,10 @@ public final class MainActivity extends Activity {
         darkAppearance="dark".equals(mode)||("system".equals(mode)&&systemIsDark());
     }
     @SuppressWarnings("deprecation") private void applyAppearance(){
-        int color=appearanceColor();
+        int color=launchIntro?LAUNCH_COLOR:appearanceColor();
         getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(color));
         getWindow().getDecorView().setBackgroundColor(color);getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
-        getWindow().getDecorView().setSystemUiVisibility(darkAppearance?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        getWindow().getDecorView().setSystemUiVisibility(launchIntro||darkAppearance?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         if(webView!=null){webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
     }
     @Override public void onConfigurationChanged(Configuration config){
@@ -140,6 +152,7 @@ public final class MainActivity extends Activity {
     private void completeLaunchSurface(){
         if(!systemSplashDelivered)return;
         if(dismissSystemSplash!=null){dismissSystemSplash.run();dismissSystemSplash=null;}
+        if(launchCover!=null){FrameLayout cover=launchCover;launchCover=null;cover.animate().alpha(0f).setDuration(220).withEndAction(()->{if(cover.getParent() instanceof FrameLayout)((FrameLayout)cover.getParent()).removeView(cover);}).start();}
         if(!launchNotified&&webView!=null&&!isDestroyed()){
             launchNotified=true;
             webView.evaluateJavascript("globalThis.dagongrenLaunchReady && globalThis.dagongrenLaunchReady();",null);
@@ -171,7 +184,7 @@ public final class MainActivity extends Activity {
     }
     public final class NativeFiles {
         @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
-        @JavascriptInterface public void introReady(){runOnUiThread(MainActivity.this::prepareLaunchSurface);}
+        @JavascriptInterface public void introReady(){runOnUiThread(()->{if(launchNotified&&webView!=null&&!isDestroyed())webView.evaluateJavascript("globalThis.dagongrenLaunchReady && globalThis.dagongrenLaunchReady();",null);else prepareLaunchSurface();});}
         @JavascriptInterface public boolean systemDark(){return systemIsDark();}
         @JavascriptInterface public void themeStyle(String mode){
             if(!"system".equals(mode)&&!"light".equals(mode)&&!"dark".equals(mode))return;
@@ -181,7 +194,7 @@ public final class MainActivity extends Activity {
                 boolean previous=darkAppearance;refreshAppearance();if(previous!=darkAppearance)applyAppearance();
             });
         }
-        @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{applyAppearance();if(!active)launchIntro=false;});}
+        @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{if(!active)launchIntro=false;applyAppearance();});}
         @JavascriptInterface public String status(){
             try{return CredentialVault.publicConfig(vault.load()).toString();}
             catch(Exception ignored){return "{\"configured\":false,\"error\":\"原连接配置无法读取，请重新配置。\"}";}
