@@ -30,13 +30,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Prepare launch video analysis tools
-        run: |
-          python3 -m pip install --quiet Pillow imageio-ffmpeg==0.6.0
-          mkdir -p "$RUNNER_TEMP/dagongren-video-tools"
-          VIDEO_FFMPEG=$(python3 -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())')
-          ln -s "$VIDEO_FFMPEG" "$RUNNER_TEMP/dagongren-video-tools/ffmpeg"
-          echo "$RUNNER_TEMP/dagongren-video-tools" >> "$GITHUB_PATH"
       - name: Find previous private signing backup
         id: signing
         env:
@@ -82,13 +75,56 @@ jobs:
           path: artifacts/
           retention-days: 30
           if-no-files-found: error
+      - name: Prepare exact APKs for device tests
+        run: |
+          mkdir -p device-artifacts
+          cp android/app/build/outputs/apk/release/app-release.apk device-artifacts/
+          cp android/app/build/outputs/apk/androidTest/release/app-release-androidTest.apk device-artifacts/
+          cd device-artifacts
+          sha256sum app-release.apk app-release-androidTest.apk > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dagongren-device-test-apks
+          path: device-artifacts/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Remove restored private signing material
+        if: always()
+        run: rm -f signing-key/debug.keystore
+      - name: Save build reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: android/app/build/reports/
+          retention-days: 30
+
+  device-tests:
+    needs: verify-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dagongren-device-test-apks
+          path: device-artifacts
+      - name: Verify device test packages
+        run: cd device-artifacts && sha256sum -c SHA256SUMS.txt
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Android device smoke tests
+      - name: Android device tests
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          DEVICE_SHARD: ${{ matrix.shard }}
+          DEVICE_SHARDS: '5'
         with:
           api-level: 35
           target: default
@@ -96,7 +132,35 @@ jobs:
           profile: pixel_2
           emulator-options: -no-window -gpu swiftshader -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
-          script: bash .github/scripts/run-device-tests.sh
+          script: bash .github/scripts/run-device-shard.sh
+      - name: Save device shard report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-test-${{ matrix.shard }}
+          path: android/app/build/reports/device-shards/${{ matrix.shard }}/
+          retention-days: 30
+          if-no-files-found: error
+
+  device-review:
+    needs: device-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare launch video analysis tools
+        run: |
+          python3 -m pip install --quiet Pillow imageio-ffmpeg==0.6.0
+          mkdir -p "$RUNNER_TEMP/dagongren-video-tools"
+          VIDEO_FFMPEG=$(python3 -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())')
+          ln -s "$VIDEO_FFMPEG" "$RUNNER_TEMP/dagongren-video-tools/ffmpeg"
+          echo "$RUNNER_TEMP/dagongren-video-tools" >> "$GITHUB_PATH"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: device-test-*
+          path: android/app/build/reports/device-shards
+      - name: Verify complete device test coverage
+        run: python3 .github/scripts/check-device-shards.py android/app/build/reports/device-shards
       - name: Render emulator preview for review
         if: always()
         run: |
@@ -145,7 +209,7 @@ jobs:
           root=Path('android/app/build/reports')
           videos=list(root.rglob('startup-transition.mp4'))
           ffmpeg=shutil.which('ffmpeg')
-          logs=list(Path('android/app/build/outputs/androidTest-results').rglob('*coldStartup*.txt'))
+          logs=list(root.rglob('device-progress.log'))
           marker=next((m for log in logs if (m:=re.search(r'FADING_SECOND=([0-9.]+)',log.read_text(errors='replace')))),None)
           center=float(marker.group(1)) if marker else 10.0
           seconds=[0,.1,.25,.5,.75,1,1.5]+[max(0,center+offset) for offset in [-2,-1,-.5,0,.12,.25,.4,.55,.7,.85,1.1,1.5,2,3]]
@@ -178,21 +242,16 @@ jobs:
       - name: Check startup handoff for flashing
         if: success()
         run: python3 .github/scripts/check-launch-flash.py
-      - name: Remove restored private signing material
-        if: always()
-        run: rm -f signing-key/debug.keystore
-      - name: Save test reports
+      - name: Save reviewed device reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: |
-            android/app/build/reports/
-            android/app/build/outputs/androidTest-results/
+          path: android/app/build/reports/
           retention-days: 30
 
   publish-release:
-    needs: verify-build
+    needs: [verify-build, device-review]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
