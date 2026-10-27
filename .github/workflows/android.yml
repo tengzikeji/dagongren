@@ -176,6 +176,9 @@ jobs:
               sheet.save(buf,format='JPEG',quality=70)
               print('LAUNCH_PREVIEW_BASE64:'+base64.b64encode(buf.getvalue()).decode())
           PY
+      - name: Check startup handoff for flashing
+        if: success()
+        run: python3 .github/scripts/check-launch-flash.py
       - name: Remove restored private signing material
         if: always()
         run: rm -f signing-key/debug.keystore
