@@ -30,6 +30,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      - name: Prepare launch video analysis tools
+        run: |
+          python3 -m pip install --quiet Pillow imageio-ffmpeg==0.6.0
+          mkdir -p "$RUNNER_TEMP/dagongren-video-tools"
+          VIDEO_FFMPEG=$(python3 -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())')
+          ln -s "$VIDEO_FFMPEG" "$RUNNER_TEMP/dagongren-video-tools/ffmpeg"
+          echo "$RUNNER_TEMP/dagongren-video-tools" >> "$GITHUB_PATH"
       - name: Find previous private signing backup
         id: signing
         env:
@@ -93,7 +100,6 @@ jobs:
       - name: Render emulator preview for review
         if: always()
         run: |
-          python3 -m pip install --quiet Pillow
           python3 - <<'PY'
           import base64, io
           from pathlib import Path
@@ -129,13 +135,6 @@ jobs:
               sheet.save(b, format='JPEG', quality=65)
               print('UPGRADE_PREVIEW_BASE64:' + base64.b64encode(b.getvalue()).decode())
           PY
-      - name: Prepare launch video review
-        if: always()
-        run: |
-          if ! command -v ffmpeg >/dev/null; then
-            timeout 90s sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 update -qq || true
-            timeout 120s sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 install -y ffmpeg || true
-          fi
       - name: Review launch transition frames
         if: always()
         run: |

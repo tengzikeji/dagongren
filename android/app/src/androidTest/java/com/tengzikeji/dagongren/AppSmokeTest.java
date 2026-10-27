@@ -362,6 +362,8 @@ public class AppSmokeTest {
             resetBook(prepared);
             waitTrue(prepared,"!matchMedia('(prefers-reduced-motion: reduce)').matches");
         }
+        // Leave the instrumentation activity before recording a real launch from Home.
+        device.pressHome();device.waitForIdle(2000);dismissEmulatorLauncherAnr();
         device.executeShellCommand("mkdir -p /sdcard/Download/dagongren-test");
         long recordingStarted=System.currentTimeMillis();
         Thread recording=new Thread(()->{try{device.executeShellCommand("screenrecord --size 720x1280 --bit-rate 2000000 --time-limit 30 /sdcard/Download/dagongren-test/startup-transition.mp4");}catch(Exception ignored){}},"startup-recording");recording.setDaemon(true);recording.start();

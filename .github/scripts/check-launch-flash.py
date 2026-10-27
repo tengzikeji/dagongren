@@ -26,15 +26,25 @@ def main():
     ffmpeg = sys.argv[2] if len(sys.argv)>2 else shutil.which('ffmpeg')
     if not video or not video.is_file() or not ffmpeg:
         raise SystemExit('Startup video and ffmpeg are required for flash review')
-    p = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '1.5', '-vf', 'fps=20,crop=iw*0.85:ih*0.75:iw*0.075:ih*0.1,scale=80:100,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+    p = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '3.0', '-vf', 'fps=20,crop=iw*0.85:ih*0.75:iw*0.075:ih*0.1,scale=80:100,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
     size=80*100
-    values=[sum(p.stdout[i:i+size])/size for i in range(0, len(p.stdout), size) if len(p.stdout[i:i+size])==size]
-    if len(values)<10:
-        raise SystemExit('Startup recording did not contain enough early frames')
+    frames=[p.stdout[i:i+size] for i in range(0, len(p.stdout), size) if len(p.stdout[i:i+size])==size]
+    stats=[]
+    for frame in frames:
+        mean=sum(frame)/size
+        variance=sum((x-mean)**2 for x in frame)/size
+        stats.append((mean, variance**.5))
+    # Exclude any launcher or test-activity frames preceding the solid blue app window.
+    anchor=next((i for i,(mean,sd) in enumerate(stats) if 22<=mean<=36 and sd<2.5),None)
+    if anchor is None or len(stats)-anchor<10:
+        raise SystemExit('Could not identify enough frames from the blue startup window')
+    values=[mean for mean,_ in stats[anchor:anchor+30]]
     flash=detect_flash(values)
-    print('Startup first 1.5s luminance:', ', '.join(f'{x:.1f}' for x in values))
+    print('Startup window first 1.5s luminance:', ', '.join(f'{x:.1f}' for x in values))
+    if any(x>=240 or x<=5 for x in values):
+        raise SystemExit('A white or black screen appeared after the startup window')
     if flash:
-        raise SystemExit(f'Launch brightness disappeared and returned around {flash[0]/20:.2f}s (drops {flash[1]:.1f}, {flash[2]:.1f})')
+        raise SystemExit(f'Launch brightness disappeared and returned around {(anchor+flash[0])/20:.2f}s (drops {flash[1]:.1f}, {flash[2]:.1f})')
     print('No bright-dark-bright flash detected during the native window handoff')
 
 
