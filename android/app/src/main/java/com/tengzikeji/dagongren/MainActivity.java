@@ -93,7 +93,8 @@ public final class MainActivity extends Activity {
             root.getViewTreeObserver().addOnDrawListener(new android.view.ViewTreeObserver.OnDrawListener(){
                 private boolean submitted;
                 @Override public void onDraw(){if(submitted)return;submitted=true;firstLaunchFramePresented=launchCover!=null&&launchCover.getAlpha()>0f&&webView==null;
-                    root.post(()->{root.getViewTreeObserver().removeOnDrawListener(this);if(!isDestroyed())initializeWebView(root);});}
+                    // Keep the first fade free of WebView initialization work.
+                    root.post(()->{root.getViewTreeObserver().removeOnDrawListener(this);root.postDelayed(()->{if(!isDestroyed())initializeWebView(root);},400);});}
             });
         }else root.post(()->{if(!isDestroyed())initializeWebView(root);});
     }
