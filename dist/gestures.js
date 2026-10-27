@@ -24,7 +24,7 @@ const reduced=()=>document.body.classList.contains('motion-off')||window.matchMe
 const mark=(name,detail)=>{try{performance.mark(name,{detail});}catch{}};
 function copy(node){const clone=node.cloneNode(true);clone.removeAttribute?.('id');for(const n of clone.querySelectorAll?.('[id]')||[])n.removeAttribute('id');return clone;}
 function contentFrom(markup,selector){if(!markup||!document.createElement)return null;const t=document.createElement('template');t.innerHTML=markup;return t.content?.querySelector(selector)||null;}
-function blend(a,b,t){const parse=s=>{const n=s.match(/[\d.]+/g)?.map(Number)||[0,0,0,0];return [n[0],n[1],n[2],n[3]??1];},x=parse(a),y=parse(b),c=x.map((v,i)=>v+(y[i]-v)*t);return 'rgba('+c.slice(0,3).map(Math.round).join(',')+','+c[3].toFixed(4)+')';}
+function blend(a,b,t){const parse=s=>{const n=s.match(/[\d.]+/g)?.map(Number)||[0,0,0,0];return [n[0],n[1],n[2],n[3]??1];},x=parse(a),y=parse(b),alpha=x[3]*(1-t)+y[3]*t;const rgb=x.slice(0,3).map((v,i)=>Math.round(alpha?(v*x[3]*(1-t)+y[i]*y[3]*t)/alpha:0));return 'rgba('+rgb.join(',')+','+alpha.toFixed(4)+')';}
 function navigationProgress(root,from,to){
  const nav=root.querySelector('.bottom-nav');if(!nav)return {set(){},clear(){}};
  const buttons=[...nav.querySelectorAll('[data-view]')],active=buttons.find(b=>b.dataset.view===from),other=buttons.find(b=>b!==active);if(!active||!other)return {set(){},clear(){}};

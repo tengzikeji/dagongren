@@ -191,15 +191,15 @@
 .cloud-cleanup-review .detail-line{min-height:42px}
 .modal:has(.cloud-cleanup-review){will-change:transform,opacity}
 
-/* Continuous page planes include their own background, so edges always touch. */
+/* One background beneath both clipped planes prevents fractional-pixel seams. */
 .page-swipe-layer{z-index:15;overflow:hidden;background:var(--bg,#f3f5f9)}
 .page-swipe-track{position:absolute;inset:0;will-change:transform}
-.page-swipe-track>.swipe-page{position:absolute;top:0;bottom:0;height:100%;overflow:hidden;background:var(--bg,#f3f5f9);contain:layout style}
+.page-swipe-track>.swipe-page{position:absolute;top:0;bottom:0;height:100%;overflow:hidden;background:transparent;will-change:auto;contain:layout style}
 .swipe-page>.content{max-width:none;transition:none!important}
 .page-swipe-layer *,.page-swipe-layer *:before,.page-swipe-layer *:after,.calendar-swipe-track *{animation:none!important;transition:none!important}
 .calendar-grid-viewport{touch-action:pan-y pinch-zoom;background:var(--white,#fff)}
 .calendar-swipe-track{position:absolute;inset:0;will-change:transform;pointer-events:none}
-.calendar-swipe-track>.swipe-month{position:absolute;top:0;overflow:hidden;background:var(--white,#fff);contain:layout style}
+.calendar-swipe-track>.swipe-month{position:absolute;top:0;overflow:hidden;background:transparent;contain:layout style}
 .swipe-month>.calendar-days{width:100%;margin:0;transform:none!important;transition:none!important}
 .bottom-nav.nav-following>button,.bottom-nav.nav-following svg{transition:none!important}
 .swipe-dragging{user-select:none}
