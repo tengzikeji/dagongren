@@ -74,7 +74,7 @@ export function renderStable(root,markup,view,motion=true,replayNumbers=false){
  uiRollNumbers(root,oldNumbers,same,motion,themeChanged,replayNumbers);
 }
 function uiRollNumbers(root,oldNumbers,same,motion,themeChanged=false,replayNumbers=false){
- if(!motion||root.classList.contains('page-transitioning')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+ if(!motion||root.classList.contains('motion-off')||document.body.classList.contains('motion-off')||root.classList.contains('page-transitioning')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
  for(const node of root.querySelectorAll('.number')){
   const calendarAmount=Boolean(node.closest?.('.calendar-day')&&node.classList.contains('day-wage'));
   const chartAmount=node.hasAttribute?.('data-chart-number');

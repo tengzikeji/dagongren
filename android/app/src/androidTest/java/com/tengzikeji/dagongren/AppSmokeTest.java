@@ -608,8 +608,9 @@ public class AppSmokeTest {
             resetBook(scenario);
             evaluate(scenario,"window.__tapNav=document.querySelector('.bottom-nav')");
             for(String next:new String[]{"calendar","settings","records","home"}){
-                assertEquals("true",evaluate(scenario,"document.querySelector('.bottom-nav [data-view="+next+"]').click();(()=>{const d=performance.getEntriesByName('dagongren.page.slide').at(-1)?.detail,t=document.querySelector('.page-swipe-track');return d?.trigger==='tap'&&d.to==='"+next+"'&&d.duration===280&&d.sharedTrack&&!!t&&t.getAnimations().length===1&&document.querySelector('.bottom-nav')===window.__tapNav})()"));
+                assertEquals("true",evaluate(scenario,"window.__tapCount=performance.getEntriesByName('dagongren.page.slide').length;document.querySelector('.bottom-nav [data-view="+next+"]').click();(()=>{const t=document.querySelector('.page-swipe-track'),a=t?.getAnimations()[0];return !!t&&t.children.length===2&&t.getAnimations().length===1&&a.effect.getTiming().duration===280&&document.getElementById('app').dataset.swipeTrigger==='tap'&&document.querySelector('.bottom-nav')===window.__tapNav})()"));
                 waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'");
+                assertEquals("true",evaluate(scenario,"(()=>{const marks=performance.getEntriesByName('dagongren.page.slide'),d=marks.at(-1)?.detail;return marks.length===window.__tapCount+1&&d?.trigger==='tap'&&d.to==='"+next+"'&&d.duration===280&&d.sharedTrack})()"));
             }
             evaluate(scenario,"document.querySelector('.bottom-nav [data-view=calendar]').click();document.querySelector('.bottom-nav [data-view=records]').click();document.querySelector('.bottom-nav [data-view=settings]').click()");
             waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='settings'&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'");
