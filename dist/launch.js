@@ -2,6 +2,7 @@ export function prepareBrandIntro(){
  let enabled=true,onComplete=null,paintedResolve,loadResolve;const painted=new Promise(resolve=>paintedResolve=resolve),beforeApp=new Promise(resolve=>loadResolve=resolve);
  try{const raw=localStorage.getItem('dagongren.paybook.v1');if(raw&&/\"motion\"\s*:\s*false/.test(raw))enabled=JSON.parse(raw)?.defaults?.motion!==false;}catch{}
  const bridge=globalThis.AndroidFiles,app=document.getElementById('app');
+ try{bridge?.motionStyle?.(enabled);}catch{}
  const releaseNative=()=>{try{bridge?.introReady?.();}catch{}};
  if(!document.body.appendChild||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||bridge?.shouldPlayIntro?.()===false){bridge?.introStyle?.(false);return {painted:Promise.resolve(),beforeApp:Promise.resolve(),play(){releaseNative();}};}
  try{const saved=localStorage.getItem('dagongren.theme.v1'),preference=['light','dark','system'].includes(saved)?saved:'system',dark=preference==='dark'||preference==='system'&&(bridge?.systemDark?.()??window.matchMedia?.('(prefers-color-scheme: dark)').matches);document.body.setAttribute('data-theme',dark?'dark':'light');}catch{}

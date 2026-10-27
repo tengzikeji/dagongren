@@ -736,7 +736,9 @@ public class AppSmokeTest {
                 paintedScreenshot(scenario,"theme-"+theme+"-form");
             evaluate(scenario,"document.querySelector('.modal-close').click();document.querySelector('[data-action=toggle-motion]').click()");
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.profile-chart-panel *')].every(e=>getComputedStyle(e).animationName==='none')"));
+            assertTrue(withActivity(activity->assertFalse(activity.isNativeMotionEnabled())));
             evaluate(scenario,"document.querySelector('[data-action=toggle-motion]').click()");
+            assertTrue(withActivity(activity->assertTrue(activity.isNativeMotionEnabled())));
                 expectedThemeBook=evaluate(scenario,"localStorage.getItem('dagongren.paybook.v1')");
                 scenario.recreate();waitReady(scenario);
                 assertEquals("\""+theme+"\"",evaluate(scenario,"document.body.dataset.themePreference"));

@@ -175,6 +175,7 @@ function render(force=false) {
   document.body.setAttribute?.('data-theme-preference',activeTheme);
   document.querySelector?.('meta[name="theme-color"]')?.setAttribute('content',appearance==='dark'?'#101827':'#f3f5f9');
   globalThis.AndroidFiles?.themeStyle?.(activeTheme);
+  if(!storageBlocked)globalThis.AndroidFiles?.motionStyle?.(db.defaults.motion!==false);
   document.body.classList?.toggle('motion-off',db.defaults.motion===false);
   app.classList.toggle('motion-off',db.defaults.motion===false);
   const markup=appMarkup();

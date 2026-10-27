@@ -135,7 +135,7 @@ public final class MainActivity extends Activity {
         band.topMargin=-clipHeight/2;launchAmbientBand.setLayoutParams(band);
     }
     private void startLaunchAmbient(){
-        if(launchCover==null||launchAmbientClip==null||launchAmbientBand==null||isDestroyed()||!android.animation.ValueAnimator.areAnimatorsEnabled())return;
+        if(launchCover==null||launchAmbientClip==null||launchAmbientBand==null||isDestroyed()||!android.animation.ValueAnimator.areAnimatorsEnabled()||!getSharedPreferences("appearance",MODE_PRIVATE).getBoolean("motionEnabled",true))return;
         if(launchAmbient!=null)launchAmbient.cancel();
         float bandWidth=Math.max(1,launchAmbientBand.getLayoutParams().width),clipWidth=Math.max(1,launchAmbientClip.getLayoutParams().width);
         launchAmbient=android.animation.ObjectAnimator.ofFloat(launchAmbientBand,View.TRANSLATION_X,-bandWidth,clipWidth+bandWidth);
@@ -237,6 +237,7 @@ public final class MainActivity extends Activity {
     public boolean isLaunchSurfaceReady(){return launchNotified;}
     public boolean isFirstLaunchFramePresented(){return firstLaunchFramePresented;}
     public boolean wasLaunchAmbientStarted(){return launchAmbientStarted;}
+    public boolean isNativeMotionEnabled(){return getSharedPreferences("appearance",MODE_PRIVATE).getBoolean("motionEnabled",true);}
 
     private void reportKeyboard(boolean visible){
         if(webView==null||Boolean.valueOf(visible).equals(reportedKeyboard))return;
@@ -263,6 +264,11 @@ public final class MainActivity extends Activity {
     public final class NativeFiles {
         @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
         @JavascriptInterface public boolean nativeLaunchPage(){return launchIntro;}
+        @JavascriptInterface public void motionStyle(boolean enabled){
+            android.content.SharedPreferences preferences=getSharedPreferences("appearance",MODE_PRIVATE);
+            if(!preferences.contains("motionEnabled")||preferences.getBoolean("motionEnabled",true)!=enabled)preferences.edit().putBoolean("motionEnabled",enabled).apply();
+            if(!enabled)runOnUiThread(MainActivity.this::stopLaunchAmbient);
+        }
         @JavascriptInterface public void introReady(){runOnUiThread(()->{if(launchNotified&&webView!=null&&!isDestroyed())webView.evaluateJavascript("globalThis.dagongrenLaunchReady && globalThis.dagongrenLaunchReady();",null);else prepareLaunchSurface();});}
         @JavascriptInterface public boolean systemDark(){return systemIsDark();}
         @JavascriptInterface public void themeStyle(String mode){
