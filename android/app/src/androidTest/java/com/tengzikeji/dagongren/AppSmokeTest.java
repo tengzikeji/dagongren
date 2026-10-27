@@ -370,7 +370,7 @@ public class AppSmokeTest {
         long readyDeadline=System.currentTimeMillis()+10000;String recordingPid="";
         while(recording.isAlive()&&System.currentTimeMillis()<readyDeadline){recordingPid=device.executeShellCommand("pidof screenrecord").trim();if(!recordingPid.isEmpty())break;Thread.sleep(100);}
         assertFalse("Startup screen recording did not start",recordingPid.isEmpty());
-        long recordingStarted=System.currentTimeMillis();Thread.sleep(700);
+        long recordingStarted=System.currentTimeMillis();Thread.sleep(1500);
         ActivityScenario<MainActivity> scenario=null;
         android.content.Context target=InstrumentationRegistry.getInstrumentation().getTargetContext();
         target.startActivity(new android.content.Intent(target,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK));
