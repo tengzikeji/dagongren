@@ -3,9 +3,9 @@ const VIEWS=['home','calendar','records','settings'];
 export function pageSwipeTarget(view,delta){const i=VIEWS.indexOf(view);return i<0||![-1,1].includes(delta)?null:VIEWS[i+delta]||null;}
 export function swipeAxis(dx,dy,locked='pending'){
  if(locked!=='pending')return locked;
- const x=Math.abs(dx),y=Math.abs(dy);if(Math.max(x,y)<6)return 'pending';
- if(x>y*1.1)return 'x';if(y>x*1.1)return 'y';
- return Math.max(x,y)>=18?(x>=y?'x':'y'):'pending';
+ const x=Math.abs(dx),y=Math.abs(dy);if(Math.max(x,y)<4)return 'pending';
+ if(x>y*1.05)return 'x';if(y>x*1.05)return 'y';
+ return Math.max(x,y)>=14?(x>=y?'x':'y'):'pending';
 }
 export function swipeVelocity(samples,at){
  const recent=samples.filter(s=>s.t>=at-80&&s.t<=at),last=recent.at(-1);if(!last||recent.length<2)return 0;
@@ -14,7 +14,7 @@ export function swipeVelocity(samples,at){
 }
 export function swipeDecision(dx,width,velocity=0,axis='x'){
  if(axis!=='x'||!Number.isFinite(dx)||!Number.isFinite(width)||width<=0||!Number.isFinite(velocity))return {complete:false,delta:0};
- const delta=dx<0?1:dx>0?-1:0,complete=Boolean(delta)&&(Math.abs(dx)>=width/4||(Math.abs(dx)>=12&&Math.abs(velocity)>=600&&Math.sign(velocity)===Math.sign(dx)));
+ const delta=dx<0?1:dx>0?-1:0,complete=Boolean(delta)&&(Math.abs(dx)>=width/5||(Math.abs(dx)>=10&&Math.abs(velocity)>=450&&Math.sign(velocity)===Math.sign(dx)));
  return {complete,delta};
 }
 export function swipeOffset(dx,width,boundary=false){return boundary?Math.sign(dx)*Math.min(width*.35,Math.abs(dx)*.4):Math.max(-width,Math.min(width,dx));}
@@ -33,7 +33,13 @@ function navigationProgress(root,from,to){
  return {set(p){for(const button of buttons){const w=button.dataset.view===from?1-p:button.dataset.view===to?p:0;button.style.color=blend(colors.idle,colors.active,w);button.style.backgroundColor=blend(colors.idleBg,colors.activeBg,w);for(const svg of button.querySelectorAll('svg'))svg.style.color=button.style.color;}nav.dataset.swipeProgress=p.toFixed(4);},clear(){for(const [n,s] of saved){if(s===null)n.removeAttribute('style');else n.setAttribute('style',s);}nav.classList.remove('nav-following');delete nav.dataset.swipeProgress;}};
 }
 function frame(className,width){const n=document.createElement('div');n.className=className;n.style.width=width+'px';return n;}
-function boundaryFrame(width,delta){const n=frame('swipe-page swipe-boundary-page',width);n.style.left=delta*width+'px';const arrow=document.createElement('span');arrow.className='swipe-boundary-arrow';arrow.setAttribute('aria-hidden','true');arrow.style[delta<0?'right':'left']='10px';arrow.style.setProperty('--edge-nudge',(delta<0?3:-3)+'px');arrow.innerHTML='<svg viewBox="0 0 16 24" fill="none" aria-hidden="true"><path d="'+(delta<0?'M5 4l7 8-7 8':'M11 4l-7 8 7 8')+'"/></svg>';n.appendChild(arrow);return n;}
+function boundaryFrame(width,delta){const n=frame('swipe-page swipe-boundary-page',width);n.style.left=delta*width+'px';return n;}
+function boundaryFeedback(delta){
+ const rail=document.createElement('div');rail.className='swipe-boundary-feedback';rail.dataset.edge=delta<0?'first':'last';rail.setAttribute('aria-hidden','true');
+ const hint=document.createElement('span');hint.className='swipe-boundary-hint';const arrow=document.createElement('span');arrow.className='swipe-boundary-arrow';arrow.style.setProperty('--edge-nudge',(delta<0?3:-3)+'px');arrow.innerHTML='<svg viewBox="0 0 16 24" fill="none" aria-hidden="true"><path d="'+(delta<0?'M5 4l7 8-7 8':'M11 4l-7 8 7 8')+'"/></svg>';
+ const label=document.createElement('span');label.className='swipe-boundary-label';label.textContent=delta<0?'已到首页':'已到底';hint.append(label,arrow);rail.appendChild(hint);
+ return {node:rail,set(x){const distance=Math.abs(x);rail.style.width=distance+'px';hint.style.opacity=Math.max(0,Math.min(1,(distance-32)/32));}};
+}
 function pageScene(root,api,cache,delta,target=null){
  const content=root.querySelector('.workspace .content'),workspace=root.querySelector('.workspace');if(!content?.getBoundingClientRect)return null;
  const from=api.current(),to=target||pageSwipeTarget(from,delta),width=document.documentElement.clientWidth,rect=content.getBoundingClientRect(),stickyRect=content.querySelector('.calendar-panel-header')?.getBoundingClientRect();
@@ -43,13 +49,13 @@ function pageScene(root,api,cache,delta,target=null){
  const old=frame('swipe-page page-swipe-outgoing',width),next=to?frame('swipe-page page-swipe-incoming',width):boundaryFrame(width,delta);old.style.left='0px';next.style.left=delta*width+'px';
  const outgoing=copy(content),incoming=to?copy(template):null,padding=parseFloat(getComputedStyle(workspace).paddingTop)||0;
  for(const [node,top] of [[outgoing,rect.top],...(incoming?[[incoming,padding]]:[])])Object.assign(node.style,{position:'absolute',left:rect.left+'px',top:top+'px',width:rect.width+'px',height:'auto',margin:'0',visibility:'visible'});
- old.appendChild(outgoing);if(incoming)next.appendChild(incoming);track.append(old,next);layer.appendChild(track);document.body.appendChild(layer);const edge=!to?next.firstElementChild:null;if(edge){edge.style.left=delta<0?'10px':'auto';edge.style.right=delta>0?'10px':'auto';layer.appendChild(edge);}if(incoming)api.fitPreview?.(incoming);
+ old.appendChild(outgoing);if(incoming)next.appendChild(incoming);track.append(old,next);const edge=!to?boundaryFeedback(delta):null;if(edge){layer.classList.add('page-swipe-at-boundary');layer.appendChild(edge.node);}layer.appendChild(track);document.body.appendChild(layer);if(incoming)api.fitPreview?.(incoming);
  for(const selector of ['.profile-name-viewport','.entry-filters']){const sources=[...content.querySelectorAll(selector)],copies=[...outgoing.querySelectorAll(selector)];sources.forEach((n,i)=>{if(copies[i])copies[i].scrollLeft=n.scrollLeft;});}
  const sticky=outgoing.querySelector('.calendar-panel-header');if(sticky&&stickyRect){sticky.style.position='relative';sticky.style.top='auto';sticky.style.transform='translateY('+(stickyRect.top-sticky.getBoundingClientRect().top)+'px)';}
  const visibility=content.style.visibility;content.style.visibility='hidden';const navProgress=navigationProgress(root,from,to);
  return {track,width,boundary:!to,delta,from,to,offset:0,
-  update(dx){this.offset=swipeOffset(dx,width,!to);track.style.transform='translate3d('+this.offset+'px,0,0)';navProgress.set(to?Math.abs(this.offset)/width:0);if(edge)edge.style.opacity=Math.min(1,Math.abs(this.offset)/16);},
-  progress(x){navProgress.set(to?Math.abs(x)/width:0);if(edge)edge.style.opacity=Math.min(1,Math.abs(x)/16);},
+  update(dx){this.offset=swipeOffset(dx,width,!to);track.style.transform='translate3d('+this.offset+'px,0,0)';navProgress.set(to?Math.abs(this.offset)/width:0);edge?.set(this.offset);},
+  progress(x){navProgress.set(to?Math.abs(x)/width:0);edge?.set(x);},
   dispose(){layer.remove();content.style.visibility=visibility;navProgress.clear();},
   commit(){if(to)api.navigate(to);},
   notify(completed,velocity,duration){mark(completed?'dagongren.page.slide':'dagongren.page.rebound',{from,to:completed?(to||from):from,direction:delta,duration,velocity,sharedTrack:true,trigger:this.trigger||'swipe',boundary:!to});}

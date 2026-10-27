@@ -36,6 +36,8 @@ public final class MainActivity extends Activity {
     private FrameLayout launchCover;
     private static final int LAUNCH_COLOR=Color.rgb(16,30,61);
     private boolean darkAppearance;
+    private android.animation.ValueAnimator launchTransition;
+    private final android.graphics.drawable.ColorDrawable windowCanvas=new android.graphics.drawable.ColorDrawable(LAUNCH_COLOR);
     private CredentialVault vault;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final ExecutorService calendarWorker=Executors.newSingleThreadExecutor();
@@ -140,12 +142,24 @@ public final class MainActivity extends Activity {
         String mode=getSharedPreferences("appearance",MODE_PRIVATE).getString("mode","system");
         darkAppearance="dark".equals(mode)||("system".equals(mode)&&systemIsDark());
     }
-    @SuppressWarnings("deprecation") private void applyAppearance(){
-        int color=launchIntro?LAUNCH_COLOR:appearanceColor();
-        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(color));
+    private void applyAppearance(){
+        if(launchTransition!=null){launchTransition.cancel();launchTransition=null;}
+        paintAppearance(launchIntro?LAUNCH_COLOR:appearanceColor(),launchIntro||darkAppearance);
+    }
+    @SuppressWarnings("deprecation") private void paintAppearance(int color,boolean darkBars){
+        windowCanvas.setColor(color);getWindow().setBackgroundDrawable(windowCanvas);
         getWindow().getDecorView().setBackgroundColor(color);getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
-        getWindow().getDecorView().setSystemUiVisibility(launchIntro||darkAppearance?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        getWindow().getDecorView().setSystemUiVisibility(darkBars?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         if(webView!=null){webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
+    }
+    private void fadeLaunchAppearance(int duration){
+        if(!launchIntro||isDestroyed())return;
+        if(launchTransition!=null)launchTransition.cancel();
+        launchTransition=android.animation.ValueAnimator.ofArgb(LAUNCH_COLOR,appearanceColor());
+        launchTransition.setDuration(Math.max(0,Math.min(1000,duration)));
+        launchTransition.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+        launchTransition.addUpdateListener(animation->{if(!isDestroyed())paintAppearance((Integer)animation.getAnimatedValue(),darkAppearance||animation.getAnimatedFraction()<.6f);});
+        launchTransition.start();
     }
     @Override public void onConfigurationChanged(Configuration config){
         super.onConfigurationChanged(config);refreshAppearance();applyAppearance();
@@ -159,8 +173,18 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private boolean launchCoverFading;
     private void completeLaunchSurface(){
-        if(launchCover!=null){FrameLayout cover=launchCover;launchCover=null;cover.animate().alpha(0f).setDuration(220).withEndAction(()->{if(cover.getParent() instanceof FrameLayout)((FrameLayout)cover.getParent()).removeView(cover);}).start();}
+        if(launchNotified||launchCoverFading||isDestroyed())return;
+        if(launchCover!=null){
+            FrameLayout cover=launchCover;launchCover=null;launchCoverFading=true;
+            cover.animate().alpha(0f).setDuration(220).withEndAction(()->{
+                if(cover.getParent() instanceof FrameLayout)((FrameLayout)cover.getParent()).removeView(cover);
+                launchCoverFading=false;notifyLaunchSurface();
+            }).start();
+        }else notifyLaunchSurface();
+    }
+    private void notifyLaunchSurface(){
         if(!launchNotified&&webView!=null&&!isDestroyed()){
             launchNotified=true;
             webView.evaluateJavascript("globalThis.dagongrenLaunchReady && globalThis.dagongrenLaunchReady();",null);
@@ -205,6 +229,7 @@ public final class MainActivity extends Activity {
                 boolean previous=darkAppearance;refreshAppearance();if(previous!=darkAppearance)applyAppearance();
             });
         }
+        @JavascriptInterface public void introTransition(int duration){runOnUiThread(()->fadeLaunchAppearance(duration));}
         @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{if(!active)launchIntro=false;applyAppearance();});}
         @JavascriptInterface public String status(){
             try{return CredentialVault.publicConfig(vault.load()).toString();}
@@ -279,6 +304,6 @@ public final class MainActivity extends Activity {
     @Override protected void onResume(){super.onResume();if(webView!=null)webView.onResume();}
     @Override protected void onPause(){if(webView!=null)webView.onPause();super.onPause();}
     @Override protected void onDestroy(){
-        worker.shutdownNow();calendarWorker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
+        if(launchTransition!=null){launchTransition.cancel();launchTransition=null;}worker.shutdownNow();calendarWorker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
     }
 }

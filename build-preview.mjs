@@ -8,15 +8,13 @@ const values=await Promise.all(names.map(file=>fs.readFile(path.join(root,'dist'
 const files=Object.fromEntries(names.map((name,i)=>[name,values[i]]));
 const shell=files['index.html'],css=files['style.css']+'\n'+files['design-v1.css']+'\n'+files['upgrade.css']+'\n'+files['themes.css'],icon=files['icon.svg'];
 const logic=['themes.js','calendar-rights.js','calendar-data.js','calendar.js','payroll.js','charts.js','data-tools.js','sync-tools.js','sync-merge.js','cloud-cleanup.js','native-sync.js','gestures.js','interaction.js','launch.js','holiday-updates.js','app.js'].map(name=>files[name].replace(/^import[^\n]+\n/gm,'').replace(/^export \{[^\n]+\n/gm,'').replaceAll('export function ','function ')).join('\n');
-const launchScene='data:image/webp;base64,'+(await fs.readFile(path.join(root,'dist','launch-scene.webp'))).toString('base64');
 const embedded = shell
-  .replace('<link rel="preload" as="image" href="./launch-scene.webp">','')
   .replace('<link rel="stylesheet" href="./design-v1.css">','')
   .replace('<link rel="stylesheet" href="./upgrade.css">','')
   .replace('<link rel="stylesheet" href="./themes.css">','')
   .replace('<link rel="icon" href="./icon.svg" type="image/svg+xml">', '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,'+encodeURIComponent(icon)+'">')
   .replace('<link rel="stylesheet" href="./style.css">', '<style>'+css+'</style>')
-  .replace('<script type="module" src="./bootstrap.js"></script>', '<script>\n(()=>{\n'+('globalThis.dagongrenIntro=prepareBrandIntro();\n'+logic.replaceAll('./launch-scene.webp',launchScene)).replace(/<\/script/gi,'<\\/script')+'\n})();\n</script>');
+  .replace('<script type="module" src="./bootstrap.js"></script>', '<script>\n(()=>{\n'+('globalThis.dagongrenIntro=prepareBrandIntro();\n'+logic).replace(/<\/script/gi,'<\\/script')+'\n})();\n</script>');
 const attribute = embedded.replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 const document = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#3276f5"><title>打工人 · 安卓版交互预览</title>
