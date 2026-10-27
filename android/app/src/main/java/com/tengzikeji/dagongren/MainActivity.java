@@ -42,14 +42,14 @@ public final class MainActivity extends Activity {
     private byte[] pendingFile;
     private Boolean reportedKeyboard;
     private volatile boolean launchIntro=true;
-    private boolean systemSplashDelivered=Build.VERSION.SDK_INT<31,launchSurfacePrepared=false,launchNotified=false;
+    private boolean launchSurfacePrepared=false,launchNotified=false;
     private boolean firstLaunchFramePresented;
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
-        super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;systemSplashDelivered=Build.VERSION.SDK_INT<31||state!=null;
+        super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;
         if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(splash->{
-            systemSplashDelivered=true;splash.remove();
+            splash.remove();
             if(launchSurfacePrepared)completeLaunchSurface();
 
         });
@@ -160,7 +160,6 @@ public final class MainActivity extends Activity {
     }
 
     private void completeLaunchSurface(){
-        if(!systemSplashDelivered)return;
         if(launchCover!=null){FrameLayout cover=launchCover;launchCover=null;cover.animate().alpha(0f).setDuration(220).withEndAction(()->{if(cover.getParent() instanceof FrameLayout)((FrameLayout)cover.getParent()).removeView(cover);}).start();}
         if(!launchNotified&&webView!=null&&!isDestroyed()){
             launchNotified=true;
