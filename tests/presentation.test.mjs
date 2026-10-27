@@ -27,13 +27,13 @@ test('横纵方向只初判一次，锁定后忽略另一轴的位移',()=>{
  assert.equal(swipeAxis(20,400,'x'),'x');assert.equal(swipeAxis(400,20,'y'),'y');
  assert.equal(swipeAxis(11,11),'pending');assert.equal(swipeAxis(25,24),'x');
 });
-test('屏宽三分之一是慢拖切换边界，与绝对48像素无关',()=>{
- for(const width of [320,360,393,400,768,1080]){assert.equal(swipeDecision(-width/3,width,0).complete,true);assert.equal(swipeDecision(width/3-.01,width,0).complete,false);assert.equal(swipeDecision(width/3,width,0).delta,-1);}
- assert.equal(swipeDecision(-100,400,0).complete,false);
+test('屏宽四分之一是慢拖切换边界，与绝对48像素无关',()=>{
+ for(const width of [320,360,393,400,768,1080]){assert.equal(swipeDecision(-width/4,width,0).complete,true);assert.equal(swipeDecision(width/4-.01,width,0).complete,false);assert.equal(swipeDecision(width/4,width,0).delta,-1);}
+ assert.equal(swipeDecision(-90,400,0).complete,false);
 });
-test('快速轻扫速度阈值为800像素每秒，反向松手不能借速度切页',()=>{
- assert.equal(swipeDecision(-40,400,-800).complete,true);assert.equal(swipeDecision(40,400,800).complete,true);
- assert.equal(swipeDecision(-40,400,-799.9).complete,false);assert.equal(swipeDecision(-40,400,1000).complete,false);
+test('快速轻扫速度阈值为600像素每秒，反向松手不能借速度切页',()=>{
+ assert.equal(swipeDecision(-40,400,-600).complete,true);assert.equal(swipeDecision(40,400,600).complete,true);
+ assert.equal(swipeDecision(-40,400,-599.9).complete,false);assert.equal(swipeDecision(-40,400,1000).complete,false);
  assert.equal(swipeDecision(-150,400,1000).complete,true);
 });
 test('纵向手势和无效输入始终不翻页',()=>{
@@ -57,6 +57,8 @@ test('主页面严格相邻且首末边界不循环',()=>{
 });
 test('合并移动事件仍按按下与松开距离判断，慢短滑与纵滑回到原月',()=>{
  assert.equal(calendarSwipeDelta(-150,2,2000,400),1);assert.equal(calendarSwipeDelta(150,2,2000,400),-1);
- assert.equal(calendarSwipeDelta(-40,2,40,400),1);assert.equal(calendarSwipeDelta(-100,2,2000,400),0);
+ assert.equal(calendarSwipeDelta(-40,2,40,400),1);assert.equal(calendarSwipeDelta(-90,2,2000,400),0);
  assert.equal(calendarSwipeDelta(-200,300,200,400),0);assert.equal(calendarSwipeDelta(100,0,31000,400),0);
 });
+
+test('单手起手6像素即可识别横向，轻微晃动不借速度翻页',()=>{assert.equal(swipeAxis(6,1),'x');assert.equal(swipeAxis(1,6),'y');assert.equal(swipeAxis(5,3),'pending');assert.equal(swipeDecision(-11,393,-2000).complete,false);assert.equal(swipeDecision(-16,393,-640).complete,true);});

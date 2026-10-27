@@ -43,13 +43,13 @@ public final class MainActivity extends Activity {
     private Boolean reportedKeyboard;
     private volatile boolean launchIntro=true;
     private boolean systemSplashDelivered=Build.VERSION.SDK_INT<31,launchSurfacePrepared=false,launchNotified=false;
-    private Runnable dismissSystemSplash;
+    private boolean firstLaunchFramePresented;
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
         super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;systemSplashDelivered=Build.VERSION.SDK_INT<31||state!=null;
         if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(splash->{
-            systemSplashDelivered=true;dismissSystemSplash=splash::remove;
+            systemSplashDelivered=true;splash.remove();
             if(launchSurfacePrepared)completeLaunchSurface();
 
         });
@@ -78,6 +78,27 @@ public final class MainActivity extends Activity {
                 reportKeyboard(root.getRootView().getHeight()-visibleFrame.bottom>getResources().getDisplayMetrics().density*150);
             }
         });
+        if(launchIntro){
+            launchCover=new FrameLayout(this);launchCover.setTag("dagongren-launch-page");launchCover.setBackgroundColor(LAUNCH_COLOR);launchCover.setAlpha(.35f);
+            android.widget.ImageView scene=new android.widget.ImageView(this);scene.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            try(java.io.InputStream image=getAssets().open("www/launch-scene.webp")){scene.setImageBitmap(android.graphics.BitmapFactory.decodeStream(image));}
+            catch(java.io.IOException missing){throw new IllegalStateException("Launch scene missing",missing);}
+            launchCover.addView(scene,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
+            root.addView(launchCover,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
+        }
+        setContentView(root);root.requestApplyInsets();applyAppearance();
+        if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
+        if(launchCover!=null){
+            launchCover.animate().alpha(1f).setDuration(380).withLayer().start();
+            root.getViewTreeObserver().addOnDrawListener(new android.view.ViewTreeObserver.OnDrawListener(){
+                private boolean submitted;
+                @Override public void onDraw(){if(submitted)return;submitted=true;firstLaunchFramePresented=launchCover!=null&&launchCover.getAlpha()>0f&&webView==null;
+                    root.post(()->{root.getViewTreeObserver().removeOnDrawListener(this);if(!isDestroyed())initializeWebView(root);});}
+            });
+        }else root.post(()->{if(!isDestroyed())initializeWebView(root);});
+    }
+
+    private void initializeWebView(FrameLayout root){
         webView=new WebView(this);webView.setId(R.id.web_view);
         webView.setBackgroundColor(launchIntro?LAUNCH_COLOR:appearanceColor());
         WebSettings settings=webView.getSettings();
@@ -108,19 +129,7 @@ public final class MainActivity extends Activity {
         });
         webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new NativeFiles(),"AndroidFiles");
-        root.addView(webView,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
-        if(launchIntro){
-            launchCover=new FrameLayout(this);launchCover.setTag("dagongren-native-launch");launchCover.setBackgroundColor(LAUNCH_COLOR);
-            android.widget.ImageView logo=new android.widget.ImageView(this);logo.setImageResource(R.drawable.intro_wordmark);
-            int size=Math.round(240*getResources().getDisplayMetrics().density);
-            launchCover.addView(logo,new FrameLayout.LayoutParams(size,size,android.view.Gravity.CENTER));
-            android.widget.TextView caption=new android.widget.TextView(this);caption.setText("工作有迹 · 收入有数");caption.setTextSize(12);caption.setTextColor(Color.rgb(177,200,235));caption.setGravity(android.view.Gravity.CENTER);
-            FrameLayout.LayoutParams captionLayout=new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.WRAP_CONTENT,android.view.Gravity.BOTTOM);
-            captionLayout.bottomMargin=Math.round(48*getResources().getDisplayMetrics().density);launchCover.addView(caption,captionLayout);
-            root.addView(launchCover,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
-        }
-        setContentView(root);root.requestApplyInsets();applyAppearance();
-        if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
+        root.addView(webView,0,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
         webView.loadUrl(HOME);
     }
 
@@ -151,7 +160,6 @@ public final class MainActivity extends Activity {
 
     private void completeLaunchSurface(){
         if(!systemSplashDelivered)return;
-        if(dismissSystemSplash!=null){dismissSystemSplash.run();dismissSystemSplash=null;}
         if(launchCover!=null){FrameLayout cover=launchCover;launchCover=null;cover.animate().alpha(0f).setDuration(220).withEndAction(()->{if(cover.getParent() instanceof FrameLayout)((FrameLayout)cover.getParent()).removeView(cover);}).start();}
         if(!launchNotified&&webView!=null&&!isDestroyed()){
             launchNotified=true;
@@ -160,6 +168,7 @@ public final class MainActivity extends Activity {
     }
 
     public boolean isLaunchSurfaceReady(){return launchNotified;}
+    public boolean isFirstLaunchFramePresented(){return firstLaunchFramePresented;}
 
     private void reportKeyboard(boolean visible){
         if(webView==null||Boolean.valueOf(visible).equals(reportedKeyboard))return;
@@ -172,6 +181,7 @@ public final class MainActivity extends Activity {
         try{startActivity(new Intent(Intent.ACTION_VIEW,uri));}catch(android.content.ActivityNotFoundException ignored){notice("手机上没有可用浏览器。");}
     }
     private void handleBack(){
+        if(webView==null){moveTaskToBack(true);return;}
         webView.evaluateJavascript("Boolean(globalThis.dagongrenBack && globalThis.dagongrenBack())",value->{if(!"true".equals(value))moveTaskToBack(true);});
     }
     @Override @SuppressWarnings("deprecation") public void onBackPressed(){handleBack();}
@@ -184,6 +194,7 @@ public final class MainActivity extends Activity {
     }
     public final class NativeFiles {
         @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
+        @JavascriptInterface public boolean nativeLaunchPage(){return launchIntro;}
         @JavascriptInterface public void introReady(){runOnUiThread(()->{if(launchNotified&&webView!=null&&!isDestroyed())webView.evaluateJavascript("globalThis.dagongrenLaunchReady && globalThis.dagongrenLaunchReady();",null);else prepareLaunchSurface();});}
         @JavascriptInterface public boolean systemDark(){return systemIsDark();}
         @JavascriptInterface public void themeStyle(String mode){

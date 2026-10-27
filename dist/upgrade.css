@@ -224,3 +224,27 @@ body.intro-playing .launch-page,body.intro-playing[data-theme=dark] .launch-page
 @keyframes launch-soft-in{from{opacity:.35}to{opacity:1}}
 
 .launch-page[data-phase=preparing] :is(.launch-ledger,.launch-chip){opacity:.35;transform:none}
+
+/* A single complete launch scene is shared with the Android first frame. */
+body.intro-playing .launch-page{display:block;padding:0}
+.launch-picture{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;animation:launch-soft-in .38s ease-out both;user-select:none}
+.launch-page[data-native-fade=true] .launch-picture{animation:none}
+.swipe-boundary-arrow{position:absolute;top:45%;display:grid;place-items:center;width:26px;height:38px;border-radius:14px;background:var(--white,#fff);color:var(--orange,#3276f5);box-shadow:0 2px 8px #142b4c10}
+.swipe-boundary-arrow svg{width:11px;height:18px;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.page-swipe-layer .swipe-boundary-arrow,.calendar-swipe-track .swipe-boundary-arrow{animation:swipe-edge-nudge .65s ease-in-out infinite alternate!important}
+@keyframes swipe-edge-nudge{from{transform:translateX(0)}to{transform:translateX(var(--edge-nudge))}}
+body.motion-off .swipe-boundary-arrow{animation:none!important}
+@media(prefers-reduced-motion:reduce){.page-swipe-layer .swipe-boundary-arrow,.calendar-swipe-track .swipe-boundary-arrow,.launch-picture{animation:none!important}}
+/* Date paints depend only on their semantic state, never hover or touch press. */
+.calendar-day{--date-bg:#fff;--date-fg:#223a5c;--date-border:transparent;background:var(--date-bg)!important;color:var(--date-fg)!important;border-color:var(--date-border)!important;-webkit-tap-highlight-color:transparent}
+.calendar-day.weekend{--date-bg:#f8f9fc;--date-fg:#7e6b74}
+.calendar-day.holiday{--date-bg:#eef7f2;--date-fg:#1d7b5c}
+.calendar-day.statutory{--date-bg:#fff4e8;--date-fg:#a45c19}
+.calendar-day.makeup{--date-bg:#f0f3f9;--date-fg:#3a526e}
+.calendar-day.leave{--date-bg:#fceef0;--date-fg:#b54c59}
+.calendar-day.today{--date-bg:#edf3ff;--date-fg:#2454ae;--date-border:#8aa9e5}
+body[data-theme=dark] .calendar-day{--date-bg:#192538;--date-fg:#e5edf9;--date-border:transparent}
+body[data-theme=dark] .calendar-day.today{--date-bg:#263e62;--date-border:#94b7f4}
+body[data-theme=dark] .calendar-day.has-entry{--date-border:#58759e}
+.calendar-day.empty{--date-bg:transparent}
+.calendar-day,.calendar-day:hover,.calendar-day:active,.calendar-day *{transition:none!important;filter:none;transform:none}

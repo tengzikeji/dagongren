@@ -58,7 +58,7 @@ public class AppSmokeTest {
     }
     private String evaluate(ActivityScenario<MainActivity> scenario,String script) throws Exception {
         CountDownLatch latch=new CountDownLatch(1);AtomicReference<String> result=new AtomicReference<>();
-        if(!withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);if(web.getProgress()<100){result.set("null");latch.countDown();return;}web.evaluateJavascript(script,value->{result.set(value);latch.countDown();});}))return "null";
+        if(!withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);if(web==null||web.getProgress()<100){result.set("null");latch.countDown();return;}web.evaluateJavascript(script,value->{result.set(value);latch.countDown();});}))return "null";
         assertTrue("WebView evaluation timed out: "+script,latch.await(25,TimeUnit.SECONDS));return result.get();
     }
     private void waitTrue(ActivityScenario<MainActivity> scenario,String script) throws Exception {
@@ -371,6 +371,8 @@ public class AppSmokeTest {
         try{
             waitTrue(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1);if(!entry)return false;window.__launchObserved=entry.detail;if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='absorbing'){const rect=page.getBoundingClientRect();window.__launchBlendSamples.push({opacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
             assertEquals("1",evaluate(scenario,"window.__launchObserved.surfaces"));
+            assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
+            assertEquals("true",evaluate(scenario,"window.__launchObserved.nativeFade&&Boolean(document.querySelector('.launch-picture'))"));
             assertEquals("false",evaluate(scenario,"window.__launchObserved.oldBrand"));
             assertEquals("true",evaluate(scenario,"window.__launchObserved.inert"));
             assertEquals("true",evaluate(scenario,"window.__launchObserved.animated"));
@@ -644,10 +646,11 @@ public class AppSmokeTest {
             assertEquals("true",evaluate(scenario,"Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.page-swipe-track')).transform).m41+innerWidth)<.6&&document.querySelectorAll('.page-swipe-track>.swipe-page').length===2"));
             evaluate(scenario,"window.__dragInput('pointerup',-innerWidth*1.2,100,2400)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'");
             evaluate(scenario,"document.querySelector('.bottom-nav [data-view=settings]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
-            evaluate(scenario,"window.__dragInput('pointerdown',250,100,3000,'.topbar');window.__dragInput('pointermove',150,100,4000)");nextGestureFrames(scenario);
+            evaluate(scenario,"window.__edgeToast=document.getElementById('toast').textContent;window.__dragInput('pointerdown',250,100,3000,'.topbar');window.__dragInput('pointermove',150,100,4000)");nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.page-swipe-track')).transform).m41+40)<.6"));
+            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.swipe-boundary-arrow svg'))&&document.querySelector('.swipe-boundary-arrow').getAnimations().length===1&&document.getElementById('toast').textContent===window.__edgeToast"));
             evaluate(scenario,"window.__dragInput('pointerup',150,100,4500)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
-            assertEquals("true",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='settings'&&performance.getEntriesByName('dagongren.page.rebound').at(-1).detail.boundary"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='settings'&&performance.getEntriesByName('dagongren.page.rebound').at(-1).detail.boundary&&document.getElementById('toast').textContent===window.__edgeToast"));
             evaluate(scenario,"document.querySelector('.bottom-nav [data-view=home]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
             evaluate(scenario,"window.__dragInput('pointerdown',150,100,5000,'.topbar');window.__dragInput('pointermove',250,100,6000)");nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.page-swipe-track')).transform).m41-40)<.6"));
@@ -659,7 +662,8 @@ public class AppSmokeTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);assertEquals("true",evaluate(scenario,"window.__dragInput=(name,x,y,t,selector)=>{if(name==='pointerdown')window.__dragNode=document.querySelector(selector);const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:771,isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});window.__dragNode.dispatchEvent(e);};window.__nextFrames=()=>{window.__framesReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>window.__framesReady=true));};true"));
             evaluate(scenario,"document.querySelector('[data-view=calendar]').click();document.querySelector('[data-action=month-picker]').click();while(!document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]')){const y=parseInt(document.querySelector('.month-year>span').textContent);document.querySelector('[data-action=picker-year][data-delta=\"'+(y<2027?1:-1)+'\"]').click()}document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]').click()");
-            evaluate(scenario,"window.__dragInput('pointerdown',250,200,0,'.calendar-panel-header');window.__dragInput('pointermove',50,200,1000);window.__dragInput('pointerup',50,200,1400)");
+            evaluate(scenario,"window.__dragInput('pointerdown',250,200,0,'.calendar-panel-header');window.__dragInput('pointermove',230,200,1000);window.__dragInput('pointerup',230,200,1400)");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
             assertEquals("true",evaluate(scenario,"!document.querySelector('.calendar-swipe-track')&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2027-02'"));
             evaluate(scenario,"window.__monthWidth=document.querySelector('.calendar-grid-viewport').clientWidth;window.__monthHeight=document.querySelector('.calendar-grid-viewport').getBoundingClientRect().height;window.__dragInput('pointerdown',250,300,2000,'.calendar-days');window.__dragInput('pointermove',250-window.__monthWidth*.5,300,3000)");nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"(()=>{const p=document.querySelector('.calendar-grid-viewport'),t=p.querySelector('.calendar-swipe-track'),a=t.children[0].getBoundingClientRect(),b=t.children[1].getBoundingClientRect(),next=t.children[1].querySelector('.calendar-days').getBoundingClientRect().height;return Math.abs(new DOMMatrix(getComputedStyle(t).transform).m41+window.__monthWidth*.5)<.6&&Math.abs(a.right-b.left)<.6&&Math.abs(p.getBoundingClientRect().height-(window.__monthHeight+next)/2)<.7&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2027-02'})()"));
@@ -807,4 +811,42 @@ public class AppSmokeTest {
             waitTrue(scenario,"document.body.dataset.theme==='dark'");
         }finally{device.executeShellCommand("cmd uimode night no");}
     }
+    @Test public void thumbSwipesStartEarlyAndCommitWithLessTravel() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            evaluate(scenario,"window.__dragInput=(name,x,y,t,selector)=>{if(name==='pointerdown')window.__dragNode=document.querySelector(selector);const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:771,isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});window.__dragNode.dispatchEvent(e);};window.__nextFrames=()=>{window.__framesReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>window.__framesReady=true));};true");
+            evaluate(scenario,"window.__dragInput('pointerdown',300,100,0,'.topbar');window.__dragInput('pointermove',294,100,10)");
+            nextGestureFrames(scenario);
+            assertEquals("true",evaluate(scenario,"Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.page-swipe-track')).transform).m41+6)<.6"));
+            evaluate(scenario,"window.__dragInput('pointermove',272,100,40);window.__dragInput('pointerup',272,100,45)");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='calendar'");
+            evaluate(scenario,"window.__dragInput('pointerdown',innerWidth*.7,100,1000,'.topbar');window.__dragInput('pointermove',innerWidth*.44,100,2000);window.__dragInput('pointerup',innerWidth*.44,100,2500)");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'");
+        }
+    }
+    @Test public void calendarPaintsStayStableAndNonDateRegionsNavigatePages() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            evaluate(scenario,"window.__dragInput=(name,x,y,t,selector)=>{if(name==='pointerdown')window.__dragNode=document.querySelector(selector);const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:771,isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});window.__dragNode.dispatchEvent(e);};window.__nextFrames=()=>{window.__framesReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>window.__framesReady=true));};true");
+            evaluate(scenario,"window.__datePaint=s=>[...document.querySelector(s).querySelectorAll('[data-date]')].map(n=>{const s=getComputedStyle(n);return [n.dataset.date,s.color,s.backgroundColor,s.borderColor,...[...n.querySelectorAll('.day-number,.lunar-label,.day-wage,.day-badge')].map(x=>getComputedStyle(x).color)]})");
+            for(String theme:new String[]{"light","dark"}){
+                evaluate(scenario,"document.querySelector('.bottom-nav [data-view=settings]').click();document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme="+theme+"]').click();document.querySelector('.bottom-nav [data-view=calendar]').click()");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+                selectCalendarMonth(scenario,"2026-10");
+            evaluate(scenario,"window.__paintBefore=JSON.stringify(window.__datePaint('.calendar-days'));window.__dateWidth=document.querySelector('.calendar-grid-viewport').clientWidth;window.__dragInput('pointerdown',280,300,3000,'.calendar-days [data-date]');window.__dragInput('pointermove',280-window.__dateWidth*.45,300,4000)");
+                nextGestureFrames(scenario);
+            assertEquals("true",evaluate(scenario,"JSON.stringify(window.__datePaint('.calendar-leaving .calendar-days'))===window.__paintBefore"));
+            evaluate(scenario,"window.__paintNext=JSON.stringify(window.__datePaint('.calendar-entering .calendar-days'));window.__dragInput('pointerup',280-window.__dateWidth*.45,300,4500)");
+            waitTrue(scenario,"!document.querySelector('.calendar-swipe-track')");
+            assertEquals("true",evaluate(scenario,"JSON.stringify(window.__datePaint('.calendar-days'))===window.__paintNext&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2026-11'"));
+            evaluate(scenario,"window.__dragInput('pointerdown',280,250,5000,'.calendar-week');window.__dragInput('pointermove',80,250,6000);window.__dragInput('pointerup',80,250,6500)");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'");
+            evaluate(scenario,"document.querySelector('.bottom-nav [data-view=calendar]').click()");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            evaluate(scenario,"window.__dragInput('pointerdown',80,250,7000,'.month-control');window.__dragInput('pointermove',280,250,8000);window.__dragInput('pointerup',280,250,8500)");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='home'");
+            }
+        }
+    }
+
 }
