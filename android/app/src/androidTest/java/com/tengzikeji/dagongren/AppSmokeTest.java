@@ -648,7 +648,7 @@ public class AppSmokeTest {
             for(String page:new String[]{"home","calendar","records","settings"}){
                 evaluate(scenario,"document.querySelector('.bottom-nav [data-view="+page+"]').click()");
                 waitTrue(scenario,"!document.getElementById('app').classList.contains('nav-lifting')");
-                evaluate(scenario,"const space=document.createElement('div');space.className='review-long-page';space.style.height=(innerHeight*6)+'px';document.querySelector('#app .workspace .content').appendChild(space);window.scrollTo({top:innerHeight*2.5,behavior:'instant'})");
+                evaluate(scenario,"const space=document.createElement('div');space.className='review-long-page';space.style.height=(innerHeight*6)+'px';document.body.appendChild(space);window.scrollTo({top:innerHeight*2.5,behavior:'instant'})");
                 waitTrue(scenario,"scrollY>innerHeight*2");
                 assertEquals("false",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.top==='true'"));
                 evaluate(scenario,"window.scrollTo({top:innerHeight*3.5,behavior:'instant'})");
@@ -1008,16 +1008,16 @@ public class AppSmokeTest {
     @Test public void pullThresholdCancellationScrollingAndUnconfiguredCloudStaySafe() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);installSyncReviewFixture(scenario);
-            evaluate(scenario,"window.__pullNode=document.querySelector('.topbar');window.__pullEvent=(type,x,y)=>window.__pullNode.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:795,isPrimary:true,button:0,clientX:x,clientY:y}));window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,100);window.__pullEvent('pointerup',180,100)");
+            evaluate(scenario,"window.__pullNode=document.querySelector('.topbar');window.__pullEvent=(type,x,y)=>window.__pullNode.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:795,isPrimary:true,button:0,clientX:x,clientY:y}));window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,200);window.__pullEvent('pointerup',180,200)");
             waitTrue(scenario,"!document.getElementById('app').classList.contains('pull-dragging')");
             assertEquals("0",evaluate(scenario,"window.__reviewReads"));
-            evaluate(scenario,"window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,190);window.__pullEvent('pointercancel',180,190)");
+            evaluate(scenario,"window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,250);window.__pullEvent('pointercancel',180,250)");
             waitTrue(scenario,"!document.getElementById('app').classList.contains('pull-dragging')");
             assertEquals("0",evaluate(scenario,"window.__reviewReads"));
             evaluate(scenario,"window.scrollTo({top:150,behavior:'instant'});window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,250);window.__pullEvent('pointerup',180,250)");
             waitTrue(scenario,"!document.getElementById('app').classList.contains('pull-dragging')");
             assertEquals("0",evaluate(scenario,"window.__reviewReads"));
-            evaluate(scenario,"window.scrollTo({top:0,behavior:'instant'});window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,200);window.__pullEvent('pointerup',180,200)");
+            evaluate(scenario,"window.scrollTo({top:0,behavior:'instant'});window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,250);window.__pullEvent('pointerup',180,250)");
             waitTrue(scenario,"window.__reviewReads===1&&document.querySelector('.cloud-sync-badge').dataset.state==='success'");
         }
     }

@@ -22,7 +22,7 @@ test('下拉先移动页面，越过展示距离后出现提示，松手完成�
  f.event('touchend',260);assert.equal(f.control.isDragging(),true);assert.equal(f.refreshes,0);await f.bounce();assert.equal(f.content.style.transform,'');assert.equal(f.ends,1);await f.flush();assert.equal(f.refreshes,1);assert.equal(f.indicator.dataset.state,'success');
 });
 test('短拉和取消手势回弹但不触发同步',async()=>{
- for(const cancel of [false,true]){const f=fixture();f.event('touchstart',100);f.event('touchmove',cancel?220:140);f.frame();f.event(cancel?'touchcancel':'touchend',cancel?220:140);await f.bounce();await f.flush();assert.equal(f.refreshes,0);assert.equal(f.content.style.transform,'');assert.equal(f.control.isDragging(),false);}
+ for(const cancel of [false,true]){const f=fixture();f.event('touchstart',100);f.event('touchmove',cancel?280:140);f.frame();f.event(cancel?'touchcancel':'touchend',cancel?280:140);await f.bounce();await f.flush();assert.equal(f.refreshes,0);assert.equal(f.content.style.transform,'');assert.equal(f.control.isDragging(),false);}
 });
 test('横向滑动及未到页面顶部时不移动页面和触发下拉',async()=>{
  const f=fixture();f.event('touchstart',100);f.event('touchmove',102,200);f.frame();assert.equal(f.content.style.transform,'');f.event('touchend',102,200);f.document.scrollingElement.scrollTop=10;f.event('touchstart',100);f.event('touchmove',270);f.frame();assert.equal(f.content.style.transform,'');assert.equal(f.refreshes,0);
