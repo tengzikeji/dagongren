@@ -648,7 +648,7 @@ public class AppSmokeTest {
             for(String page:new String[]{"home","calendar","records","settings"}){
                 evaluate(scenario,"document.querySelector('.bottom-nav [data-view="+page+"]').click()");
                 waitTrue(scenario,"!document.getElementById('app').classList.contains('nav-lifting')");
-                evaluate(scenario,"const space=document.createElement('div');space.className='review-long-page';space.style.height=(innerHeight*6)+'px';document.body.appendChild(space);window.scrollTo({top:innerHeight*2.5,behavior:'instant'})");
+                assertEquals("true",evaluate(scenario,"(()=>{const space=document.createElement('div');space.className='review-long-page';space.style.height=(innerHeight*6)+'px';document.body.appendChild(space);window.scrollTo({top:innerHeight*2.5,behavior:'instant'});return space.isConnected&&space.offsetHeight>=innerHeight*5})()"));
                 waitTrue(scenario,"scrollY>innerHeight*2");
                 assertEquals("false",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.top==='true'"));
                 evaluate(scenario,"window.scrollTo({top:innerHeight*3.5,behavior:'instant'})");
