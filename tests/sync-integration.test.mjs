@@ -137,3 +137,9 @@ test('同笔冲突等待确认时返回待处理状态，保留双方记录',asy
  try{await new Promise(r=>setImmediate(r));a.setInteracting(true);await a.sync.run('normal',true);assert.equal(a.reads(),0);assert.equal(a.states.some(x=>x.state==='syncing'),false);a.setInteracting(false);await a.flush(150);assert.equal(a.reads(),1);assert.equal(a.sync.feedback().state,'success');}
  finally{a.sync.dispose();}
 });
+
+ test('同步成功后新增待上传记录会清除绿色成功态，补传确认后再恢复',async()=>{
+ const s={book:seed(),version:1},a=device(s);
+ try{await a.sync.run();assert.equal(a.sync.feedback().state,'success');a.get().months['2026-10'].subsidies.push(entry('after-success'));a.get().sync.pending=1;assert.equal(a.sync.feedback().state,'idle');assert.match(a.sync.feedback().message,/待同步/);await a.sync.run('normal',false,{source:'pull'});assert.equal(a.sync.feedback().state,'success');assert.equal(s.book.months['2026-10'].subsidies[0].id,'after-success');}
+ finally{a.sync.dispose();}
+});

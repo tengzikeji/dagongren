@@ -8,6 +8,7 @@ export function installNativeSync(api){
  let config=JSON.parse(native.status()),busy=false,timer,pollTimer,lastAttempt=0,conflict=null,lastError='',sequence=0,failures=0,disposed=false,cleanupGeneration=0,cleanupReview=null,cleanupEpoch=0,cleanupCommitting=false,cleanupRetryOptions=null;
  let feedback={state:'idle',source:'auto',message:'',revision:0},activeRun=null,runSource='auto';
  function report(state,message='',source=runSource){feedback={state,source,message,revision:feedback.revision+1};api.onState?.({...feedback});return {...feedback};}
+ function feedbackState(){return feedback.state==='success'&&db().sync.pending?{...feedback,state:'idle',message:'本机有待同步的修改'}:{...feedback};}
  const db=()=>api.getBook(),signature=book=>native.fingerprint(canonicalJSON(snapshotBook(book)));
  const visible=()=>globalThis.document?.visibilityState!=='hidden',online=()=>globalThis.navigator?.onLine!==false;
  if(db().sync.pendingCleanup)db().sync.pausedByCleanup=true;
@@ -233,5 +234,5 @@ export function installNativeSync(api){
  globalThis.window?.addEventListener?.('online',foreground);
  globalThis.document?.addEventListener?.('visibilitychange',()=>{if(visible())foreground();else{clearTimeout(timer);clearTimeout(pollTimer);}});
  queueMicrotask(()=>{if(canAuto())schedule(500);});
- return {view,showConfig,run,schedule,feedback:()=>({...feedback}),submit,handleClick,status,reviewCleanup,confirmCleanup,cancelCleanupReview,isBusy:()=>busy||cleanupCommitting,configured:()=>!!config.configured,beforeCleanup(){cleanupGeneration++;clearTimeout(timer);clearTimeout(pollTimer);},foreground,fetchCalendar:year=>request('calendar-read',{year}),dispose(){disposed=true;clearTimeout(timer);clearTimeout(pollTimer);}};
+ return {view,showConfig,run,schedule,feedback:feedbackState,submit,handleClick,status,reviewCleanup,confirmCleanup,cancelCleanupReview,isBusy:()=>busy||cleanupCommitting,configured:()=>!!config.configured,beforeCleanup(){cleanupGeneration++;clearTimeout(timer);clearTimeout(pollTimer);},foreground,fetchCalendar:year=>request('calendar-read',{year}),dispose(){disposed=true;clearTimeout(timer);clearTimeout(pollTimer);}};
 }
