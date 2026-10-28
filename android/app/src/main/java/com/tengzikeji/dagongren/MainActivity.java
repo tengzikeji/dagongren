@@ -37,7 +37,6 @@ public final class MainActivity extends Activity {
     private View systemSplashView;
     private static final int LAUNCH_COLOR=Color.rgb(16,30,61);
     private boolean darkAppearance;
-    private android.animation.ValueAnimator launchTransition;
     private final android.graphics.drawable.ColorDrawable windowCanvas=new android.graphics.drawable.ColorDrawable(LAUNCH_COLOR);
     private CredentialVault vault;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
@@ -136,7 +135,6 @@ public final class MainActivity extends Activity {
         darkAppearance="dark".equals(mode)||("system".equals(mode)&&systemIsDark());
     }
     private void applyAppearance(){
-        if(launchTransition!=null){launchTransition.cancel();launchTransition=null;}
         paintAppearance(launchIntro?LAUNCH_COLOR:appearanceColor(),launchIntro||darkAppearance);
     }
     @SuppressWarnings("deprecation") private void paintAppearance(int color,boolean darkBars){
@@ -157,15 +155,9 @@ public final class MainActivity extends Activity {
         if(webView!=null){if(!launchIntro)webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
     }
     private void fadeLaunchAppearance(int duration){
-        if(!launchIntro||isDestroyed())return;
-        if(launchTransition!=null)launchTransition.cancel();
-        launchTransition=android.animation.ValueAnimator.ofArgb(LAUNCH_COLOR,appearanceColor());
-        launchTransition.setDuration(Math.max(0,Math.min(1000,duration)));
-        launchTransition.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
-        // Keep launch icons in the theme's light mode throughout the scene.
-        // Switching once after the handoff avoids repeated SystemUI icon transactions.
-        launchTransition.addUpdateListener(animation->{if(!isDestroyed())paintAppearance((Integer)animation.getAnimatedValue(),true);});
-        launchTransition.start();
+        // Keep both the dark bar background and its light icons fixed while the
+        // web scene fades. introStyle(false) applies the home background and
+        // its icon mode together, avoiding light icons fading into a light bar.
     }
     @Override public void onConfigurationChanged(Configuration config){
         super.onConfigurationChanged(config);refreshAppearance();applyAppearance();
@@ -322,6 +314,6 @@ public final class MainActivity extends Activity {
     @Override protected void onPause(){if(webView!=null)webView.onPause();super.onPause();}
     @Override protected void onDestroy(){
         if(Build.VERSION.SDK_INT>=31&&systemSplashView!=null){((android.window.SplashScreenView)systemSplashView).remove();systemSplashView=null;}
-        if(launchTransition!=null){launchTransition.cancel();launchTransition=null;}worker.shutdownNow();calendarWorker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
+        worker.shutdownNow();calendarWorker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
     }
 }

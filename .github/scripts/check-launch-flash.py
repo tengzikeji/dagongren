@@ -57,9 +57,14 @@ def main():
     # that the clock and system icons have remained visible.
     raw = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '10.0', '-vf', 'fps=20,crop=iw:ih*0.032:0:0,scale=360:20,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True).stdout
     from statistics import median
-    icon_frames=[raw[i:i+7200] for i in range(0,len(raw),7200) if len(raw[i:i+7200])==7200][anchor+1:anchor+30]
+    import re
+    progress=video.parent.parent/'device-progress.log'
+    done=re.search(r'COMPLETED_SECOND=([0-9.]+)',progress.read_text(errors='replace')) if progress.exists() else None
+    end=int((float(done.group(1))+.15)*20) if done else anchor+30
+    icon_frames=[raw[i:i+7200] for i in range(0,len(raw),7200) if len(raw[i:i+7200])==7200][anchor+1:end]
+    backgrounds=[median(frame[y*360+x] for y in range(4,16) for x in range(150,210)) for frame in icon_frames]
     for name,start,end in [('clock',0,120),('system',240,360)]:
-        counts=[sum(frame[y*360+x]>150 for y in range(20) for x in range(start,end)) for frame in icon_frames]
+        counts=[sum(abs(frame[y*360+x]-bg)>55 for y in range(20) for x in range(start,end)) for frame,bg in zip(icon_frames,backgrounds)]
         baseline=median(counts) if counts else 0
         print('Startup '+name+' icon pixels:', ', '.join(map(str,counts)))
         if baseline<3 or detect_flash(counts,threshold=max(3,baseline*.55)):
