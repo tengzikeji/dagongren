@@ -237,7 +237,7 @@ public class AppSmokeTest {
     }
 
     private String rollingLayoutCheck(String selector) {
-        return "(()=>{const numbers=[...document.querySelectorAll('"+selector+"')];return numbers.length===2&&numbers.some(n=>n.querySelectorAll('.number-roll-slot').length>1)&&numbers.every(n=>{const slots=[...n.querySelectorAll('.number-roll-slot')];return slots.length>0&&slots.every(s=>getComputedStyle(s).display==='inline-block'&&getComputedStyle(s).fontSize===getComputedStyle(n).fontSize&&Math.abs(s.getBoundingClientRect().top-slots[0].getBoundingClientRect().top)<1)})})()";
+        return "(()=>{const numbers=[...document.getElementById('app').querySelectorAll('"+selector+"')];return numbers.length===2&&numbers.some(n=>n.querySelectorAll('.number-roll-slot').length>1)&&numbers.every(n=>{const slots=[...n.querySelectorAll('.number-roll-slot')];return slots.length>0&&slots.every(s=>getComputedStyle(s).display==='inline-block'&&getComputedStyle(s).fontSize===getComputedStyle(n).fontSize&&Math.abs(s.getBoundingClientRect().top-slots[0].getBoundingClientRect().top)<1)})})()";
     }
     @Test public void appLoadsSavesWagesAndOffersEditableConnection() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
@@ -511,9 +511,10 @@ public class AppSmokeTest {
             waitTrue(scenario,"!document.querySelector('#app .calendar-day .number-roll-strip')");
             assertEquals("0",evaluate(scenario,"document.querySelectorAll('#app .calendar-day .number-roll-strip').length"));
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('#app .calendar-day[data-date]')].every(e=>Number(e.dataset.date.slice(8))===Number(e.querySelector('.day-number').childNodes[0].nodeValue))"));
-            evaluate(scenario,"document.querySelector('[data-action=calendar-today]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click()");
-            waitTrue(scenario,"!document.querySelector('.calendar-swipe-track')");
-            assertEquals("true",evaluate(scenario,rollingLayoutCheck(".calendar-summary .number")));
+            evaluate(scenario,"document.querySelector('[data-action=calendar-today]').click();window.__rollTarget=document.querySelector('[data-calendar-month]').dataset.calendarMonth;window.__summaryRollVerified=false;window.__summaryRollObserver=new MutationObserver(()=>{if(document.querySelector('[data-calendar-month]').dataset.calendarMonth===window.__rollTarget&&"+rollingLayoutCheck(".calendar-summary .number")+")window.__summaryRollVerified=true;});window.__summaryRollObserver.observe(document.getElementById('app'),{childList:true,subtree:true});document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click()");
+            waitTrue(scenario,"!document.querySelector('.calendar-swipe-track')&&document.querySelector('[data-calendar-month]').dataset.calendarMonth===window.__rollTarget");
+            assertEquals(evaluate(scenario,"JSON.stringify({live:document.getElementById('app').querySelectorAll('.calendar-summary .number').length,all:document.querySelectorAll('.calendar-summary .number').length,slots:[...document.getElementById('app').querySelectorAll('.calendar-summary .number')].map(n=>n.querySelectorAll('.number-roll-slot').length),month:document.querySelector('[data-calendar-month]').dataset.calendarMonth})"),"true",evaluate(scenario,"window.__summaryRollVerified"));
+            evaluate(scenario,"window.__summaryRollObserver.disconnect()");
             assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.calendar-panel-header .month-display'))"));
             evaluate(scenario,"window.__beforeSwipe=document.querySelector('.month-display').textContent");
             swipeCalendar(scenario,1);
