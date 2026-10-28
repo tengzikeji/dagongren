@@ -1,0 +1,4 @@
+<resources>
+    <color name="system_bar_surface">#F3F5F9</color>
+    <bool name="system_bar_light">true</bool>
+</resources>

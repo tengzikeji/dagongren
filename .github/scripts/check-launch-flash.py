@@ -17,23 +17,24 @@ def detect_flash(values, threshold=4.0, window=10):
     return None
 
 
-def bar_flickers(values):
+def bar_flickers(values,expected=245):
     # The launcher may hand the status bar to the starting window once.
     # A monotonic light-to-blue handoff is not repeated flashing; reject a
     # reversal in either direction, then require the bar to settle on blue.
-    return (len(values)<10 or any(x<=5 or x>=240 for x in values)
+    return (len(values)<10 or any(x<=5 for x in values)
             or detect_flash(values,threshold=12) is not None
             or detect_flash([-x for x in values],threshold=12) is not None
-            or any(not 22<=x<=40 for x in values[-5:]))
+            or any(abs(x-expected)>12 for x in values[-5:]))
 
 
 def main():
     assert detect_flash([26, 26, 37, 26, 26, 37])
     assert detect_flash([26, 26, 27, 29, 32, 37]) is None
-    assert not bar_flickers([188]*5+[29]*15)
-    assert not bar_flickers([29]*20)
-    assert bar_flickers([29]*5+[188]*3+[29]*12)
-    assert bar_flickers([188]*3+[29]*3+[188]*3+[29]*11)
+    assert not bar_flickers([188]*5+[245]*15)
+    assert not bar_flickers([245]*20)
+    assert not bar_flickers([29]*20,expected=29)
+    assert bar_flickers([245]*5+[29]*3+[245]*12)
+    assert bar_flickers([188]*3+[245]*3+[188]*3+[245]*11)
     if '--self-test' in sys.argv:
         print('Flash detector self-test passed')
         return
@@ -78,6 +79,7 @@ def main():
     progress=video.parent.parent/'device-progress.log'
     done=re.search(r'COMPLETED_SECOND=([0-9.]+)',progress.read_text(errors='replace')) if progress.exists() else None
     ready=re.search(r'FADE_READY_SECOND=([0-9.]+)',progress.read_text(errors='replace')) if progress.exists() else None
+    playing=re.search(r'PLAYING_SECOND=([0-9.]+)',progress.read_text(errors='replace')) if progress.exists() else None
     end=int((float(done.group(1))+.15)*20) if done else anchor+30
     icon_frames=[raw[i:i+7200] for i in range(0,len(raw),7200) if len(raw[i:i+7200])==7200][anchor+1:end]
     backgrounds=[median(frame[y*360+x] for y in range(4,16) for x in range(150,210)) for frame in icon_frames]
@@ -88,10 +90,11 @@ def main():
     else:
         fading=[(i+anchor+1,bg) for i,bg in enumerate(backgrounds) if (i+anchor+1)/20>=float(ready.group(1))]
         review['bar_handoff']=fading
-        if not any(45<bg<230 for _,bg in fading):
-            failures.append('Status bar did not follow the launch fade')
-        if not any(bg>=235 and index/20<=float(done.group(1))+.1 for index,bg in fading):
-            failures.append('Status bar stayed blue after home was visible')
+        first=next((i for i,bg in enumerate(backgrounds) if abs(bg-245)<=12),None)
+        if first is None or not playing or (first+anchor+1)/20>float(playing.group(1))+.1:
+            failures.append('Home status-bar scheme was not ready before the live launch scene')
+        elif any(abs(bg-245)>12 for bg in backgrounds[first:]):
+            failures.append('Native status-bar scheme changed during the launch handoff')
     for name,start,end in [('clock',0,120),('system',240,360)]:
         counts=[sum(abs(frame[y*360+x]-bg)>55 for y in range(20) for x in range(start,end)) for frame,bg in zip(icon_frames,backgrounds)]
         baseline=median(counts) if counts else 0

@@ -407,7 +407,7 @@ public class AppSmokeTest {
             assertEquals("true",evaluateLoading(scenario,"!document.querySelector('.launch-edition')&&window.__launchObserved.animationNames.includes('launch-content-in')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false"));
             android.util.Log.i("DagongrenLaunchReview","NATIVE_BARS_BEFORE_CONTENT="+launchBarModes);
             assertFalse("No native startup frames were sampled",launchBarModes.isEmpty());
-            for(int mode:launchBarModes)assertEquals("Startup icons changed before first WebView frame",0,mode);
+            for(int mode:launchBarModes)assertEquals("Startup icons do not match the home scheme",android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,mode);
             assertTrue(withActivity(activity->assertTrue("Repeated SystemUI icon writes",activity.getSystemBarIconUpdateCount()<=1)));
             assertTrue(withActivity(activity->{assertFalse(activity.getWindow().isStatusBarContrastEnforced());assertFalse(activity.getWindow().isNavigationBarContrastEnforced());}));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.inert"));
@@ -424,7 +424,7 @@ public class AppSmokeTest {
             android.util.Log.i("DagongrenLaunchReview","FADE_READY_SECOND="+fadeReadySecond);
             double completedSecond=(Double.parseDouble(evaluateLoading(scenario,"performance.timeOrigin+performance.getEntriesByName('dagongren.launch.complete').at(-1).startTime"))-recordingStarted)/1000.0;
             android.util.Log.i("DagongrenLaunchReview","COMPLETED_SECOND="+completedSecond);
-            assertTrue("Chrome did not transition while the web launch faded",launchBarColors.stream().anyMatch(color->color!=android.graphics.Color.rgb(16,30,61)&&color!=android.graphics.Color.rgb(243,245,249)));
+            assertTrue("Native launch chrome did not remain in the home scheme",!launchBarColors.isEmpty()&&launchBarColors.stream().allMatch(color->color==android.graphics.Color.rgb(243,245,249)));
             assertTrue(withActivity(activity->{assertEquals(android.graphics.Color.rgb(243,245,249),((android.graphics.drawable.ColorDrawable)((android.view.View)activity.findViewById(R.id.web_view).getParent()).getBackground()).getColor());assertTrue("Icon mode toggled repeatedly",activity.getSystemBarIconUpdateCount()<=1);}));
             android.util.Log.i("DagongrenLaunchReview","BLEND_REVIEW="+evaluateLoading(scenario,"JSON.stringify({detail:performance.getEntriesByName('dagongren.launch.fading').at(-1)?.detail,viewport:[innerWidth,innerHeight],sampleCount:window.__launchBlendSamples.length,samples:window.__launchBlendSamples.slice(0,12)})"));
             assertEquals("true",evaluateLoading(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.launch.fading').at(-1)?.detail,s=window.__launchBlendSamples;return !!d&&d.duration===640&&d.hold===1700&&d.surfaces===1&&d.fullScreen&&d.homeReady&&s.length>=3&&s.every((f,i)=>f.homeOpacity===1&&Math.abs(f.width-innerWidth)<1&&Math.abs(f.height-innerHeight)<1&&f.left===0&&f.top===0&&f.transform==='none'&&f.radius==='0px'&&(!i||f.opacity<=s[i-1].opacity+.001))})()"));

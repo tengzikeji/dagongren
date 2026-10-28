@@ -25,7 +25,7 @@ export function prepareBrandIntro(){
    // A busy renderer may not start this animation immediately. A wall-clock
    // duration+100 timeout can remove the surface while it is still opaque.
    timer=setTimeout(done,10000);
-   const ready=()=>{if(finished)return;clearTimeout(timer);const elapsed=Math.max(0,Math.min(duration,Math.round(Number(fade.currentTime)||0)));try{if(bridge?.introTransitionAt)bridge.introTransitionAt(duration,elapsed);else bridge?.introTransition?.(duration);}catch{}try{performance.mark('dagongren.launch.fade.ready',{detail:{duration,elapsed}});}catch{}timer=setTimeout(done,Math.max(2500,duration*4));};
+   const ready=()=>{if(finished)return;clearTimeout(timer);try{bridge?.introTransition?.(duration);}catch{}try{performance.mark('dagongren.launch.fade.ready');}catch{}timer=setTimeout(done,Math.max(2500,duration*4));};
    if(fade.ready)fade.ready.then(ready,done);else ready();
    fade.finished.then(done,done);
   }else{try{bridge?.introTransition?.(0);}catch{}page.style.opacity='0';requestAnimationFrame(done);}
