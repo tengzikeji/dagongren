@@ -158,12 +158,12 @@ public final class MainActivity extends Activity {
         // background every animation frame unnecessarily invalidates Chromium.
         if(webView!=null){if(!launchIntro)webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
     }
-    private void fadeLaunchAppearance(int duration){
+    private void fadeLaunchAppearance(int duration,int elapsed){
         if(!launchIntro||isDestroyed())return;
         stopLaunchBarTransition();launchBarsFading=true;
         final int from=paintedWindowColor==null?LAUNCH_COLOR:paintedWindowColor;
         if(duration<=0){paintAppearance(appearanceColor(),darkAppearance);launchBarsFading=false;return;}
-        final long began=System.nanoTime(),length=Math.min(duration,2000)*1000000L;
+        final long began=System.nanoTime()-Math.max(0,Math.min(duration,elapsed))*1000000L,length=Math.min(duration,2000)*1000000L;
         final android.view.animation.Interpolator easing=new android.view.animation.PathInterpolator(.42f,0f,.58f,1f);
         // The web fade and native chrome share one ease-in-out clock. Only the
         // chrome is repainted on vsync; WebView content and layout stay intact.
@@ -259,7 +259,8 @@ public final class MainActivity extends Activity {
                 boolean previous=darkAppearance;refreshAppearance();if(previous!=darkAppearance)applyAppearance();
             });
         }
-        @JavascriptInterface public void introTransition(int duration){runOnUiThread(()->fadeLaunchAppearance(duration));}
+        @JavascriptInterface public void introTransition(int duration){runOnUiThread(()->fadeLaunchAppearance(duration,0));}
+        @JavascriptInterface public void introTransitionAt(int duration,int elapsed){runOnUiThread(()->fadeLaunchAppearance(duration,elapsed));}
         @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{if(!active){stopLaunchBarTransition();launchIntro=false;if(webView!=null)webView.getSettings().setOffscreenPreRaster(false);}applyAppearance();});}
         @JavascriptInterface public String status(){
             try{return CredentialVault.publicConfig(vault.load()).toString();}

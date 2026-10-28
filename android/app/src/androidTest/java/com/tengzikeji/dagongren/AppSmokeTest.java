@@ -388,7 +388,7 @@ public class AppSmokeTest {
             if(activity instanceof MainActivity&&stage==androidx.test.runner.lifecycle.Stage.CREATED){
                 MainActivity launched=(MainActivity)activity;
                 launched.getWindow().getDecorView().getViewTreeObserver().addOnDrawListener(()->{
-                    launchBarColors.add(launched.getWindow().getStatusBarColor());
+                    launchBarColors.add(((android.graphics.drawable.ColorDrawable)((android.view.View)launched.findViewById(R.id.web_view).getParent()).getBackground()).getColor());
                     if(!launched.isFirstLaunchFramePresented()){
                         int mask=android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
                         launchBarModes.add(launched.getWindow().getInsetsController().getSystemBarsAppearance()&mask);
@@ -425,7 +425,7 @@ public class AppSmokeTest {
             double completedSecond=(Double.parseDouble(evaluateLoading(scenario,"performance.timeOrigin+performance.getEntriesByName('dagongren.launch.complete').at(-1).startTime"))-recordingStarted)/1000.0;
             android.util.Log.i("DagongrenLaunchReview","COMPLETED_SECOND="+completedSecond);
             assertTrue("Chrome did not transition while the web launch faded",launchBarColors.stream().anyMatch(color->color!=android.graphics.Color.rgb(16,30,61)&&color!=android.graphics.Color.rgb(243,245,249)));
-            assertTrue(withActivity(activity->{assertEquals(android.graphics.Color.rgb(243,245,249),activity.getWindow().getStatusBarColor());assertTrue("Icon mode toggled repeatedly",activity.getSystemBarIconUpdateCount()<=1);}));
+            assertTrue(withActivity(activity->{assertEquals(android.graphics.Color.rgb(243,245,249),((android.graphics.drawable.ColorDrawable)((android.view.View)activity.findViewById(R.id.web_view).getParent()).getBackground()).getColor());assertTrue("Icon mode toggled repeatedly",activity.getSystemBarIconUpdateCount()<=1);}));
             android.util.Log.i("DagongrenLaunchReview","BLEND_REVIEW="+evaluateLoading(scenario,"JSON.stringify({detail:performance.getEntriesByName('dagongren.launch.fading').at(-1)?.detail,viewport:[innerWidth,innerHeight],sampleCount:window.__launchBlendSamples.length,samples:window.__launchBlendSamples.slice(0,12)})"));
             assertEquals("true",evaluateLoading(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.launch.fading').at(-1)?.detail,s=window.__launchBlendSamples;return !!d&&d.duration===640&&d.hold===1700&&d.surfaces===1&&d.fullScreen&&d.homeReady&&s.length>=3&&s.every((f,i)=>f.homeOpacity===1&&Math.abs(f.width-innerWidth)<1&&Math.abs(f.height-innerHeight)<1&&f.left===0&&f.top===0&&f.transform==='none'&&f.radius==='0px'&&(!i||f.opacity<=s[i-1].opacity+.001))})()"));
             assertEquals("false",evaluateLoading(scenario,"document.getElementById('app').inert"));
@@ -504,13 +504,16 @@ public class AppSmokeTest {
             assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();Boolean(document.querySelector('#app .number-roll-strip')) && [...document.querySelectorAll('#app .number-roll-strip')].every(e=>Number(e.style.getPropertyValue('--roll-steps'))>0&&Number(e.style.getPropertyValue('--roll-steps'))<=19)"));
             evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
             waitTrue(scenario,"!document.querySelector('#app .number-roll-strip')");
-            evaluate(scenario,"document.querySelector('[data-view=calendar]').click();window.__calendarHeight=document.querySelector('#app .calendar-days').getBoundingClientRect().height;for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
+            evaluate(scenario,"document.querySelector('[data-view=calendar]').click();window.__calendarHeight=document.querySelector('#app .calendar-days').getBoundingClientRect().height;window.__calendarMonth=document.querySelector('[data-calendar-month]').dataset.calendarMonth;for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
+            waitTrue(scenario,"!document.querySelector('.calendar-swipe-track')&&document.querySelector('[data-calendar-month]').dataset.calendarMonth===window.__calendarMonth");
             assertEquals("true",evaluate(scenario,"(()=>{const m=document.querySelector('[data-calendar-month]').dataset.calendarMonth,[y,n]=m.split('-').map(Number),first=(new Date(Date.UTC(y,n-1,1)).getUTCDay()+6)%7,days=new Date(Date.UTC(y,n,0)).getUTCDate();return document.querySelector('#app .calendar-days').children.length===Math.ceil((first+days)/7)*7})()"));
             assertEquals("true",evaluate(scenario,"Math.abs(document.querySelector('#app .calendar-days').getBoundingClientRect().height-window.__calendarHeight)<1"));
             waitTrue(scenario,"!document.querySelector('#app .calendar-day .number-roll-strip')");
             assertEquals("0",evaluate(scenario,"document.querySelectorAll('#app .calendar-day .number-roll-strip').length"));
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('#app .calendar-day[data-date]')].every(e=>Number(e.dataset.date.slice(8))===Number(e.querySelector('.day-number').childNodes[0].nodeValue))"));
-            assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=calendar-today]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();"+rollingLayoutCheck(".calendar-summary .number")));
+            evaluate(scenario,"document.querySelector('[data-action=calendar-today]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click()");
+            waitTrue(scenario,"!document.querySelector('.calendar-swipe-track')");
+            assertEquals("true",evaluate(scenario,rollingLayoutCheck(".calendar-summary .number")));
             assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.calendar-panel-header .month-display'))"));
             evaluate(scenario,"window.__beforeSwipe=document.querySelector('.month-display').textContent");
             swipeCalendar(scenario,1);
