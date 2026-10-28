@@ -55,7 +55,7 @@ def main():
         raise SystemExit('Status-bar background changed unexpectedly before launch content')
     # Inspect foreground occupancy too: a stable blue background cannot prove
     # that the clock and system icons have remained visible.
-    raw = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '10.0', '-vf', 'fps=20,crop=iw:ih*0.032:0:0,scale=360:20,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True).stdout
+    raw = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '30.0', '-vf', 'fps=20,crop=iw:ih*0.032:0:0,scale=360:20,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True).stdout
     from statistics import median
     import re
     progress=video.parent.parent/'device-progress.log'
