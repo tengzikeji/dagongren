@@ -382,6 +382,19 @@ public class AppSmokeTest {
         long recordingStarted=System.currentTimeMillis();Thread.sleep(1500);
         ActivityScenario<MainActivity> scenario=null;
         android.content.Context target=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        java.util.List<Integer> launchBarModes=new java.util.concurrent.CopyOnWriteArrayList<>();
+        androidx.test.runner.lifecycle.ActivityLifecycleCallback launchBarObserver=(activity,stage)->{
+            if(activity instanceof MainActivity&&stage==androidx.test.runner.lifecycle.Stage.CREATED){
+                MainActivity launched=(MainActivity)activity;
+                launched.getWindow().getDecorView().getViewTreeObserver().addOnDrawListener(()->{
+                    if(!launched.isFirstLaunchFramePresented()){
+                        int mask=android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                        launchBarModes.add(launched.getWindow().getInsetsController().getSystemBarsAppearance()&mask);
+                    }
+                });
+            }
+        };
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().addLifecycleCallback(launchBarObserver));
         target.startActivity(new android.content.Intent(target,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK));
         try{
             waitTrueLoading(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1);if(!entry)return false;window.__launchObserved=entry.detail;if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='fading'){const rect=page.getBoundingClientRect(),style=getComputedStyle(page);window.__launchBlendSamples.push({opacity:Number(style.opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height,left:rect.left,top:rect.top,transform:style.transform,radius:style.borderRadius})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
@@ -390,7 +403,10 @@ public class AppSmokeTest {
             assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.1'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface"));
             assertEquals("false",evaluateLoading(scenario,"window.__launchObserved.oldBrand"));
             assertEquals("true",evaluateLoading(scenario,"!document.querySelector('.launch-edition')&&window.__launchObserved.animationNames.includes('launch-content-in')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false"));
-            assertTrue(withActivity(activity->{assertFalse(activity.getWindow().isStatusBarContrastEnforced());assertFalse(activity.getWindow().isNavigationBarContrastEnforced());int mask=android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;assertEquals(0,activity.getWindow().getInsetsController().getSystemBarsAppearance()&mask);}));
+            android.util.Log.i("DagongrenLaunchReview","NATIVE_BARS_BEFORE_CONTENT="+launchBarModes);
+            assertFalse("No native startup frames were sampled",launchBarModes.isEmpty());
+            for(int mode:launchBarModes)assertEquals("Startup icons changed before first WebView frame",0,mode);
+            assertTrue(withActivity(activity->{assertFalse(activity.getWindow().isStatusBarContrastEnforced());assertFalse(activity.getWindow().isNavigationBarContrastEnforced());}));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.inert"));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.animated&&['launch-soft-in','launch-line','launch-bar','launch-sheen','launch-orbit','launch-dot'].every(name=>window.__launchObserved.animationNames.includes(name))"));
             waitTrueLoading(scenario,"performance.getEntriesByName('dagongren.app.render').length>0");
@@ -414,6 +430,7 @@ public class AppSmokeTest {
             awaitInputWindow(scenario);dismissEmulatorLauncherAnr();
             assertEquals("true",evaluateLoading(scenario,"performance.getEntriesByName('dagongren.home.self-check').length===0&&performance.getEntriesByName('dagongren.home.glare').length===0&&performance.getEntriesByName('dagongren.home.glare.complete').length===0&&localStorage.getItem('dagongren.paybook.v1')===window.__selfCheckBook"));
         } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().removeLifecycleCallback(launchBarObserver));
             withActivity(activity->activity.finish());
             recording.join(35000);
             device.executeShellCommand("settings put global window_animation_scale 0");
