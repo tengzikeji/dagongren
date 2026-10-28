@@ -216,7 +216,7 @@ body[data-theme=dark] .calendar-day.has-entry{--date-border:#58759e}
 
 
 /* Restore the beta.1 launch composition and its independent animations. */
-.launch-page{position:fixed;inset:0;z-index:10000;overflow:hidden;background:#101e3d;color:#e5edf9;isolation:isolate}
+.launch-page{position:fixed;inset:0;z-index:10000;overflow:hidden;background:#f3f5f9;color:#1c3454;isolation:isolate}
 .launch-scene{position:absolute;left:50%;top:50%;width:393px;height:777px;transform:translate(-50%,-50%) scale(var(--launch-scale,1));transform-origin:center;display:grid;grid-template-rows:auto minmax(150px,.9fr) minmax(230px,1fr) auto;gap:14px;padding:28px 24px 24px;background:#f3f6fb;color:#1c3454;overflow:hidden;isolation:isolate}
 .launch-grid{position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse at 75% 45%,#dce9fd99,transparent 65%),linear-gradient(#a9c4ea0d 1px,transparent 1px),linear-gradient(90deg,#a9c4ea0d 1px,transparent 1px);background-size:auto,32px 32px,32px 32px}
 .launch-header{display:flex;align-items:center;gap:12px;min-height:48px}.launch-app-icon{display:grid;place-items:center;width:44px;height:44px;background:linear-gradient(145deg,#3e83ff,#214fe2);border:1px solid #ffffff99;border-radius:14px;box-shadow:0 6px 16px #2f65e32b;flex-shrink:0}.launch-app-icon svg{width:25px;height:25px;stroke:#fff;stroke-width:1.5}.launch-header>div{display:flex;flex-direction:column;gap:4px}.launch-header strong{font-size:21px;line-height:1.2;font-weight:700;letter-spacing:.2px}.launch-header>div>span{font-size:9px;letter-spacing:.8px;color:#7f90a8}.launch-edition{font-size:9px;letter-spacing:.6px;padding:5px 8px;border:1px solid #dce5f2;color:#7c8fa8;border-radius:7px;margin-left:auto;white-space:nowrap}
@@ -232,15 +232,16 @@ body[data-theme=dark] .calendar-day.has-entry{--date-border:#58759e}
 .intro-playing #app{opacity:0;pointer-events:none}.intro-playing #app *,.intro-playing #app *:before,.intro-playing #app *:after{animation:none!important}.intro-opening #app{opacity:1}
 
 /* The native window and live launch surface share one blue canvas. */
-body.intro-playing .launch-page,body.intro-playing[data-theme=dark] .launch-page{background:#101e3d;color:#e5edf9}
+body.intro-playing .launch-page{background:#f3f5f9;color:#1c3454}
+body.intro-playing[data-theme=dark] .launch-page{background:#101827;color:#e5edf9}
 .launch-page .launch-grid{opacity:.22}
-.launch-page .launch-header strong,.launch-page .launch-copy h2,body[data-theme=dark] .launch-page .launch-copy h2{color:#e5edf9}
-.launch-page .launch-header>div>span,.launch-page .launch-copy p,.launch-page .launch-status small{color:#91a8cc}
-.launch-page .launch-eyebrow,.launch-page .launch-status>span:nth-child(2){color:#b1c8eb}
-.launch-page .launch-chip{background:#203452;color:#cbdfff;border-color:#42618a}
-.launch-page .launch-status{border-color:#365076}
-.launch-page .launch-status-icon{background:#1c3153}
-.launch-page .launch-ledger{border-color:#46628c;box-shadow:0 18px 34px #0002}
+body[data-theme=dark] .launch-page .launch-header strong,body[data-theme=dark] .launch-page .launch-copy h2{color:#e5edf9}
+body[data-theme=dark] .launch-page .launch-header>div>span,body[data-theme=dark] .launch-page .launch-copy p,body[data-theme=dark] .launch-page .launch-status small{color:#91a8cc}
+body[data-theme=dark] .launch-page .launch-eyebrow,body[data-theme=dark] .launch-page .launch-status>span:nth-child(2){color:#b1c8eb}
+body[data-theme=dark] .launch-page .launch-chip{background:#203452;color:#cbdfff;border-color:#42618a}
+body[data-theme=dark] .launch-page .launch-status{border-color:#365076}
+body[data-theme=dark] .launch-page .launch-status-icon{background:#1c3153}
+body[data-theme=dark] .launch-page .launch-ledger{border-color:#46628c;box-shadow:0 18px 34px #0002}
 .launch-page[data-phase] .launch-header{animation:launch-soft-in .28s ease-out both}
 .launch-page[data-phase] .launch-copy{animation:launch-soft-in .32s .04s ease-out both}
 .launch-page[data-phase] .launch-ledger{animation:launch-soft-in .38s .08s ease-out both}
@@ -249,7 +250,7 @@ body.intro-playing .launch-page,body.intro-playing[data-theme=dark] .launch-page
 @keyframes launch-soft-in{from{opacity:.35}to{opacity:1}}
 
 
-.launch-scene{background:#101e3d;color:#e5edf9}.launch-copy h2{font-size:31.833px}
+.launch-scene{background:#f3f5f9;color:#1c3454}body[data-theme=dark] .launch-scene{background:#101827;color:#e5edf9}.launch-copy h2{font-size:31.833px}
 .launch-page[data-phase=preparing] *{animation-play-state:paused!important}
 .launch-page[data-phase=fading]{transform:none;border-radius:0;box-shadow:none;will-change:opacity;pointer-events:none}
 .launch-page :is(.launch-ledger,.launch-value-line,.launch-bars i,.launch-ready i){will-change:transform,opacity}

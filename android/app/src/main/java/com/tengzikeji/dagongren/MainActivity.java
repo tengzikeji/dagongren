@@ -35,9 +35,8 @@ public final class MainActivity extends Activity {
     private static final int SAVE_FILE=7101;
     private WebView webView;
     private View systemSplashView;
-    private static final int LAUNCH_COLOR=Color.rgb(16,30,61);
     private boolean darkAppearance;
-    private final android.graphics.drawable.ColorDrawable windowCanvas=new android.graphics.drawable.ColorDrawable(LAUNCH_COLOR);
+    private final android.graphics.drawable.ColorDrawable windowCanvas=new android.graphics.drawable.ColorDrawable(Color.rgb(243,245,249));
     private CredentialVault vault;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final ExecutorService calendarWorker=Executors.newSingleThreadExecutor();
@@ -95,7 +94,7 @@ public final class MainActivity extends Activity {
 
     private void initializeWebView(FrameLayout root){
         webView=new WebView(this);webView.setId(R.id.web_view);
-        webView.setBackgroundColor(launchIntro?LAUNCH_COLOR:appearanceColor());
+        webView.setBackgroundColor(appearanceColor());
         WebSettings settings=webView.getSettings();
         settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
         settings.setOffscreenPreRaster(launchIntro);

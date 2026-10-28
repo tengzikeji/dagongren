@@ -19,8 +19,8 @@ def detect_flash(values, threshold=4.0, window=10):
 
 def bar_flickers(values,expected=245):
     # The launcher may hand the status bar to the starting window once.
-    # A monotonic light-to-blue handoff is not repeated flashing; reject a
-    # reversal in either direction, then require the bar to settle on blue.
+    # A monotonic launcher-to-app handoff is not repeated flashing; reject a
+    # reversal in either direction, then require the bar to settle on the requested scheme.
     return (len(values)<10 or any(x<=5 for x in values)
             or detect_flash(values,threshold=12) is not None
             or detect_flash([-x for x in values],threshold=12) is not None
@@ -52,16 +52,16 @@ def main():
         mean=sum(frame)/size
         variance=sum((x-mean)**2 for x in frame)/size
         stats.append((mean, variance**.5))
-    # Allow the launcher to remain visible until the process presents its solid blue window.
-    anchor=next((i for i,(mean,sd) in enumerate(stats) if 22<=mean<=36 and sd<2.5),None)
+    # Allow the launcher to remain visible until the process presents its solid themed window.
+    anchor=next((i for i,(mean,sd) in enumerate(stats) if 235<=mean<=252 and sd<2.5),None)
     if anchor is None or len(stats)-anchor<10:
-        raise SystemExit('Could not identify enough frames from the blue startup window')
+        raise SystemExit('Could not identify enough frames from the themed startup window')
     print('Solid startup window identified at',f'{anchor/20:.2f}s')
     values=[mean for mean,_ in stats[anchor:anchor+30]]
     flash=detect_flash(values)
     print('Startup window first 1.5s luminance:', ', '.join(f'{x:.1f}' for x in values))
-    if any(x>=240 or x<=5 for x in values):
-        raise SystemExit('A white or black screen appeared after the startup window')
+    if any(x<=5 for x in values) or any(mean<75 and sd<2.5 for mean,sd in stats[anchor:anchor+30]):
+        raise SystemExit('A dark blank screen appeared after the light startup window')
     if flash:
         raise SystemExit(f'Launch brightness disappeared and returned around {(anchor+flash[0])/20:.2f}s (drops {flash[1]:.1f}, {flash[2]:.1f})')
     print('No bright-dark-bright flash detected during the native window handoff')
