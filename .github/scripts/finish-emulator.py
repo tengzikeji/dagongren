@@ -8,7 +8,7 @@ import time
 
 
 def matches(args, avd):
-    if not args or '/emulator/qemu/' not in args[0] or Path(args[0]).name != 'qemu-system-x86_64':
+    if not args or '/emulator/qemu/' not in args[0] or Path(args[0]).name not in {'qemu-system-x86_64', 'qemu-system-x86_64-headless'}:
         return False
     return any(args[i] == '-avd' and args[i+1] == avd for i in range(len(args)-1))
 
@@ -28,6 +28,7 @@ def main():
     if sys.argv[1:] == ['--self-test']:
         command = ['/sdk/emulator/qemu/linux-x86_64/qemu-system-x86_64', '-avd', 'dagongren-ci-6']
         assert matches(command, 'dagongren-ci-6')
+        assert matches([command[0]+'-headless', *command[1:]], 'dagongren-ci-6')
         assert not matches(command, 'dagongren-ci-5')
         assert not matches(command, 'dagongren-ci')
         assert not matches(['/usr/bin/python3', '-avd', 'dagongren-ci-6'], 'dagongren-ci-6')
