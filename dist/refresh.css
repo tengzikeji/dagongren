@@ -1,0 +1,37 @@
+/* One stable cloud outline with a separate, readable result badge. */
+.cloud-button.sync-cloud-button{position:relative;width:44px;min-width:44px;height:36px;padding:0;display:flex;justify-content:center;gap:7px;overflow:visible;flex-shrink:0;border-radius:12px}
+.sync-cloud-button .cloud-icon{position:relative;display:block;overflow:visible;width:28px;height:27px;max-width:none}
+.sync-cloud-button .cloud-icon>svg{display:block;width:23px;height:23px;margin:1px 0 0;color:var(--muted,#7385a0)}
+.sync-cloud-button .cloud-sync-badge{position:absolute;right:-2px;bottom:-1px;display:grid;place-items:center;max-width:none;width:16px;height:16px;border-radius:50%;background:var(--white,#fff);box-shadow:0 0 0 2px var(--white,#fff);color:var(--orange,#3276f5);overflow:visible}
+.sync-cloud-button .cloud-sync-badge[data-state=idle]{display:none}
+.sync-cloud-button .cloud-sync-badge svg{width:14px;height:14px}
+.sync-cloud-button .cloud-label{display:none}
+.cloud-sync-badge[data-state=success],.pull-refresh[data-state=success] .pull-refresh-symbol{color:#168652}
+.cloud-sync-badge[data-state=error],.pull-refresh[data-state=error] .pull-refresh-symbol{color:#d8444e}
+.cloud-sync-badge[data-state=attention],.pull-refresh[data-state=attention] .pull-refresh-symbol{color:#b77919}
+.sync-ring-track{opacity:.18}
+.cloud-sync-badge[data-state=syncing] .sync-spinner{animation:sync-spin .8s linear infinite}
+.cloud-sync-badge[data-state=success] .sync-result-stroke,.cloud-sync-badge[data-state=error] .sync-result-stroke{stroke-dasharray:36;animation:sync-draw .4s ease-out both}
+.cloud-sync-badge[data-state=success] .sync-result,.cloud-sync-badge[data-state=error] .sync-result{animation:sync-pop .36s cubic-bezier(.2,.75,.3,1.25)}
+.pull-refresh{position:fixed;z-index:80;left:50%;top:0;display:flex;align-items:center;gap:9px;min-height:42px;padding:8px 15px 8px 10px;max-width:calc(100vw - 40px);border:1px solid var(--line,#dce5f1);border-radius:22px;background:var(--white,#fff);color:var(--ink,#25405f);box-shadow:0 6px 25px #1739631c;transform:translate3d(-50%,var(--pull-y,12px),0);pointer-events:none;will-change:transform,opacity;font-size:11px;line-height:1.5}
+.pull-refresh[hidden]{display:none!important}
+.pull-refresh .pull-refresh-symbol{display:grid;place-items:center;flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#3276f50c;color:#3276f5}
+.pull-refresh .pull-refresh-symbol svg{width:19px;height:19px}
+.pull-refresh[data-state=hidden]{opacity:0;transform:translate3d(-50%,-32px,0)}
+.pull-refresh[data-state=pulling]{opacity:calc(.4 + var(--pull-progress,0)*.6)}
+.pull-refresh[data-state=armed]{box-shadow:0 6px 26px #3276f52a}
+.pull-refresh[data-state=syncing] .sync-spinner{animation:sync-spin .8s linear infinite!important}
+.pull-refresh[data-state=success] .sync-result-stroke,.pull-refresh[data-state=error] .sync-result-stroke{stroke-dasharray:36;animation:sync-draw .4s ease-out both!important}
+.pull-refresh[data-source=pull]{transition:transform .18s ease-out,opacity .18s ease-out!important}
+.pull-refresh:is([data-state=pulling],[data-state=armed]){transition:opacity .12s linear!important}
+body.motion-off .cloud-sync-badge[data-source=pull][data-state=syncing] .sync-spinner{animation:sync-spin .8s linear infinite!important}
+body.motion-off .cloud-sync-badge[data-source=pull]:is([data-state=success],[data-state=error]) .sync-result-stroke{animation:sync-draw .4s ease-out both!important}
+body.motion-off .cloud-sync-badge[data-source=pull]:is([data-state=success],[data-state=error]) .sync-result{animation:sync-pop .36s ease-out!important}
+body[data-theme=dark] .cloud-sync-badge{background:#192538;box-shadow:0 0 0 2px #192538}
+body[data-theme=dark] .cloud-sync-badge[data-state=success]{color:#55c990}
+body[data-theme=dark] .cloud-sync-badge[data-state=error]{color:#ff7d88}
+@keyframes sync-spin{to{transform:rotate(360deg)}}
+@keyframes sync-draw{from{stroke-dashoffset:36}to{stroke-dashoffset:0}}
+@keyframes sync-pop{from{transform:scale(.7);opacity:.4}to{transform:scale(1);opacity:1}}
+@media(min-width:761px){.cloud-button.sync-cloud-button{width:auto;padding:0 12px}.sync-cloud-button .cloud-label{display:block;max-width:none}.sync-cloud-button .cloud-icon{width:28px}}
+@media(prefers-reduced-motion:reduce){body .cloud-sync-badge .sync-spinner,body .cloud-sync-badge .sync-result,body .cloud-sync-badge .sync-result-stroke,body.motion-off .cloud-sync-badge[data-source=pull][data-state=syncing] .sync-spinner,body.motion-off .cloud-sync-badge[data-source=pull]:is([data-state=success],[data-state=error]) :is(.sync-result,.sync-result-stroke),body .pull-refresh[data-source=pull][data-state] :is(.sync-spinner,.sync-result-stroke){animation:none!important}body .pull-refresh[data-source=pull]{transition:none!important}}

@@ -6,6 +6,9 @@ import {mergeBooks,rememberDeletions} from './sync-merge.js';
 export function installNativeSync(api){
  const native=globalThis.AndroidFiles,pending=new Map(),requestPrefix=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
  let config=JSON.parse(native.status()),busy=false,timer,pollTimer,lastAttempt=0,conflict=null,lastError='',sequence=0,failures=0,disposed=false,cleanupGeneration=0,cleanupReview=null,cleanupEpoch=0,cleanupCommitting=false,cleanupRetryOptions=null;
+ let feedback={state:'idle',source:'auto',message:'',revision:0},activeRun=null,runSource='auto';
+ function report(state,message='',source=runSource){feedback={state,source,message,revision:feedback.revision+1};api.onState?.({...feedback});return {...feedback};}
+ function feedbackState(){return feedback.state==='success'&&db().sync.pending?{...feedback,state:'idle',message:'本机有待同步的修改'}:{...feedback};}
  const db=()=>api.getBook(),signature=book=>native.fingerprint(canonicalJSON(snapshotBook(book)));
  const visible=()=>globalThis.document?.visibilityState!=='hidden',online=()=>globalThis.navigator?.onLine!==false;
  if(db().sync.pendingCleanup)db().sync.pausedByCleanup=true;
@@ -59,14 +62,23 @@ export function installNativeSync(api){
   next.sync.pending=signature(next)===signature(base)?0:Math.max(1,db().sync.pending||0);
   localStorage.setItem('dagongren.paybook.v1',JSON.stringify(next));api.replaceBook(next);api.persist();lastError='';failures=0;conflict=null;if(didChange)api.render();
  }
- async function run(resolution='normal',silent=false){
-  if(disposed||busy||cleanupReview)return;
-  if(db().sync.pendingCleanup){if(!silent)reviewCleanup(db().sync.pendingCleanup.options);return;}
-  if(!config.configured){if(!silent)showConfig();return;}
-  if(api.storageBlocked()){if(!silent)message('本机存储不可用，已暂停同步，请先导出账本。');return;}
-  if(!online()){lastError='网络已断开，修改保存在本机，联网后会自动补齐。';armPoll();if(!silent)api.toast(lastError);return;}
-  if(api.editing?.()){if(!silent)api.toast('请先保存或取消当前编辑，自动同步会在编辑完成后继续。');schedule();return;}
-  const generation=cleanupGeneration,cancelled=()=>cleanupGeneration!==generation||(silent&&!db().sync.auto);busy=true;clearTimeout(timer);clearTimeout(pollTimer);lastAttempt=Date.now();if(!silent)api.render();
+ function run(resolution='normal',silent=false,options={}){
+  const source=options.source||(silent?'auto':'manual');
+  if(activeRun){if(source==='pull'){runSource='pull';report('syncing','正在同步');}return activeRun;}
+  const task=performRun(resolution,silent,source).then(result=>result||({...feedback}));activeRun=task;
+  const clear=()=>{if(activeRun===task)activeRun=null;};task.then(clear,clear);return task;
+ }
+ async function performRun(resolution='normal',silent=false,source='manual'){
+  runSource=source;
+  if(disposed||busy||cleanupReview)return report('attention','请等待当前网盘操作完成');
+  if(db().sync.pendingCleanup){if(!silent)reviewCleanup(db().sync.pendingCleanup.options);return report('attention','请先核对上次云端清理结果');}
+  if(!config.configured){if(!silent)showConfig();return report('attention','请先配置坚果云');}
+  if(silent&&api.interacting?.()){schedule(150);return {...feedback};}
+  if(api.storageBlocked()){if(!silent)message('本机存储不可用，已暂停同步，请先导出账本。');return report('error','本机存储不可用');}
+  if(!online()){lastError='网络已断开，修改保存在本机，联网后会自动补齐。';armPoll();if(!silent)api.toast(lastError);return report('error',lastError);}
+  if(api.editing?.()){if(!silent)api.toast('请先保存或取消当前编辑，自动同步会在编辑完成后继续。');schedule();return report('attention','请先保存或取消当前编辑');}
+  let succeeded=false;
+  const generation=cleanupGeneration,cancelled=()=>cleanupGeneration!==generation||(silent&&runSource!=='pull'&&!db().sync.auto);busy=true;clearTimeout(timer);clearTimeout(pollTimer);lastAttempt=Date.now();report('syncing','正在同步');
   try{
    for(let attempt=0;attempt<3;attempt++){
     const initialHash=signature(db()),remote=await request('read');if(cancelled())return;
@@ -87,12 +99,12 @@ export function installNativeSync(api){
     }else if(choosing)action=resolution;
     if(action==='conflict'){lastError='请先确认这次同步要保留的账本。';conflictDialog(remoteHash,localHash);return;}
     if(choosing)api.closeModal();
-    if(action==='same'){adopt(local,local);if(!silent)api.toast('本机与网盘账本一致。');return;}
+    if(action==='same'){adopt(local,local);succeeded=true;if(!silent)api.toast('本机与网盘账本一致。');return;}
     if(action==='download')candidate=canMerge?candidate:remoteBook;
     if(!candidate)throw new Error('网盘账本不存在，本机记录保留。');
     candidate=migrateBook(snapshotBook(candidate),api.defaults,api.today());ensureAccrualMonths(candidate,api.today());
     rememberDeletions(candidate,local,requestPrefix+'-'+(++sequence));calculateBook(candidate.months,candidate.defaults,api.today());candidate=snapshotBook(candidate);
-    if(action==='download'&&signature(candidate)===remoteHash){saveBeforeReplace(db());adopt(candidate,remoteBook);if(!silent)api.toast('网盘的新记录已合并到本机。');return;}
+    if(action==='download'&&signature(candidate)===remoteHash){saveBeforeReplace(db());adopt(candidate,remoteBook);succeeded=true;if(!silent)api.toast('网盘的新记录已合并到本机。');return;}
     if(remote.exists&&(!remote.etag||remote.etag.startsWith('W/')))throw new Error('网盘未提供可用于防冲突的版本标识，本次未覆盖网盘账本。');
     saveBeforeReplace(db());
     try{await request('write',{content:canonicalJSON(candidate),exists:remote.exists,etag:remote.etag||''});}
@@ -104,13 +116,23 @@ export function installNativeSync(api){
      const rebased=mergeBooks(local,current,candidate);adopt(rebased.book,rebased.conflicts.length?local:candidate);
      if(rebased.conflicts.length){lastError='同步期间同一笔记录又有修改，请确认冲突部分。';conflictDialog(signature(candidate),signature(db()),rebased.conflicts,true);}
     }else adopt(candidate,candidate);
+    succeeded=!conflict&&!db().sync.pending;
     if(!silent&&!conflict)api.toast(action==='merge'?'两端不同的新记录已自动合并。':'账本已同步到坚果云。');return;
    }
   }catch(error){
    if(cancelled())return;
    failures++;lastError=/[\u4e00-\u9fff]/.test(error.message||'')?error.message:'同步未完成，修改保存在本机，稍后会自动重试。';
    if(error.code===429)failures=Math.max(failures,4);if(!silent)api.toast(lastError);
-  }finally{busy=false;if(!silent||lastError)api.render();if(canAuto()&&db().sync.pending&&!failures)schedule();armPoll();}
+  }finally{
+   busy=false;
+   if(cancelled())report('idle','同步已暂停');
+   else if(succeeded)report('success','云端数据同步成功');
+   else if(conflict)report('attention',lastError||'请先确认账本冲突');
+   else if(failures)report('error',lastError||'同步失败，本机记录已保留');
+   else report('attention','本机有新修改，等待继续同步');
+   if(!silent||lastError)api.render();if(canAuto()&&db().sync.pending&&!failures)schedule();armPoll();
+  }
+  return {...feedback};
  }
  function cleanupRange(options){return options.scope==='month'?options.month.slice(0,4)+'年'+Number(options.month.slice(5))+'月':options.scope==='year'?options.year+'年':'全部账本记录';}
  function cleanupCount(count){return count.months+'个月 · '+['leaves','paid','advances','overtime','subsidies','deductions'].reduce((n,key)=>n+(count[key]||0),0)+'条逐笔记录';}
@@ -212,5 +234,5 @@ export function installNativeSync(api){
  globalThis.window?.addEventListener?.('online',foreground);
  globalThis.document?.addEventListener?.('visibilitychange',()=>{if(visible())foreground();else{clearTimeout(timer);clearTimeout(pollTimer);}});
  queueMicrotask(()=>{if(canAuto())schedule(500);});
- return {view,showConfig,run,schedule,submit,handleClick,status,reviewCleanup,confirmCleanup,cancelCleanupReview,isBusy:()=>busy||cleanupCommitting,configured:()=>!!config.configured,beforeCleanup(){cleanupGeneration++;clearTimeout(timer);clearTimeout(pollTimer);},foreground,fetchCalendar:year=>request('calendar-read',{year}),dispose(){disposed=true;clearTimeout(timer);clearTimeout(pollTimer);}};
+ return {view,showConfig,run,schedule,feedback:feedbackState,submit,handleClick,status,reviewCleanup,confirmCleanup,cancelCleanupReview,isBusy:()=>busy||cleanupCommitting,configured:()=>!!config.configured,beforeCleanup(){cleanupGeneration++;clearTimeout(timer);clearTimeout(pollTimer);},foreground,fetchCalendar:year=>request('calendar-read',{year}),dispose(){disposed=true;clearTimeout(timer);clearTimeout(pollTimer);}};
 }

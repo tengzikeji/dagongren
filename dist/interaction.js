@@ -1,6 +1,5 @@
 import {bindPageSwipe,bindCalendarSwipe} from './gestures.js';
 export {calendarSwipeDelta,pageSwipeTarget,swipeAxis,swipeVelocity,swipeDecision,swipeOffset} from './gestures.js';
-let uiHomeGlareDone=false;
 const uiRollingNodes=new Map();
 let uiRenderedView='',uiRenderedTheme='',uiRollCleanups=[],uiActiveChoice=null,uiResizeObserver=null,uiObservedWidth=0;
 const uiEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -110,18 +109,6 @@ function snapshotFinalNumbers(source){
  }
  return clone;
 }
-export function playHomeStartupGlare(root,motion=true){
- if(uiHomeGlareDone||!motion||document.body.classList.contains('motion-off')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||document.querySelector('.launch-page')||root.inert||document.visibilityState==='hidden')return false;
- const hero=root.querySelector('.view-home .balance-hero');if(!hero?.animate)return false;
- uiHomeGlareDone=true;
- const glare=document.createElement('span');glare.className='hero-startup-glare';glare.setAttribute('aria-hidden','true');hero.appendChild(glare);
- const duration=1000,from='translate3d(0,0,0) skewX(-25deg)',to='translate3d('+Math.round(hero.clientWidth*1.6)+'px,0,0) skewX(-25deg)';
- const sweep=glare.animate([{offset:0,transform:from,opacity:0},{offset:.18,opacity:.5},{offset:.82,opacity:.5},{offset:1,transform:to,opacity:0}],{duration,easing:'cubic-bezier(.2,.55,.35,1)',fill:'both'});
- let finished=false,timer;const done=()=>{if(finished)return;finished=true;clearTimeout(timer);glare.remove();sweep.cancel();try{performance.mark('dagongren.home.glare.complete');}catch{}};
- timer=setTimeout(done,duration+100);sweep.finished.then(done,done);
- try{performance.mark('dagongren.home.glare',{detail:{runs:1,afterLaunch:!document.querySelector('.launch-page'),direction:'left-to-right',from,to,duration,at:Date.now(),rolling:hero.querySelectorAll('.number-roll-strip').length}});}catch{}
- return true;
-}
 export function closeChoicePicker(){
  if(!uiActiveChoice)return false;const {panel,children,trigger,modal}=uiActiveChoice;uiActiveChoice=null;panel.remove();modal.classList.remove('choosing');
  for(const child of children){child.inert=false;child.removeAttribute('aria-hidden');}trigger?.focus({preventScroll:true});return true;
@@ -167,5 +154,5 @@ export function enhanceModalChoices(root){
 }
 export function playBrandIntro(enabled=true,onComplete=null){return globalThis.dagongrenIntro?.play(enabled,onComplete);}
 
-export function installPageSwipe(root,api){return bindPageSwipe(root,{...api,snapshot:snapshotFinalNumbers,fitPreview:fitCompanyNames,before(){for(const finish of [...uiRollCleanups])finish();api.before?.();},settled(completed,to){if(completed)uiRollNumbers(root,new Map(),false,true);api.settled?.(completed,to);}});}
+export function installPageSwipe(root,api){return bindPageSwipe(root,{...api,snapshot:snapshotFinalNumbers,fitPreview:fitCompanyNames,before(){api.before?.();},settled(completed,to){if(completed)uiRollNumbers(root,new Map(),false,true);api.settled?.(completed,to);}});}
 export function installCalendarSwipe(root,api){return bindCalendarSwipe(root,api);}

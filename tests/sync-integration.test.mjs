@@ -14,9 +14,9 @@ const entry=(id,amount=10000)=>({id,date:'2026-10-20',amountCents:amount,categor
 const names=['calendar-data.js','calendar.js','payroll.js','data-tools.js','sync-tools.js','sync-merge.js','cloud-cleanup.js','native-sync.js'];
 const code=names.map(n=>fs.readFileSync(new URL('../dist/'+n,import.meta.url),'utf8').replace(/^import[^\n]+\n/gm,'').replace(/^export /gm,'')).join('\n')+'\nglobalThis.createSync=installNativeSync;';
 function device(server,initial=seed()){
- let current=copy(initial),modal='',editing=false,writes=0,reads=0;
+ let current=copy(initial),modal='',editing=false,interacting=false,writes=0,reads=0;
  current.sync={auto:true,pending:0,nativeVersion:1,baseline:sha(server.book),baseBook:copy(server.book),logs:[],...copy(initial.sync||{})};
- const timers=new Map(),events={},messages=[],storage=new Map();let id=0,failStorageKey='';
+ const timers=new Map(),events={},messages=[],states=[],storage=new Map();let id=0,failStorageKey='';
  const context=vm.createContext({console,Date,Intl,URL,queueMicrotask,navigator:{onLine:true},document:{visibilityState:'visible',getElementById:()=>null,addEventListener:(n,f)=>events[n]=f},window:{addEventListener:(n,f)=>events[n]=f},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>{if(k===failStorageKey)throw new Error('QuotaExceeded');storage.set(k,v)}},setTimeout:(fn,delay)=>{const key={id:++id,unref(){}};timers.set(key,{fn,delay});return key;},clearTimeout:k=>timers.delete(k)});
  context.AndroidFiles={status:()=>JSON.stringify({configured:server.configured!==false,path:'打工人/工资账本.json'}),fingerprint:v=>createHash('sha256').update(v).digest('hex'),request(requestId,action,payload){
   queueMicrotask(()=>{if(action==='read'){reads++;if(server.readError){context.dagongrenNativeResult(requestId,{ok:false,error:server.readError});return;}if(server.exists===false){context.dagongrenNativeResult(requestId,{ok:true,data:{exists:false}});return;}context.dagongrenNativeResult(requestId,{ok:true,data:{exists:true,etag:'"'+server.version+'"',envelope:{format:'dagongren.webdav.v2',book:copy(server.book)}}});}
@@ -24,9 +24,9 @@ function device(server,initial=seed()){
   });
  }};
  vm.runInContext(code,context);
- const api={getBook:()=>current,replaceBook:n=>current=n,defaults,today:()=> '2026-10-25',storageBlocked:()=>false,editing:()=>editing,persist(){},render(){},toast:m=>messages.push(m),showModal:(t,b)=>modal=t+b,closeModal:()=>modal='',esc:x=>String(x)};
+ const api={onState:s=>states.push(copy(s)),getBook:()=>current,replaceBook:n=>current=n,defaults,today:()=> '2026-10-25',storageBlocked:()=>false,editing:()=>editing,interacting:()=>interacting,persist(){},render(){},toast:m=>messages.push(m),showModal:(t,b)=>modal=t+b,closeModal:()=>modal='',esc:x=>String(x)};
  const sync=context.createSync(api);
- return {sync,get:()=>current,failStorage:key=>failStorageKey=key,storage,modal:()=>modal,messages,context,events,setEditing:v=>editing=v,reads:()=>reads,writes:()=>writes,async flush(delay){for(const [k,t] of [...timers])if(t.delay===delay){timers.delete(k);t.fn();}await new Promise(r=>setImmediate(r));}};
+ return {sync,states,get:()=>current,failStorage:key=>failStorageKey=key,storage,modal:()=>modal,messages,context,events,setEditing:v=>editing=v,setInteracting:v=>interacting=v,reads:()=>reads,writes:()=>writes,async flush(delay){for(const [k,t] of [...timers])if(t.delay===delay){timers.delete(k);t.fn();}await new Promise(r=>setImmediate(r));}};
 }
 test('双设备不同新增自动合并且不重复',async()=>{const s={book:seed(),version:1},a=device(s),b=device(s);a.get().months['2026-10'].subsidies.push(entry('a'));b.get().months['2026-10'].subsidies.push(entry('b',20000));await a.sync.run();await b.sync.run();await a.sync.run('normal',true);for(const d of [a,b])assert.deepEqual([...d.get().months['2026-10'].subsidies].map(x=>x.id).sort(),['a','b']);assert.equal(s.book.months['2026-10'].subsidies.length,2);assert.equal(a.modal(),'');assert.equal(b.modal(),'');a.sync.dispose();b.sync.dispose();});
 test('未编辑设备通过前台轮询收到远端新增',async()=>{const s={book:seed(),version:1},a=device(s),b=device(s);await a.sync.run();b.get().months['2026-10'].subsidies.push(entry('remote'));await b.sync.run();const n=a.reads();await a.flush(30000);assert.ok(a.reads()>n);assert.equal(a.get().months['2026-10'].subsidies[0].id,'remote');a.sync.dispose();b.sync.dispose();});
@@ -97,4 +97,49 @@ test('一并清理保留原来关闭的自动同步开关，取消和云端失�
    await a.sync.reviewCleanup({scope:'month',month:'2026-10'});assert.equal(await a.sync.confirmCleanup(),true);assert.equal(a.get().sync.auto,auto);assert.equal(a.get().sync.pausedByCleanup,false);
   }finally{a.sync.dispose();}
  }
+});
+
+
+test('自动同步先报告执行中，只有远端确认完成才报告成功',async()=>{
+ const s={book:seed(),version:1},a=device(s);
+ try{const task=a.sync.run('normal',true);assert.equal(a.states.at(-1).state,'syncing');assert.equal(a.states.at(-1).source,'auto');const result=await task;assert.equal(result.state,'success');assert.deepEqual(a.states.map(x=>x.state),['syncing','success']);assert.equal(a.reads(),1);assert.equal(a.writes(),0);}
+ finally{a.sync.dispose();}
+});
+test('手动下拉加入在途自动同步，不重复请求并保持手动反馈来源',async()=>{
+ const s={book:seed(),version:1},a=device(s);
+ try{const auto=a.sync.run('normal',true),pull=a.sync.run('normal',false,{source:'pull'});assert.equal(auto,pull);assert.equal(a.sync.feedback().source,'pull');assert.equal((await pull).state,'success');assert.equal(a.sync.feedback().source,'pull');assert.equal(a.reads(),1);}
+ finally{a.sync.dispose();}
+});
+test('失败不会出现成功标识，后续重试成功能清除失败状态',async()=>{
+ const s={book:seed(),version:1,readError:'网络中断，未完成同步'},a=device(s);
+ try{const before=copy(a.get());assert.equal((await a.sync.run('normal',false,{source:'pull'})).state,'error');assert.equal(a.states.some(x=>x.state==='success'),false);assert.deepEqual(a.get().months,before.months);delete s.readError;assert.equal((await a.sync.run()).state,'success');}
+ finally{a.sync.dispose();}
+});
+test('关闭自动同步和界面动效后手动下拉仍完成双向同步且不改开关',async()=>{
+ const initial=seed();initial.defaults.motion=false;initial.sync={auto:false};const s={book:copy(initial),version:1},a=device(s,initial);
+ try{s.book.months['2026-10'].subsidies.push(entry('pull-while-disabled'));s.version++;const result=await a.sync.run('normal',false,{source:'pull'});assert.equal(result.state,'success');assert.equal(result.source,'pull');assert.equal(a.get().sync.auto,false);assert.equal(a.get().defaults.motion,false);assert.equal(a.get().months['2026-10'].subsidies[0].id,'pull-while-disabled');}
+ finally{a.sync.dispose();}
+});
+test('未配置、离线和正在编辑时均不伪报云端同步成功',async()=>{
+ for(const condition of ['unconfigured','offline','editing']){const s={book:seed(),version:1,configured:condition!=='unconfigured'},a=device(s);
+  try{if(condition==='offline')a.context.navigator.onLine=false;if(condition==='editing')a.setEditing(true);const result=await a.sync.run('normal',false,{source:'pull'});assert.ok(['error','attention'].includes(result.state));assert.equal(a.reads(),0);assert.equal(a.states.some(x=>x.state==='success'),false);}
+  finally{a.sync.dispose();}
+ }
+});
+test('同笔冲突等待确认时返回待处理状态，保留双方记录',async()=>{
+ const initial=seed();initial.months['2026-10'].subsidies=[entry('same')];const s={book:copy(initial),version:1},a=device(s,initial);
+ try{a.get().months['2026-10'].subsidies[0].amountCents=20000;s.book.months['2026-10'].subsidies[0].amountCents=30000;s.version++;const result=await a.sync.run('normal',false,{source:'pull'});assert.equal(result.state,'attention');assert.equal(a.states.some(x=>x.state==='success'),false);assert.equal(a.writes(),0);assert.equal(a.get().months['2026-10'].subsidies[0].amountCents,20000);assert.equal(s.book.months['2026-10'].subsidies[0].amountCents,30000);}
+ finally{a.sync.dispose();}
+});
+
+ test('手指正在操作时自动同步延后，手势结束后再读取云端',async()=>{
+ const s={book:seed(),version:1},a=device(s);
+ try{await new Promise(r=>setImmediate(r));a.setInteracting(true);await a.sync.run('normal',true);assert.equal(a.reads(),0);assert.equal(a.states.some(x=>x.state==='syncing'),false);a.setInteracting(false);await a.flush(150);assert.equal(a.reads(),1);assert.equal(a.sync.feedback().state,'success');}
+ finally{a.sync.dispose();}
+});
+
+ test('同步成功后新增待上传记录会清除绿色成功态，补传确认后再恢复',async()=>{
+ const s={book:seed(),version:1},a=device(s);
+ try{await a.sync.run();assert.equal(a.sync.feedback().state,'success');a.get().months['2026-10'].subsidies.push(entry('after-success'));a.get().sync.pending=1;assert.equal(a.sync.feedback().state,'idle');assert.match(a.sync.feedback().message,/待同步/);await a.sync.run('normal',false,{source:'pull'});assert.equal(a.sync.feedback().state,'success');assert.equal(s.book.months['2026-10'].subsidies[0].id,'after-success');}
+ finally{a.sync.dispose();}
 });

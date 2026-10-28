@@ -56,10 +56,18 @@ public class AppSmokeTest {
         });
         return found.get();
     }
-    private String evaluate(ActivityScenario<MainActivity> scenario,String script) throws Exception {
+    private String evaluate(ActivityScenario<MainActivity> scenario,String script) throws Exception {return evaluate(scenario,script,false);}
+    private String evaluateLoading(ActivityScenario<MainActivity> scenario,String script) throws Exception {return evaluate(scenario,script,true);}
+    private String evaluate(ActivityScenario<MainActivity> scenario,String script,boolean observeLoading) throws Exception {
         CountDownLatch latch=new CountDownLatch(1);AtomicReference<String> result=new AtomicReference<>();
-        if(!withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);if(web==null||web.getProgress()<100){result.set("null");latch.countDown();return;}web.evaluateJavascript(script,value->{result.set(value);latch.countDown();});}))return "null";
+        if(!withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);if(web==null||(!observeLoading&&web.getProgress()<100)){result.set("null");latch.countDown();return;}web.evaluateJavascript(script,value->{result.set(value);latch.countDown();});}))return "null";
         assertTrue("WebView evaluation timed out: "+script,latch.await(25,TimeUnit.SECONDS));return result.get();
+    }
+    private void waitTrueLoading(ActivityScenario<MainActivity> scenario,String script) throws Exception {
+        long deadline=System.currentTimeMillis()+20000;String last="";
+        while(System.currentTimeMillis()<deadline){last=evaluateLoading(scenario,script);if("true".equals(last))return;Thread.sleep(100);}
+        screenshot("startup-condition-failed");
+        fail("Startup condition did not become true: "+script+"; last="+last+"; "+evaluateLoading(scenario,"JSON.stringify({observed:window.__launchObserved,samples:window.__launchBlendSamples,phase:document.querySelector('.launch-page')?.dataset.phase})"));
     }
     private void waitTrue(ActivityScenario<MainActivity> scenario,String script) throws Exception {
         long deadline=System.currentTimeMillis()+20000;String last="";
@@ -68,7 +76,7 @@ public class AppSmokeTest {
             Thread.sleep(150);
         }
         screenshot("condition-failed");
-        String details=evaluate(scenario,"JSON.stringify({view:document.querySelector('.bottom-nav [aria-current=page]')?.dataset.view,classes:document.getElementById('app').className,modal:document.getElementById('modal-title')?.textContent,forms:[...document.querySelectorAll('#modal-root form')].map(f=>f.id),pointers:window.__pointerEvents,swipe:window.__lastSwipeTarget,viewport:[innerWidth,innerHeight,visualViewport.height],keyboard:document.body.classList.contains('keyboard-open'),focused:document.activeElement.id,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,motion:JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion,introAllowed:AndroidFiles.shouldPlayIntro(),rects:['.modal','.modal-body','.modal-footer','#company-name'].map(s=>{const e=document.querySelector(s);return e?{s,top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom}:null})})");
+        String details=evaluate(scenario,"JSON.stringify({view:document.querySelector('.bottom-nav [aria-current=page]')?.dataset.view,classes:document.getElementById('app').className,modal:document.getElementById('modal-title')?.textContent,forms:[...document.querySelectorAll('#modal-root form')].map(f=>f.id),pointers:window.__pointerEvents,swipe:window.__lastSwipeTarget,viewport:[innerWidth,innerHeight,visualViewport.height],keyboard:document.body.classList.contains('keyboard-open'),focused:document.activeElement.id,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,motion:JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion,introAllowed:AndroidFiles.shouldPlayIntro(),pull:{state:document.querySelector('.pull-refresh')?.dataset.state,hidden:document.querySelector('.pull-refresh')?.hidden,cloud:document.querySelector('.cloud-sync-badge')?.dataset.state,source:document.querySelector('.cloud-sync-badge')?.dataset.source,reads:window.__reviewReads,events:window.__pullTouchEvents},rects:['.modal','.modal-body','.modal-footer','#company-name'].map(s=>{const e=document.querySelector(s);return e?{s,top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom}:null})})");
         fail("Condition did not become true: "+script+"; last result: "+last+"; "+details);
     }
     private void waitReady(ActivityScenario<MainActivity> scenario) throws Exception {
@@ -97,7 +105,7 @@ public class AppSmokeTest {
     }
     private void paintedScreenshot(ActivityScenario<MainActivity> scenario,String name) throws Exception {
         dismissEmulatorLauncherAnr();
-        waitTrue(scenario,"!document.querySelector('.data-chart .number-roll-strip,.calendar-day .number-roll-strip')");
+        waitTrue(scenario,"!document.querySelector('#app .data-chart .number-roll-strip,.calendar-day .number-roll-strip')");
         evaluate(scenario,"window.__captureInfiniteAnimations=document.getAnimations().filter(a=>a.playState==='running'&&a.effect?.getTiming().iterations===Infinity);for(const a of window.__captureInfiniteAnimations)a.pause();window.__upgradePaintReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>{window.__upgradePaintReady=true;}))");
         try{
             waitTrue(scenario,"window.__upgradePaintReady===true");
@@ -116,9 +124,9 @@ public class AppSmokeTest {
             resetBook(scenario);
             evaluate(scenario,"const defaults={salaryCents:600001,company:'周期图表验收',joinDate:'2026-09-21',periodMode:'custom',periodStartDay:21,payday:25,motion:true};const r=()=>({...defaults,leaves:[],overtime:[],subsidies:[],deductions:[],advances:[],payments:[]});const sept=r(),oct=r();sept.payments=[{id:'p',date:'2026-10-22',amountCents:200000,periodStart:'2026-09-21',periodEnd:'2026-10-20'}];sept.advances=[{id:'a',date:'2026-10-22',amountCents:100000,periodStart:'2026-09-21',periodEnd:'2026-10-20'}];oct.leaves=[{id:'l',date:'2026-10-22',days:.5,deduct:true}];oct.overtime=[{id:'o',date:'2026-10-23',mode:'custom',amountCents:8000}];oct.subsidies=[{id:'s',date:'2026-10-23',amountCents:20000,category:'餐补'}];oct.deductions=[{id:'d',date:'2026-10-24',amountCents:3000,category:'住宿费'}];localStorage.setItem('dagongren.paybook.v1',JSON.stringify({version:2,defaults,months:{'2026-09':sept,'2026-10':oct},excludedMonths:[],sync:{auto:false,nativeVersion:1,pending:0,logs:[]}}))");
             scenario.recreate();waitReady(scenario);
-            waitTrue(scenario,"Boolean(document.querySelector('.settlement-chart .chart-ring-fill'))");
+            waitTrue(scenario,"Boolean(document.querySelector('#app .settlement-chart .chart-ring-fill'))");
             assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth"));
-            waitTrue(scenario,"[...document.querySelectorAll('.data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
+            waitTrue(scenario,"[...document.querySelectorAll('#app .data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
             paintedScreenshot(scenario,"charts-home");
             evaluate(scenario,"document.querySelector('[data-action=home-period-picker]').click();document.querySelector('[data-action=choose-home-period][data-month=\"2026-09\"]').click();document.querySelector('.month-account-head [data-metric=earned]').click()");
             assertEquals("600001",evaluate(scenario,"Number(document.querySelector('.metric-total').dataset.total)"));
@@ -130,40 +138,40 @@ public class AppSmokeTest {
             assertEquals("600001",evaluate(scenario,"Number(document.querySelector('.metric-total').dataset.total)"));
             evaluate(scenario,"globalThis.dagongrenBack();document.querySelector('[data-view=records]').click()");
             waitTrue(scenario,"Boolean(document.querySelector('.annual-chart .wage-plot'))");
-            waitTrue(scenario,"[...document.querySelectorAll('.data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
+            waitTrue(scenario,"[...document.querySelectorAll('#app .data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
             paintedScreenshot(scenario,"charts-records");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click()");
-            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&Boolean(document.querySelector('.employment-chart'))&&!document.querySelector('.record-mix-chart')");
-            waitTrue(scenario,"!document.querySelector('.employment-chart .number-roll-strip')");
-            assertEquals("true",evaluate(scenario,"document.querySelectorAll('.employment-metrics [data-stat]').length===3"));
-            assertEquals("true",evaluate(scenario,"(()=>{const e=document.querySelector('.employment-chart'),days=Math.round((Date.parse(e.dataset.asOf)-Date.parse('2026-09-21'))/86400000)+1;return parseInt(e.querySelector('[data-stat=days]').textContent)===days})()"));
-            waitTrue(scenario,"[...document.querySelectorAll('.data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&Boolean(document.querySelector('#app .employment-chart'))&&!document.querySelector('#app .record-mix-chart')");
+            waitTrue(scenario,"!document.querySelector('#app .employment-chart .number-roll-strip')");
+            assertEquals("true",evaluate(scenario,"document.querySelectorAll('#app .employment-metrics [data-stat]').length===3"));
+            assertEquals("true",evaluate(scenario,"(()=>{const e=document.querySelector('#app .employment-chart'),days=Math.round((Date.parse(e.dataset.asOf)-Date.parse('2026-09-21'))/86400000)+1;return parseInt(e.querySelector('[data-stat=days]').textContent)===days})()"));
+            waitTrue(scenario,"[...document.querySelectorAll('#app .data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
             paintedScreenshot(scenario,"charts-profile");
             evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click()");
-            waitTrue(scenario,"document.querySelectorAll('.record-mix-bar .mix-segment').length===6&&!document.querySelector('.employment-chart')");
-            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.mix-segment')].reduce((n,e)=>n+Number(e.dataset.count),0)===6&&document.querySelectorAll('.profile-chart-panel').length===1"));
-            evaluate(scenario,"document.querySelector('.record-mix-chart').scrollIntoView({block:'start'})");
+            waitTrue(scenario,"document.querySelectorAll('#app .record-mix-bar .mix-segment').length===6&&!document.querySelector('#app .employment-chart')");
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('#app .mix-segment')].reduce((n,e)=>n+Number(e.dataset.count),0)===6&&document.querySelectorAll('#app .profile-chart-panel').length===1"));
+            evaluate(scenario,"document.querySelector('#app .record-mix-chart').scrollIntoView({block:'start'})");
             paintedScreenshot(scenario,"charts-profile-records");
             evaluate(scenario,"document.querySelector('[data-view=calendar]').click()");
             selectCalendarMonth(scenario,"2021-02");
-            assertEquals("28",evaluate(scenario,"document.querySelector('.calendar-days').children.length"));
-            evaluate(scenario,"window.__fourWeekHeight=document.querySelector('.calendar-days').getBoundingClientRect().height;document.querySelector('.calendar-panel').scrollIntoView({block:'start'})");
+            assertEquals("28",evaluate(scenario,"document.querySelector('#app .calendar-days').children.length"));
+            evaluate(scenario,"window.__fourWeekHeight=document.querySelector('#app .calendar-days').getBoundingClientRect().height;document.querySelector('.calendar-panel').scrollIntoView({block:'start'})");
             paintedScreenshot(scenario,"calendar-four-weeks");
             selectCalendarMonth(scenario,"2024-02");
-            assertEquals("35",evaluate(scenario,"document.querySelector('.calendar-days').children.length"));
+            assertEquals("35",evaluate(scenario,"document.querySelector('#app .calendar-days').children.length"));
             evaluate(scenario,"document.querySelector('.calendar-panel').scrollIntoView({block:'start'})");
             paintedScreenshot(scenario,"calendar-five-weeks");
             selectCalendarMonth(scenario,"2026-08");
-            assertEquals("42",evaluate(scenario,"document.querySelector('.calendar-days').children.length"));
-            assertEquals("true",evaluate(scenario,"document.querySelector('.calendar-days').getBoundingClientRect().height>window.__fourWeekHeight*1.4"));
+            assertEquals("42",evaluate(scenario,"document.querySelector('#app .calendar-days').children.length"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('#app .calendar-days').getBoundingClientRect().height>window.__fourWeekHeight*1.4"));
             evaluate(scenario,"document.querySelector('.calendar-panel').scrollIntoView({block:'start'})");
             paintedScreenshot(scenario,"calendar-six-weeks");
             selectCalendarMonth(scenario,"2026-10");
-            waitTrue(scenario,"document.querySelectorAll('.daily-chart .chart-bar').length>0");
-            waitTrue(scenario,"!document.querySelector('.calendar-summary .number-roll-strip')");
-            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.daily-chart .chart-bar')].reduce((n,e)=>n+Number(e.dataset.amount),0)===Math.round(Number(document.querySelector('.calendar-summary button strong').textContent.replace(/[^0-9.-]/g,''))*100)"));
-            evaluate(scenario,"document.querySelector('.daily-chart').scrollIntoView({block:'start'})");
-            waitTrue(scenario,"[...document.querySelectorAll('.data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
+            waitTrue(scenario,"document.querySelectorAll('#app .daily-chart .chart-bar').length>0");
+            waitTrue(scenario,"!document.querySelector('#app .calendar-summary .number-roll-strip')");
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('#app .daily-chart .chart-bar')].reduce((n,e)=>n+Number(e.dataset.amount),0)===Math.round(Number(document.querySelector('#app .calendar-summary button strong').textContent.replace(/[^0-9.-]/g,''))*100)"));
+            evaluate(scenario,"document.querySelector('#app .daily-chart').scrollIntoView({block:'start'})");
+            waitTrue(scenario,"[...document.querySelectorAll('#app .data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
             paintedScreenshot(scenario,"charts-calendar");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('[data-view=home]').click()");
             assertEquals("\"none\"",evaluate(scenario,"getComputedStyle(document.querySelector('.chart-ring-fill')).animationName"));
@@ -211,8 +219,8 @@ public class AppSmokeTest {
             scenario.recreate();waitReady(scenario);
             evaluate(scenario,"document.querySelector('[data-view=calendar]').click()");
             selectCalendarMonth(scenario,"2026-10");
-            assertEquals("true",evaluate(scenario,"(()=>{const cell=date=>document.querySelector('.calendar-day[data-date=\"'+date+'\"] .day-wage'),rgb=e=>getComputedStyle(e).color.match(/[0-9.]+/g).map(Number),p=cell('2026-10-01'),n=cell('2026-10-02'),z=cell('2026-10-03'),f=cell('2026-10-31'),pc=rgb(p),nc=rgb(n);return Number(p.textContent)===100&&Number(n.textContent)===-200&&Number(z.textContent)===0&&f.textContent==='—'&&pc[1]>pc[0]&&pc[1]>pc[2]&&nc[0]>nc[1]&&nc[0]>nc[2]&&getComputedStyle(z).color===getComputedStyle(f).color&&z.classList.contains('wage-neutral')})()"));
-            assertEquals("true",evaluate(scenario,"(()=>{const today=document.querySelector('.calendar-day.today .day-wage');const c=getComputedStyle(today).color.match(/[0-9.]+/g).map(Number);return c[1]>c[0]&&c[1]>c[2]})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const cell=date=>document.querySelector('#app .calendar-day[data-date=\"'+date+'\"] .day-wage'),rgb=e=>getComputedStyle(e).color.match(/[0-9.]+/g).map(Number),p=cell('2026-10-01'),n=cell('2026-10-02'),z=cell('2026-10-03'),f=cell('2026-10-31'),pc=rgb(p),nc=rgb(n);return Number(p.textContent)===100&&Number(n.textContent)===-200&&Number(z.textContent)===0&&f.textContent==='—'&&pc[1]>pc[0]&&pc[1]>pc[2]&&nc[0]>nc[1]&&nc[0]>nc[2]&&getComputedStyle(z).color===getComputedStyle(f).color&&z.classList.contains('wage-neutral')})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const today=document.querySelector('#app .calendar-day.today .day-wage');const c=getComputedStyle(today).color.match(/[0-9.]+/g).map(Number);return c[1]>c[0]&&c[1]>c[2]})()"));
             assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth"));
             evaluate(scenario,"document.querySelector('.calendar-panel').scrollIntoView({block:'start'})");
             paintedScreenshot(scenario,"calendar-signed-wages");
@@ -237,8 +245,8 @@ public class AppSmokeTest {
             resetBook(scenario);
             assertEquals("4",evaluate(scenario,"document.querySelectorAll('.bottom-nav button').length"));
             assertEquals("0",evaluate(scenario,"JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.salaryCents"));
-            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.view-home [data-action=home-current]'))&&!document.querySelector('.view-home [data-action=salary-settings]')"));
-            evaluate(scenario,"document.querySelector('.bottom-nav [data-view=settings]').click();document.querySelector('.view-settings [data-action=salary-settings]').click()");
+            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('#app .view-home [data-action=home-current]'))&&!document.querySelector('#app .view-home [data-action=salary-settings]')"));
+            evaluate(scenario,"document.querySelector('.bottom-nav [data-view=settings]').click();document.querySelector('#app .view-settings [data-action=salary-settings]').click()");
             assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.modal-footer button[form=salary-form]'))"));
             evaluate(scenario,"document.querySelector('#salary-form [name=salary]').value='6500';document.querySelector('.modal-footer button[type=submit]').click()");
             assertEquals("650000",evaluate(scenario,"JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.salaryCents"));
@@ -375,37 +383,33 @@ public class AppSmokeTest {
         android.content.Context target=InstrumentationRegistry.getInstrumentation().getTargetContext();
         target.startActivity(new android.content.Intent(target,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK));
         try{
-            waitTrue(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1);if(!entry)return false;window.__launchObserved=entry.detail;if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='fading'){const rect=page.getBoundingClientRect(),style=getComputedStyle(page);window.__launchBlendSamples.push({opacity:Number(style.opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height,left:rect.left,top:rect.top,transform:style.transform,radius:style.borderRadius})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
-            assertEquals("1",evaluate(scenario,"window.__launchObserved.surfaces"));
-            assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertTrue(activity.wasLaunchAmbientStarted());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
-            assertEquals("true",evaluate(scenario,"window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='beta.1'&&window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&Boolean(document.querySelector('.launch-ledger'))&&!document.querySelector('.launch-picture')"));
-            assertEquals("false",evaluate(scenario,"window.__launchObserved.oldBrand"));
-            assertEquals("true",evaluate(scenario,"window.__launchObserved.inert"));
-            assertEquals("true",evaluate(scenario,"window.__launchObserved.animated&&['launch-soft-in','launch-line','launch-bar','launch-sheen','launch-orbit','launch-dot'].every(name=>window.__launchObserved.animationNames.includes(name))"));
-            waitTrue(scenario,"performance.getEntriesByName('dagongren.app.render').length>0");
-            assertEquals("true",evaluate(scenario,"(()=>{const created=performance.getEntriesByName('dagongren.launch.created')[0],painted=performance.getEntriesByName('dagongren.launch.painted')[0],render=performance.getEntriesByName('dagongren.app.render')[0],playing=performance.getEntriesByName('dagongren.launch.playing')[0];return !!created&&!!painted&&!!render&&created.startTime<=painted.startTime&&painted.startTime<=playing.startTime&&playing.startTime<render.startTime})()"));
-            double playingSecond=(Double.parseDouble(evaluate(scenario,"window.__launchObserved.at"))-recordingStarted)/1000.0;
+            waitTrueLoading(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1);if(!entry)return false;window.__launchObserved=entry.detail;if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='fading'){const rect=page.getBoundingClientRect(),style=getComputedStyle(page);window.__launchBlendSamples.push({opacity:Number(style.opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height,left:rect.left,top:rect.top,transform:style.transform,radius:style.borderRadius})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
+            assertEquals("1",evaluateLoading(scenario,"window.__launchObserved.surfaces"));
+            assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertFalse(activity.hasBitmapLaunchCover());assertTrue(activity.getWindow().getDecorView().isHardwareAccelerated());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
+            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.4'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface"));
+            assertEquals("false",evaluateLoading(scenario,"window.__launchObserved.oldBrand"));
+            assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.inert"));
+            assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.animated&&['launch-soft-in','launch-line','launch-bar','launch-sheen','launch-orbit','launch-dot'].every(name=>window.__launchObserved.animationNames.includes(name))"));
+            waitTrueLoading(scenario,"performance.getEntriesByName('dagongren.app.render').length>0");
+            assertEquals("true",evaluateLoading(scenario,"(()=>{const created=performance.getEntriesByName('dagongren.launch.created')[0],painted=performance.getEntriesByName('dagongren.launch.painted')[0],render=performance.getEntriesByName('dagongren.app.render')[0],playing=performance.getEntriesByName('dagongren.launch.playing')[0];return !!created&&!!painted&&!!render&&created.startTime<=painted.startTime&&painted.startTime<=playing.startTime&&playing.startTime<render.startTime})()"));
+            double playingSecond=(Double.parseDouble(evaluateLoading(scenario,"window.__launchObserved.at"))-recordingStarted)/1000.0;
             android.util.Log.i("DagongrenLaunchReview","PLAYING_SECOND="+playingSecond);
-            waitTrue(scenario,"window.__launchBlendSamples.some(frame=>frame.opacity>0&&frame.opacity<1&&frame.homeOpacity===1&&Math.abs(frame.width-innerWidth)<1&&Math.abs(frame.height-innerHeight)<1)");
-            waitTrue(scenario,"!document.querySelector('.launch-page')");
-            double fadingSecond=(Double.parseDouble(evaluate(scenario,"performance.timeOrigin+performance.getEntriesByName('dagongren.launch.fading').at(-1).startTime"))-recordingStarted)/1000.0;
+            waitTrueLoading(scenario,"window.__launchBlendSamples.some(frame=>frame.opacity>0&&frame.opacity<1&&frame.homeOpacity===1&&Math.abs(frame.width-innerWidth)<1&&Math.abs(frame.height-innerHeight)<1)");
+            waitTrueLoading(scenario,"!document.querySelector('.launch-page')");
+            double fadingSecond=(Double.parseDouble(evaluateLoading(scenario,"performance.timeOrigin+performance.getEntriesByName('dagongren.launch.fading').at(-1).startTime"))-recordingStarted)/1000.0;
             android.util.Log.i("DagongrenLaunchReview","FADING_SECOND="+fadingSecond);
-            assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.launch.fading').at(-1)?.detail,s=window.__launchBlendSamples;return !!d&&d.duration===640&&d.hold===1700&&d.surfaces===1&&d.fullScreen&&d.homeReady&&s.length>=3&&s.every((f,i)=>f.homeOpacity===1&&Math.abs(f.width-innerWidth)<1&&Math.abs(f.height-innerHeight)<1&&f.left===0&&f.top===0&&f.transform==='none'&&f.radius==='0px'&&(!i||f.opacity<=s[i-1].opacity+.001))})()"));
-            assertEquals("false",evaluate(scenario,"document.getElementById('app').inert"));
-            assertEquals("\"none\"",evaluate(scenario,"getComputedStyle(document.getElementById('view-content')).animationName"));
-            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.bottom-nav'))"));
-            waitTrue(scenario,"performance.getEntriesByName('dagongren.home.glare').length===1");
-            assertEquals("true",evaluate(scenario,"(()=>{const glare=performance.getEntriesByName('dagongren.home.glare')[0],launch=performance.getEntriesByName('dagongren.launch.fading').at(-1);return performance.getEntriesByName('dagongren.home.self-check').length===0&&glare.detail.afterLaunch&&glare.detail.rolling===0&&glare.detail.runs===1&&glare.detail.direction==='left-to-right'&&glare.detail.duration===1000&&glare.detail.from.includes('skewX(-25deg)')&&glare.startTime>=launch.startTime+launch.detail.duration&&glare.startTime<launch.startTime+launch.detail.duration+250})()"));
-            evaluate(scenario,"window.__selfCheckBook=localStorage.getItem('dagongren.paybook.v1')");
-            double glareSecond=(Double.parseDouble(evaluate(scenario,"performance.getEntriesByName('dagongren.home.glare')[0].detail.at"))-recordingStarted)/1000.0;
-            android.util.Log.i("DagongrenLaunchReview","GLARE_SECOND="+glareSecond);
-            waitTrue(scenario,"performance.getEntriesByName('dagongren.home.glare.complete').length===1&&!document.querySelector('.hero-startup-glare')");
-            paintedScreenshot(scenario,"startup-home");
+            android.util.Log.i("DagongrenLaunchReview","BLEND_REVIEW="+evaluateLoading(scenario,"JSON.stringify({detail:performance.getEntriesByName('dagongren.launch.fading').at(-1)?.detail,viewport:[innerWidth,innerHeight],sampleCount:window.__launchBlendSamples.length,samples:window.__launchBlendSamples.slice(0,12)})"));
+            assertEquals("true",evaluateLoading(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.launch.fading').at(-1)?.detail,s=window.__launchBlendSamples;return !!d&&d.duration===640&&d.hold===1700&&d.surfaces===1&&d.fullScreen&&d.homeReady&&s.length>=3&&s.every((f,i)=>f.homeOpacity===1&&Math.abs(f.width-innerWidth)<1&&Math.abs(f.height-innerHeight)<1&&f.left===0&&f.top===0&&f.transform==='none'&&f.radius==='0px'&&(!i||f.opacity<=s[i-1].opacity+.001))})()"));
+            assertEquals("false",evaluateLoading(scenario,"document.getElementById('app').inert"));
+            assertEquals("\"none\"",evaluateLoading(scenario,"getComputedStyle(document.getElementById('view-content')).animationName"));
+            assertEquals("true",evaluateLoading(scenario,"Boolean(document.querySelector('.bottom-nav'))"));
+            assertEquals("true",evaluateLoading(scenario,"performance.getEntriesByName('dagongren.home.glare').length===0&&!document.querySelector('.hero-startup-glare')"));
+            evaluateLoading(scenario,"window.__selfCheckBook=localStorage.getItem('dagongren.paybook.v1')");
             device.pressHome();
             target.startActivity(new android.content.Intent(target,MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
-            waitTrue(scenario,"Boolean(document.querySelector('.view-home'))&&!document.querySelector('.launch-page')&&!document.getElementById('app').inert");
+            waitTrueLoading(scenario,"Boolean(document.querySelector('#app .view-home'))&&!document.querySelector('.launch-page')&&!document.getElementById('app').inert");
             awaitInputWindow(scenario);dismissEmulatorLauncherAnr();
-            assertEquals("true",evaluate(scenario,"performance.getEntriesByName('dagongren.home.self-check').length===0&&performance.getEntriesByName('dagongren.home.glare').length===1&&performance.getEntriesByName('dagongren.home.glare.complete').length===1&&localStorage.getItem('dagongren.paybook.v1')===window.__selfCheckBook"));
+            assertEquals("true",evaluateLoading(scenario,"performance.getEntriesByName('dagongren.home.self-check').length===0&&performance.getEntriesByName('dagongren.home.glare').length===0&&performance.getEntriesByName('dagongren.home.glare.complete').length===0&&localStorage.getItem('dagongren.paybook.v1')===window.__selfCheckBook"));
         } finally {
             withActivity(activity->activity.finish());
             recording.join(35000);
@@ -467,15 +471,15 @@ public class AppSmokeTest {
             waitTrue(scenario,"!matchMedia('(prefers-reduced-motion: reduce)').matches");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=salary-settings]').click();document.getElementById('salary').value='6000';document.querySelector('.modal-footer button[type=submit]').click()");
             evaluate(scenario,"document.querySelector('[data-action=company-settings]').click();const d=new Date();d.setUTCMonth(0,1);d.setUTCFullYear(d.getUTCFullYear()-1);document.getElementById('join-date').value=d.toISOString().slice(0,10);document.querySelector('.modal-footer button[type=submit]').click();document.querySelector('[data-view=home]').click()");
-            assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();Boolean(document.querySelector('.number-roll-strip')) && [...document.querySelectorAll('.number-roll-strip')].every(e=>Number(e.style.getPropertyValue('--roll-steps'))>0&&Number(e.style.getPropertyValue('--roll-steps'))<=19)"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();Boolean(document.querySelector('#app .number-roll-strip')) && [...document.querySelectorAll('#app .number-roll-strip')].every(e=>Number(e.style.getPropertyValue('--roll-steps'))>0&&Number(e.style.getPropertyValue('--roll-steps'))<=19)"));
             evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
-            waitTrue(scenario,"!document.querySelector('.number-roll-strip')");
-            evaluate(scenario,"document.querySelector('[data-view=calendar]').click();window.__calendarHeight=document.querySelector('.calendar-days').getBoundingClientRect().height;for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
-            assertEquals("true",evaluate(scenario,"(()=>{const m=document.querySelector('[data-calendar-month]').dataset.calendarMonth,[y,n]=m.split('-').map(Number),first=(new Date(Date.UTC(y,n-1,1)).getUTCDay()+6)%7,days=new Date(Date.UTC(y,n,0)).getUTCDate();return document.querySelector('.calendar-days').children.length===Math.ceil((first+days)/7)*7})()"));
-            assertEquals("true",evaluate(scenario,"Math.abs(document.querySelector('.calendar-days').getBoundingClientRect().height-window.__calendarHeight)<1"));
-            waitTrue(scenario,"!document.querySelector('.calendar-day .number-roll-strip')");
-            assertEquals("0",evaluate(scenario,"document.querySelectorAll('.calendar-day .number-roll-strip').length"));
-            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.calendar-day[data-date]')].every(e=>Number(e.dataset.date.slice(8))===Number(e.querySelector('.day-number').childNodes[0].nodeValue))"));
+            waitTrue(scenario,"!document.querySelector('#app .number-roll-strip')");
+            evaluate(scenario,"document.querySelector('[data-view=calendar]').click();window.__calendarHeight=document.querySelector('#app .calendar-days').getBoundingClientRect().height;for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();for(let i=0;i<5;i++)document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
+            assertEquals("true",evaluate(scenario,"(()=>{const m=document.querySelector('[data-calendar-month]').dataset.calendarMonth,[y,n]=m.split('-').map(Number),first=(new Date(Date.UTC(y,n-1,1)).getUTCDay()+6)%7,days=new Date(Date.UTC(y,n,0)).getUTCDate();return document.querySelector('#app .calendar-days').children.length===Math.ceil((first+days)/7)*7})()"));
+            assertEquals("true",evaluate(scenario,"Math.abs(document.querySelector('#app .calendar-days').getBoundingClientRect().height-window.__calendarHeight)<1"));
+            waitTrue(scenario,"!document.querySelector('#app .calendar-day .number-roll-strip')");
+            assertEquals("0",evaluate(scenario,"document.querySelectorAll('#app .calendar-day .number-roll-strip').length"));
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('#app .calendar-day[data-date]')].every(e=>Number(e.dataset.date.slice(8))===Number(e.querySelector('.day-number').childNodes[0].nodeValue))"));
             assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=calendar-today]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();"+rollingLayoutCheck(".calendar-summary .number")));
             assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.calendar-panel-header .month-display'))"));
             evaluate(scenario,"window.__beforeSwipe=document.querySelector('.month-display').textContent");
@@ -567,14 +571,14 @@ public class AppSmokeTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
             evaluate(scenario,"document.querySelector('[data-view=calendar]').click();document.querySelector('[data-action=month-picker]').click();while(!document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]')){const y=parseInt(document.querySelector('.month-year>span').textContent);document.querySelector('[data-action=picker-year][data-delta=\"'+(y<2027?1:-1)+'\"]').click()}document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]').click()");
-            assertEquals("28",evaluate(scenario,"document.querySelector('.calendar-days').children.length"));
+            assertEquals("28",evaluate(scenario,"document.querySelector('#app .calendar-days').children.length"));
             assertEquals("true",evaluate(scenario,"window.__reviewPush=(selector,delta,type)=>{\n const host=document.querySelector(selector),r=host.getBoundingClientRect(),viewport=type==='page'?document.documentElement:host.closest('.calendar-grid-viewport'),width=viewport.clientWidth,x=innerWidth*.5,y=Math.max(5,Math.min(innerHeight-120,r.top+25));\n const dispatch=(name,x,t)=>{const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerId:709,pointerType:'mouse',isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});host.dispatchEvent(e);};\n const nav=document.querySelector('.bottom-nav'),navRect=nav.getBoundingClientRect();dispatch('pointerdown',x,1000);dispatch('pointermove',x-delta*width*.55,2000);dispatch('pointerup',x-delta*width*.55,2400);\n const track=document.querySelector(type==='page'?'.page-swipe-track':'.calendar-swipe-track');if(!track)return false;\n const a=track.getAnimations()[0],out=track.children[0],next=track.children[1];if(!a)return false;a.pause();let samples=[];\n for(const progress of [0,.25,.5,.75,1]){a.currentTime=a.effect.getTiming().duration*progress;\n  const o=out.getBoundingClientRect(),n=next.getBoundingClientRect(),bar=nav.getBoundingClientRect(),v=type==='page'?{left:0,right:innerWidth}:viewport.getBoundingClientRect();\n  samples.push({progress,gap:Math.abs((n.left-o.left)-delta*width),navStable:document.querySelector('.bottom-nav')===nav&&Math.abs(bar.top-navRect.top)<.5&&getComputedStyle(nav).opacity==='1'&&getComputedStyle(nav).visibility==='visible'&&getComputedStyle(nav).backdropFilter==='none',transparent:[...track.querySelectorAll('.balance-primary,.balance-primary .number,.balance-primary .number span')].every(e=>getComputedStyle(e).backgroundColor==='rgba(0, 0, 0, 0)'),end:progress!==1||(Math.abs(n.left-v.left)<.6&&(delta>0?o.right<=v.left+.6:o.left>=v.right-.6)),navOutside:type!=='page'||track.parentElement.getBoundingClientRect().bottom<=navRect.top+.6});\n }\n window.__pushSamples=samples;window.__heldPush=a;window.__heldHeight=null;a.currentTime=a.effect.getTiming().duration*.5;\n return samples.every(s=>s.gap<.6&&s.navStable&&s.transparent&&s.end&&s.navOutside);\n};true"));
             for(int direction:new int[]{1,1,1,-1,-1,-1}){
                 evaluate(scenario,"document.querySelector('.calendar-grid-viewport').scrollIntoView({block:'center',behavior:'instant'})");
                 String diagnostic=evaluate(scenario,"window.__reviewPush('.calendar-days',"+direction+",'calendar');JSON.stringify(window.__pushSamples)");
                 assertEquals(diagnostic,"true",evaluate(scenario,"window.__pushSamples.every(s=>s.gap<.6&&s.navStable&&s.end)"));
                 evaluate(scenario,"window.__heldPush.finish();window.__heldHeight?.finish()");
-                waitTrue(scenario,"!document.querySelector('.calendar-swipe-track')&&getComputedStyle(document.querySelector('.calendar-days')).visibility==='visible'");
+                waitTrue(scenario,"!document.querySelector('.calendar-swipe-track')&&getComputedStyle(document.querySelector('#app .calendar-days')).visibility==='visible'");
                 assertEquals("true",evaluate(scenario,"(()=>{const p=document.querySelector('.calendar-grid-viewport'),g=p.querySelector('.calendar-days');return Math.abs(p.getBoundingClientRect().height-g.getBoundingClientRect().height)<.6&&[28,35,42].includes(g.children.length)&&!g.querySelector('.number-roll-strip')})()"));
             }
             paintedScreenshot(scenario,"calendar-four-weeks");
@@ -677,19 +681,19 @@ public class AppSmokeTest {
             waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
             assertEquals("true",evaluate(scenario,"!document.querySelector('.calendar-swipe-track')&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2027-02'"));
             evaluate(scenario,"window.__monthWidth=document.querySelector('.calendar-grid-viewport').clientWidth;window.__monthHeight=document.querySelector('.calendar-grid-viewport').getBoundingClientRect().height;window.__dragInput('pointerdown',250,300,2000,'.calendar-days');window.__dragInput('pointermove',250-window.__monthWidth*.5,300,3000)");nextGestureFrames(scenario);
-            assertEquals("true",evaluate(scenario,"(()=>{const p=document.querySelector('.calendar-grid-viewport'),t=p.querySelector('.calendar-swipe-track'),a=t.children[0].getBoundingClientRect(),b=t.children[1].getBoundingClientRect(),next=t.children[1].querySelector('.calendar-days').getBoundingClientRect().height;return Math.abs(new DOMMatrix(getComputedStyle(t).transform).m41+window.__monthWidth*.5)<.6&&Math.abs(a.right-b.left)<.6&&Math.abs(p.getBoundingClientRect().height-(window.__monthHeight+next)/2)<.7&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2027-02'})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const p=document.querySelector('.calendar-grid-viewport'),t=document.querySelector('.calendar-swipe-track'),a=t.children[0].getBoundingClientRect(),b=t.children[1].getBoundingClientRect(),next=t.children[1].querySelector('.calendar-days').getBoundingClientRect().height;return Math.abs(new DOMMatrix(getComputedStyle(t).transform).m41+window.__monthWidth*.5)<.6&&Math.abs(a.right-b.left)<.6&&Math.abs(p.getBoundingClientRect().height-(window.__monthHeight+next)/2)<.7&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2027-02'})()"));
             paintedScreenshot(scenario,"calendar-live-half-height");
             evaluate(scenario,"window.__dragInput('pointermove',250-window.__monthWidth*.15,300,4000);window.__dragInput('pointerup',250-window.__monthWidth*.15,300,4500)");waitTrue(scenario,"!document.querySelector('.calendar-swipe-track')");
             assertEquals("true",evaluate(scenario,"Math.abs(document.querySelector('.calendar-grid-viewport').getBoundingClientRect().height-window.__monthHeight)<.6&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2027-02'"));
             evaluate(scenario,"window.__dragInput('pointerdown',250,300,5000,'.calendar-days');window.__dragInput('pointermove',210,300,5040);window.__dragInput('pointerup',210,300,5050)");waitTrue(scenario,"!document.querySelector('.calendar-swipe-track')&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2027-03'");
-            assertEquals("true",evaluate(scenario,"document.querySelector('.calendar-days').children.length===35&&!document.querySelector('.calendar-day .number-roll-strip')"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('#app .calendar-days').children.length===35&&!document.querySelector('#app .calendar-day .number-roll-strip')"));
         }
     }
     @Test public void swipedChartsAnimateAndHomeCanReturnToCurrentMonth() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);assertEquals("true",evaluate(scenario,"window.__dragInput=(name,x,y,t,selector)=>{if(name==='pointerdown')window.__dragNode=document.querySelector(selector);const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:771,isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});window.__dragNode.dispatchEvent(e);};window.__nextFrames=()=>{window.__framesReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>window.__framesReady=true));};true"));
-            evaluate(scenario,"document.querySelector('.view-home [data-action=shift-month][data-delta=\"-1\"]').click();window.__beforeReturnBook=localStorage.getItem('dagongren.paybook.v1');document.querySelector('[data-action=home-current]').click()");
-            assertEquals("true",evaluate(scenario,"document.querySelector('.view-home .month-display').textContent.includes(new Date().getFullYear()+'年')&&document.querySelector('.view-home .month-display').textContent.includes((new Date().getMonth()+1)+'月')&&localStorage.getItem('dagongren.paybook.v1')===window.__beforeReturnBook"));
+            evaluate(scenario,"document.querySelector('#app .view-home [data-action=shift-month][data-delta=\"-1\"]').click();window.__beforeReturnBook=localStorage.getItem('dagongren.paybook.v1');document.querySelector('[data-action=home-current]').click()");
+            assertEquals("true",evaluate(scenario,"document.querySelector('#app .view-home .month-display').textContent.includes(new Date().getFullYear()+'年')&&document.querySelector('#app .view-home .month-display').textContent.includes((new Date().getMonth()+1)+'月')&&localStorage.getItem('dagongren.paybook.v1')===window.__beforeReturnBook"));
             evaluate(scenario,"window.__swipeChartSnapshot=null;window.__dragInput('pointerdown',300,100,0,'.topbar');window.__dragInput('pointermove',100,100,1000);window.__dragInput('pointerup',100,100,1400);document.querySelector('.page-swipe-track').getAnimations()[0].finished.then(()=>{window.__swipeChartSnapshot={count:document.querySelectorAll('#app .data-chart .number-roll-strip').length,view:document.querySelector('.bottom-nav [aria-current=page]').dataset.view}})");
             waitTrue(scenario,"window.__swipeChartSnapshot!==null");
             assertEquals("true",evaluate(scenario,"window.__swipeChartSnapshot.view==='calendar'&&window.__swipeChartSnapshot.count>0"));
@@ -709,38 +713,38 @@ public class AppSmokeTest {
                 evaluate(scenario,"document.querySelector('[data-action=choose-theme][data-theme="+theme+"]').click()");
                 assertEquals("\""+theme+"\"",evaluate(scenario,"document.body.dataset.themePreference"));
             assertEquals(expectedThemeBook,evaluate(scenario,"localStorage.getItem('dagongren.paybook.v1')"));
-            assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('.view-settings')).touchAction.includes('pan-y')"));
+            assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('#app .view-settings')).touchAction.includes('pan-y')"));
             assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.theme-gauge>svg,.theme-orbit>svg,.mix-orbit>svg')].every(e=>e.getBoundingClientRect().height>=70)"));
-            evaluate(scenario,"document.querySelector('.profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
+            evaluate(scenario,"document.querySelector('#app .profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 paintedScreenshot(scenario,"theme-"+theme+"-profile");
             evaluate(scenario,"document.querySelector('.app-info-footer').scrollIntoView({block:'center',behavior:'instant'})");
             waitTrue(scenario,"!document.getElementById('toast').classList.contains('show')");
-            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.3 正式版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.4 正式版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
                 paintedScreenshot(scenario,"theme-"+theme+"-copyright");
-            evaluate(scenario,"document.querySelector('.profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
+            evaluate(scenario,"document.querySelector('#app .profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 swipeRegion(scenario,".employment-progress",-1);
                 waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'&&!document.getElementById('app').classList.contains('page-transitioning')");
             assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth"));
                 paintedScreenshot(scenario,"theme-"+theme+"-records");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=profile-chart]').click()");
-            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('.record-mix-chart'))&&document.querySelectorAll('.record-type-row').length===6&&document.querySelectorAll('.profile-chart-panel').length===1"));
-            evaluate(scenario,"document.querySelector('.record-mix-chart').scrollIntoView({block:'start',behavior:'instant'})");
+            assertEquals("true",evaluate(scenario,"Boolean(document.querySelector('#app .record-mix-chart'))&&document.querySelectorAll('#app .record-type-row').length===6&&document.querySelectorAll('#app .profile-chart-panel').length===1"));
+            evaluate(scenario,"document.querySelector('#app .record-mix-chart').scrollIntoView({block:'start',behavior:'instant'})");
                 paintedScreenshot(scenario,"theme-"+theme+"-mix");
             evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();document.querySelector('[data-view=home]').click();window.scrollTo({top:0,behavior:'instant'})");
-            assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth&&Boolean(document.querySelector('.settlement-chart'))"));
+            assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth&&Boolean(document.querySelector('#app .settlement-chart'))"));
                 paintedScreenshot(scenario,"theme-"+theme+"-home");
             evaluate(scenario,"document.querySelector('[data-view=calendar]').click();document.querySelector('[data-action=calendar-today]').click()");
-            assertEquals("true",evaluate(scenario,"(()=>{const e=document.querySelector('.calendar-day.today .day-wage'),s=getComputedStyle(e);return s.backgroundColor==='rgba(0, 0, 0, 0)'&&s.backgroundImage==='none'&&s.paddingLeft==='0px'&&s.paddingRight==='0px'})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const e=document.querySelector('#app .calendar-day.today .day-wage'),s=getComputedStyle(e);return s.backgroundColor==='rgba(0, 0, 0, 0)'&&s.backgroundImage==='none'&&s.paddingLeft==='0px'&&s.paddingRight==='0px'})()"));
             assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth"));
             evaluate(scenario,"document.querySelector('.calendar-panel').scrollIntoView({block:'start',behavior:'instant'})");
                 paintedScreenshot(scenario,"theme-"+theme+"-calendar");
-            evaluate(scenario,"document.querySelector('.daily-chart').scrollIntoView({block:'start',behavior:'instant'})");
+            evaluate(scenario,"document.querySelector('#app .daily-chart').scrollIntoView({block:'start',behavior:'instant'})");
                 paintedScreenshot(scenario,"theme-"+theme+"-daily");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=company-settings]').click()");
             assertEquals("true",evaluate(scenario,"document.querySelector('#company-name').value==='主题验收 · 工资账本'&&document.documentElement.scrollWidth<=innerWidth"));
                 paintedScreenshot(scenario,"theme-"+theme+"-form");
             evaluate(scenario,"document.querySelector('.modal-close').click();document.querySelector('[data-action=toggle-motion]').click()");
-            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.profile-chart-panel *')].every(e=>getComputedStyle(e).animationName==='none')"));
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('#app .profile-chart-panel *')].every(e=>getComputedStyle(e).animationName==='none')"));
             assertTrue(withActivity(activity->assertFalse(activity.isNativeMotionEnabled())));
             evaluate(scenario,"document.querySelector('[data-action=toggle-motion]').click()");
             assertTrue(withActivity(activity->assertTrue(activity.isNativeMotionEnabled())));
@@ -758,12 +762,12 @@ public class AppSmokeTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
             evaluate(scenario,"document.querySelector('[data-action=salary-settings]').click();document.getElementById('salary').value='6000';document.querySelector('.modal-footer button[type=submit]').click();document.querySelector('[data-view=calendar]').click()");
-            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.calendar-day .day-wage')].every(e=>e.hasAttribute('data-static-number')&&!e.classList.contains('number')&&!e.querySelector('.number-roll'))"));
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('#app .calendar-day .day-wage')].every(e=>e.hasAttribute('data-static-number')&&!e.classList.contains('number')&&!e.querySelector('.number-roll'))"));
             evaluate(scenario,"document.querySelector('[data-action=shift-month][data-delta=\"-1\"]').click();document.querySelector('[data-action=shift-month][data-delta=\"1\"]').click()");
-            assertEquals("true",evaluate(scenario,"!document.querySelector('.calendar-day .number-roll-strip')&&[...document.querySelectorAll('.calendar-day[data-date]')].every(e=>Number(e.querySelector('.day-number').childNodes[0].nodeValue)===Number(e.dataset.date.slice(8)))"));
+            assertEquals("true",evaluate(scenario,"!document.querySelector('#app .calendar-day .number-roll-strip')&&[...document.querySelectorAll('#app .calendar-day[data-date]')].every(e=>Number(e.querySelector('.day-number').childNodes[0].nodeValue)===Number(e.dataset.date.slice(8)))"));
             paintedScreenshot(scenario,"calendar-rolling-settled");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('[data-view=calendar]').click()");
-            assertEquals("true",evaluate(scenario,"!document.querySelector('.calendar-day .number-roll-strip')"));
+            assertEquals("true",evaluate(scenario,"!document.querySelector('#app .calendar-day .number-roll-strip')"));
         }
     }
 
@@ -776,17 +780,17 @@ public class AppSmokeTest {
             for(String theme:new String[]{"system","light","dark"}){
                 evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme="+theme+"]').click()");
                 for(String page:new String[]{"home","calendar","records","settings"}){
-                    evaluate(scenario,"document.querySelector('[data-view="+page+"]').click();(()=>{window.__chartRoll=null;const capture=()=>window.__chartRoll=(()=>{const numbers=[...document.querySelectorAll('.data-chart [data-chart-number]')],rolling=numbers.filter(e=>e.querySelector('.number-roll-strip'));return {count:rolling.length,values:numbers.map(e=>e.getAttribute('aria-label')||e.textContent),style:rolling.every(e=>getComputedStyle(e).fontSize===getComputedStyle(e.parentElement).fontSize&&[...e.querySelectorAll('.number-roll-slot')].every(s=>getComputedStyle(s).fontSize===getComputedStyle(e).fontSize)),steps:rolling.every(e=>[...e.querySelectorAll('.number-roll-strip')].every(s=>Number(s.style.getPropertyValue('--roll-steps'))>0&&Number(s.style.getPropertyValue('--roll-steps'))<=19)),static:!document.querySelector('.chart-axis .number-roll, time .number-roll')}})();const push=document.querySelector('.page-swipe-track')?.getAnimations()[0];if(push)push.finished.then(capture);else capture()})()");
+                    evaluate(scenario,"document.querySelector('[data-view="+page+"]').click();(()=>{window.__chartRoll=null;const capture=()=>window.__chartRoll=(()=>{const numbers=[...document.querySelectorAll('#app .data-chart [data-chart-number]')],rolling=numbers.filter(e=>e.querySelector('.number-roll-strip'));return {count:rolling.length,values:numbers.map(e=>e.getAttribute('aria-label')||e.textContent),style:rolling.every(e=>getComputedStyle(e).fontSize===getComputedStyle(e.parentElement).fontSize&&[...e.querySelectorAll('.number-roll-slot')].every(s=>getComputedStyle(s).fontSize===getComputedStyle(e).fontSize)),steps:rolling.every(e=>[...e.querySelectorAll('.number-roll-strip')].every(s=>Number(s.style.getPropertyValue('--roll-steps'))>0&&Number(s.style.getPropertyValue('--roll-steps'))<=19)),static:!document.querySelector('#app .chart-axis .number-roll, time .number-roll')}})();const push=document.querySelector('.page-swipe-track')?.getAnimations()[0];if(push)push.finished.then(capture);else capture()})()");
             waitTrue(scenario,"window.__chartRoll!==null");
             assertEquals("true",evaluate(scenario,"window.__chartRoll.count>0&&window.__chartRoll.style&&window.__chartRoll.steps&&window.__chartRoll.static"));
-                    waitTrue(scenario,"!document.querySelector('.data-chart .number-roll-strip')");
-            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('.data-chart [data-chart-number]')].every((e,i)=>e.textContent===window.__chartRoll.values[i])"));
+                    waitTrue(scenario,"!document.querySelector('#app .data-chart .number-roll-strip')");
+            assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('#app .data-chart [data-chart-number]')].every((e,i)=>e.textContent===window.__chartRoll.values[i])"));
                 }
-            evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();window.__mixRoll=(()=>{const n=[...document.querySelectorAll('.record-type-row strong .chart-number')];return n.length===12&&JSON.stringify(n.map(e=>e.getAttribute('aria-label')||e.textContent))===JSON.stringify(['0','0.0','0','0.0','1','50.0','0','0.0','0','0.0','1','50.0'])})()");
+            evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();window.__mixRoll=(()=>{const n=[...document.querySelectorAll('#app .record-type-row strong .chart-number')];return n.length===12&&JSON.stringify(n.map(e=>e.getAttribute('aria-label')||e.textContent))===JSON.stringify(['0','0.0','0','0.0','1','50.0','0','0.0','0','0.0','1','50.0'])})()");
             assertEquals("true",evaluate(scenario,"window.__mixRoll"));
-                waitTrue(scenario,"!document.querySelector('.data-chart .number-roll-strip')");
+                waitTrue(scenario,"!document.querySelector('#app .data-chart .number-roll-strip')");
             evaluate(scenario,"document.querySelector('[data-action=profile-chart]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('[data-view=home]').click()");
-            assertEquals("true",evaluate(scenario,"!document.querySelector('.data-chart .number-roll-strip')"));
+            assertEquals("true",evaluate(scenario,"!document.querySelector('#app .data-chart .number-roll-strip')"));
             evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click()");
             }
             evaluate(scenario,"document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme=system]').click()");
@@ -801,9 +805,9 @@ public class AppSmokeTest {
             for(String kind:new String[]{"leave","overtime","subsidy","deduction","advance","payment"}){
             evaluate(scenario,"document.querySelector('[data-view=home]').click();document.querySelector('[data-action=record-entry]').click();");
                 evaluate(scenario,"document.querySelector('[data-action=record-kind][data-kind="+kind+"]').click()");
-            evaluate(scenario,"window.__recordNav=document.querySelector('.bottom-nav');var f=document.querySelector('#modal-root form');if(f.id==='leave-form')f.elements.deductMode.value='yes';else if(f.id==='overtime-form'){f.elements.quantity.value='2';f.elements.rate.value='25';}else f.elements.amount.value='25';window.__frames=[];window.__lastFrame=performance.now();var probe=t=>{window.__frames.push(t-window.__lastFrame);window.__lastFrame=t;if(window.__frames.length<40)requestAnimationFrame(probe)};requestAnimationFrame(probe);window.__submitStart=performance.now();f.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));window.__submitMs=performance.now()-window.__submitStart;window.__savedRolls=[...document.querySelectorAll('.view-home .number')].map(e=>({e,text:e.getAttribute('aria-label')||e.textContent}));window.__numberAnimations=[...document.querySelectorAll('.number-roll-strip')];document.querySelector('[data-action=nav][data-view=home]').click();window.__recordAnimationCheck={formClosed:!document.querySelector('#modal-root form'),sameNav:document.querySelector('.bottom-nav')===window.__recordNav,count:window.__numberAnimations.length,kept:window.__numberAnimations.every(e=>e.isConnected),bounded:[...document.querySelectorAll('.number-roll-strip')].every(e=>e.children.length<=20&&parseFloat(e.style.animationDuration)<=440)};window.__recordAnimationCheck.ok=window.__recordAnimationCheck.formClosed&&window.__recordAnimationCheck.sameNav&&window.__recordAnimationCheck.count>0&&window.__recordAnimationCheck.kept&&window.__recordAnimationCheck.bounded");
+            evaluate(scenario,"window.__recordNav=document.querySelector('.bottom-nav');var f=document.querySelector('#modal-root form');if(f.id==='leave-form')f.elements.deductMode.value='yes';else if(f.id==='overtime-form'){f.elements.quantity.value='2';f.elements.rate.value='25';}else f.elements.amount.value='25';window.__frames=[];window.__lastFrame=performance.now();var probe=t=>{window.__frames.push(t-window.__lastFrame);window.__lastFrame=t;if(window.__frames.length<40)requestAnimationFrame(probe)};requestAnimationFrame(probe);window.__submitStart=performance.now();f.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));window.__submitMs=performance.now()-window.__submitStart;window.__savedRolls=[...document.querySelectorAll('#app .view-home .number')].map(e=>({e,text:e.getAttribute('aria-label')||e.textContent}));window.__numberAnimations=[...document.querySelectorAll('#app .number-roll-strip')];document.querySelector('[data-action=nav][data-view=home]').click();window.__recordAnimationCheck={formClosed:!document.querySelector('#modal-root form'),sameNav:document.querySelector('.bottom-nav')===window.__recordNav,count:window.__numberAnimations.length,kept:window.__numberAnimations.every(e=>e.isConnected),bounded:[...document.querySelectorAll('#app .number-roll-strip')].every(e=>e.children.length<=20&&parseFloat(e.style.animationDuration)<=440)};window.__recordAnimationCheck.ok=window.__recordAnimationCheck.formClosed&&window.__recordAnimationCheck.sameNav&&window.__recordAnimationCheck.count>0&&window.__recordAnimationCheck.kept&&window.__recordAnimationCheck.bounded");
             assertEquals(evaluate(scenario,"JSON.stringify(window.__recordAnimationCheck)"),"true",evaluate(scenario,"window.__recordAnimationCheck.ok"));
-            waitTrue(scenario,"!document.querySelector('.number-roll-strip')&&window.__frames.length>=20");
+            waitTrue(scenario,"!document.querySelector('#app .number-roll-strip')&&window.__frames.length>=20");
             assertEquals("true",evaluate(scenario,"window.__savedRolls.every(x=>x.e.textContent===x.text)"));
                 android.util.Log.i("DagongrenMotion","RECORD_"+kind+"="+evaluate(scenario,"JSON.stringify({submitMs:window.__submitMs,frames:window.__frames,rowsMax:20})"));
             }
@@ -833,17 +837,21 @@ public class AppSmokeTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
             evaluate(scenario,"window.__dragInput=(name,x,y,t,selector)=>{if(name==='pointerdown')window.__dragNode=document.querySelector(selector);const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:771,isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});window.__dragNode.dispatchEvent(e);};window.__nextFrames=()=>{window.__framesReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>window.__framesReady=true));};true");
+            waitTrue(scenario,"Boolean(document.querySelector('.page-swipe-preload'))");
             evaluate(scenario,"window.__dragInput('pointerdown',300,100,0,'.topbar')");
-            assertEquals("true",evaluate(scenario,"(()=>{const layer=document.querySelector('.page-swipe-layer');return !!layer&&getComputedStyle(layer).opacity==='0'&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const layer=document.querySelector('.page-swipe-preload');return !!layer&&Number(getComputedStyle(layer).opacity)<.01&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'})()"));
             evaluate(scenario,"window.__dragInput('pointermove',296,100,10)");
+            nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"(()=>{const layer=document.querySelector('.page-swipe-layer'),track=layer?.querySelector('.page-swipe-track'),mark=performance.getEntriesByName('dagongren.page.activate').at(-1);return !!track&&getComputedStyle(layer).opacity==='1'&&track.children.length===2&&Math.abs(new DOMMatrix(getComputedStyle(track).transform).m41+4)<.6&&mark?.detail?.prepared===true})()"));
             nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.page-swipe-track')).transform).m41+4)<.6"));
             evaluate(scenario,"window.__dragInput('pointermove',280,100,35);window.__dragInput('pointerup',280,100,40)");
             waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='calendar'");
+            waitTrue(scenario,"Boolean(document.querySelector('.calendar-swipe-preload'))");
             evaluate(scenario,"window.__thumbMonth=document.querySelector('[data-calendar-month]').dataset.calendarMonth;window.__dragInput('pointerdown',280,300,100,'.calendar-days')");
-            assertEquals("true",evaluate(scenario,"(()=>{const track=document.querySelector('.calendar-swipe-track'),grid=document.querySelector('.calendar-grid-viewport>.calendar-days');return !!track&&getComputedStyle(track).opacity==='0'&&getComputedStyle(grid).visibility==='visible'})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const track=document.querySelector('.calendar-swipe-preload'),grid=document.querySelector('.calendar-grid-viewport>.calendar-days');return !!track&&Number(getComputedStyle(track).opacity)<.01&&getComputedStyle(grid).visibility==='visible'})()"));
             evaluate(scenario,"window.__dragInput('pointermove',276,300,110)");
+            nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"(()=>{const track=document.querySelector('.calendar-swipe-track'),mark=performance.getEntriesByName('dagongren.calendar.activate').at(-1);return !!track&&getComputedStyle(track).opacity==='1'&&track.children.length===2&&Math.abs(new DOMMatrix(getComputedStyle(track).transform).m41+4)<.6&&mark?.detail?.prepared===true})()"));
             nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"!document.querySelector('.page-swipe-layer')&&Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.calendar-swipe-track')).transform).m41+4)<.6"));
@@ -877,5 +885,118 @@ public class AppSmokeTest {
             }
         }
     }
+
+    private void installSyncReviewFixture(ActivityScenario<MainActivity> scenario) throws Exception {
+        final String injection="""
+            (()=>{const real=window.AndroidFiles,book=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));
+            book.defaults.motion=false;book.sync={...book.sync,auto:false,nativeVersion:1};delete book.sync.baseBook;delete book.sync.baseline;
+            localStorage.setItem('dagongren.paybook.v1',JSON.stringify(book));window.__reviewBook=JSON.parse(JSON.stringify(book));window.__reviewReads=0;window.__reviewWrites=0;window.__reviewVersion=1;window.__reviewFailure=false;window.__reviewDelay=900;window.__reviewHoldReads=false;window.__reviewHeld=[];window.__releaseReviewReads=()=>{window.__reviewHoldReads=false;for(const reply of window.__reviewHeld.splice(0))reply();};
+            window.AndroidFiles={shouldPlayIntro:()=>false,nativeLaunchPage:()=>false,introReady:()=>real.introReady(),introStyle:v=>real.introStyle(v),motionStyle:v=>real.motionStyle(v),systemDark:()=>real.systemDark(),themeStyle:v=>real.themeStyle(v),fingerprint:v=>real.fingerprint(v),status:()=>JSON.stringify({configured:true,username:'sync-review@example.invalid',path:'打工人/工资账本.json'}),request(id,action,payload){
+            if(action==='calendar-read'){setTimeout(()=>globalThis.dagongrenNativeResult(id,{ok:false,error:'测试不访问外部网络'}),0);return;}
+            if(action==='read'){window.__reviewReads++;const reply=()=>globalThis.dagongrenNativeResult(id,window.__reviewFailure?{ok:false,error:'测试网络中断，本机记录保留'}:{ok:true,data:{exists:true,etag:'"'+window.__reviewVersion+'"',envelope:{format:'dagongren.webdav.v2',book:JSON.parse(JSON.stringify(window.__reviewBook))}}});if(window.__reviewHoldReads)window.__reviewHeld.push(reply);else setTimeout(reply,window.__reviewDelay);return;}
+            if(action==='write'){window.__reviewWrites++;const data=JSON.parse(payload);window.__reviewBook=JSON.parse(data.content);window.__reviewVersion++;setTimeout(()=>globalThis.dagongrenNativeResult(id,{ok:true,data:{saved:true}}),20);return;}
+            setTimeout(()=>globalThis.dagongrenNativeResult(id,{ok:false,error:'不支持的测试操作'}),0);
+            }};})()
+            """;
+        withActivity(activity->{try{
+            String source=new String(activity.getAssets().open("www/index.html").readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
+            final byte[] html=source.replace("<script type=\"module\"", "<script>"+injection+"</script><script type=\"module\"").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            WebView web=activity.findViewById(R.id.web_view);android.webkit.WebViewClient original=web.getWebViewClient();
+            web.setWebViewClient(new android.webkit.WebViewClient(){
+                @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view,android.webkit.WebResourceRequest request){
+                    if(request.isForMainFrame()&&"/assets/www/index.html".equals(request.getUrl().getPath()))return new android.webkit.WebResourceResponse("text/html","UTF-8",new java.io.ByteArrayInputStream(html));
+                    return original.shouldInterceptRequest(view,request);
+                }
+                @Override public boolean shouldOverrideUrlLoading(WebView view,android.webkit.WebResourceRequest request){return original.shouldOverrideUrlLoading(view,request);}
+                @Override public void onPageFinished(WebView view,String url){original.onPageFinished(view,url);}
+            });web.loadUrl("https://appassets.androidplatform.net/assets/www/index.html?review=refresh");
+        }catch(Exception error){throw new RuntimeException(error);}});
+        waitReady(scenario);waitTrue(scenario,"document.body.classList.contains('motion-off')&&window.__reviewReads===0");
+    }
+    private void nativePull(ActivityScenario<MainActivity> scenario) throws Exception {
+        evaluate(scenario,"window.scrollTo({top:0,behavior:'instant'});window.__pullTouchEvents=[];if(!window.__pullTouchTracking){window.__pullTouchTracking=true;for(const type of ['touchstart','touchmove','touchend','touchcancel','pointercancel'])document.addEventListener(type,e=>{if(window.__pullTouchEvents.length<60)window.__pullTouchEvents.push({type:e.type,cancelable:e.cancelable,y:e.touches?.[0]?.clientY,state:document.querySelector('.pull-refresh')?.dataset.state})},true)}");awaitInputWindow(scenario);
+        int[] origin=new int[2];float[] density=new float[1];
+        assertTrue(withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(origin);density[0]=activity.getResources().getDisplayMetrics().density;}));
+        float x=Float.parseFloat(evaluate(scenario,"innerWidth*.45"));
+        assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(origin[0]+Math.round(x*density[0]),origin[1]+Math.round(65*density[0]),origin[0]+Math.round(x*density[0]),origin[1]+Math.round(230*density[0]),45));
+    }
+    @Test public void fourMainPagesPullSyncEvenWhenMotionIsDisabled() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);installSyncReviewFixture(scenario);
+            for(String page:new String[]{"home","calendar","records","settings"}){
+                evaluate(scenario,"document.querySelector('.bottom-nav [data-view="+page+"]').click()");
+                waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='"+page+"'");
+                evaluate(scenario,"window.__reviewHoldReads=true");nativePull(scenario);
+                waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='syncing'");
+                assertEquals("true",evaluate(scenario,"(()=>{const badge=document.querySelector('.cloud-sync-badge'),pull=document.querySelector('.pull-refresh');return document.body.classList.contains('motion-off')&&badge.dataset.source==='pull'&&getComputedStyle(badge.querySelector('svg')).animationName==='sync-spin'&&pull.dataset.state==='syncing'&&getComputedStyle(pull.querySelector('svg')).animationName==='sync-spin'})()"));
+                evaluate(scenario,"window.__releaseReviewReads()");
+                waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='success'&&document.querySelector('.pull-refresh').dataset.state==='success'");
+                assertEquals("true",evaluate(scenario,"(()=>{const b=document.querySelector('.sync-cloud-button'),r=b.getBoundingClientRect(),data=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));return r.width>=40&&r.height>=34&&r.right<=innerWidth&&getComputedStyle(b.querySelector('.cloud-sync-badge')).color==='rgb(22, 134, 82)'&&!data.defaults.motion&&!data.sync.auto&&window.__reviewWrites===0})()"));
+                paintedScreenshot(scenario,"pull-sync-"+page);
+            }
+            assertEquals("4",evaluate(scenario,"window.__reviewReads"));
+        }
+    }
+    @Test public void automaticSyncBadgesFollowRealResultAndMotionPreference() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);installSyncReviewFixture(scenario);
+            evaluate(scenario,"window.__reviewHoldReads=true;document.querySelector('.sync-cloud-button').click();document.querySelector('[data-action=toggle-auto]').click()");
+            waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='syncing'");
+            assertEquals("true",evaluate(scenario,"document.querySelector('.cloud-sync-badge').dataset.source==='auto'&&getComputedStyle(document.querySelector('.cloud-sync-badge svg')).animationName==='none'"));
+            evaluate(scenario,"window.__releaseReviewReads()");
+            waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='success'");
+            assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('.sync-result-stroke')).animationName==='none'"));
+            evaluate(scenario,"document.querySelector('[data-action=toggle-auto]').click();window.__reviewFailure=true;document.querySelector('[data-action=toggle-auto]').click()");
+            waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='error'");
+            assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('.cloud-sync-badge')).color==='rgb(216, 68, 78)'&&window.__reviewWrites===0"));
+            paintedScreenshot(scenario,"cloud-sync-error");
+            evaluate(scenario,"document.querySelector('[data-action=toggle-auto]').click();window.__reviewFailure=false;document.querySelector('[data-view=home]').click()");
+            nativePull(scenario);waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='success'");
+        }
+    }
+    @Test public void pullThresholdCancellationScrollingAndUnconfiguredCloudStaySafe() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);installSyncReviewFixture(scenario);
+            evaluate(scenario,"window.__pullNode=document.querySelector('.topbar');window.__pullEvent=(type,x,y)=>window.__pullNode.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:795,isPrimary:true,button:0,clientX:x,clientY:y}));window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,100);window.__pullEvent('pointerup',180,100)");
+            assertEquals("0",evaluate(scenario,"window.__reviewReads"));
+            evaluate(scenario,"window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,190);window.__pullEvent('pointercancel',180,190)");
+            assertEquals("0",evaluate(scenario,"window.__reviewReads"));
+            evaluate(scenario,"window.scrollTo({top:150,behavior:'instant'});window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,200);window.__pullEvent('pointerup',180,200)");
+            assertEquals("0",evaluate(scenario,"window.__reviewReads"));
+            evaluate(scenario,"window.scrollTo({top:0,behavior:'instant'});window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,200);window.__pullEvent('pointerup',180,200)");
+            waitTrue(scenario,"window.__reviewReads===1&&document.querySelector('.cloud-sync-badge').dataset.state==='success'");
+        }
+    }
+    private void slowNativeDrag(ActivityScenario<MainActivity> scenario,String selector,String kind) throws Exception {
+        evaluate(scenario,"document.querySelector('"+selector+"').scrollIntoView({block:'center',behavior:'instant'})");awaitInputWindow(scenario);
+        waitTrue(scenario,"Boolean(document.querySelector('"+(kind.equals("page")?".page-swipe-preload":".calendar-swipe-preload")+"'))");
+        evaluate(scenario,"performance.clearMarks('dagongren."+kind+".input-commit');performance.clearMarks('dagongren."+kind+".first-frame');performance.mark('review.drag.ready')");
+        JSONObject rect=new JSONObject(new org.json.JSONTokener(evaluate(scenario,"JSON.stringify((()=>{const r=document.querySelector('"+selector+"').getBoundingClientRect();return {x:r.left+r.width*.7,y:Math.max(35,r.top+Math.min(50,r.height*.5))}})())")).nextValue().toString());
+        int[] origin=new int[2];float[] density=new float[1];
+        assertTrue(withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(origin);density[0]=activity.getResources().getDisplayMetrics().density;}));
+        int x=origin[0]+Math.round((float)rect.getDouble("x")*density[0]),y=origin[1]+Math.round((float)rect.getDouble("y")*density[0]);
+        assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(x,y,x-Math.round(60*density[0]),y,240));
+        waitTrue(scenario,"performance.getEntriesByName('dagongren."+kind+".first-frame').length>0&&!document.getElementById('app').classList.contains('swipe-busy')");
+        assertEquals("true",evaluate(scenario,"(()=>{const input=performance.getEntriesByName('dagongren."+kind+".input-commit').at(-1)?.detail,frame=performance.getEntriesByName('dagongren."+kind+".first-frame').at(-1)?.detail;return input?.prepared&&frame?.prepared&&input.raf&&input.callbackWork<50&&input.eventToCommit>=0})()"));
+        android.util.Log.i("DagongrenMotion","SLOW_DRAG_WEB_"+kind.toUpperCase()+"="+evaluate(scenario,"JSON.stringify({commit:performance.getEntriesByName('dagongren."+kind+".input-commit').at(-1).detail,nextFrame:performance.getEntriesByName('dagongren."+kind+".first-frame').at(-1).detail,preparation:performance.getEntriesByName('dagongren."+kind+".prepare').at(-1)?.detail})"));
+    }
+    @Test public void slowNativeSwipesReportInputAndFrameCostsWithoutTouchPreparation() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            android.os.HandlerThread thread=new android.os.HandlerThread("frame-review");thread.start();
+            java.util.List<long[]> samples=new java.util.concurrent.CopyOnWriteArrayList<>();
+            android.view.Window.OnFrameMetricsAvailableListener listener=(window,metrics,dropped)->samples.add(new long[]{metrics.getMetric(android.view.FrameMetrics.TOTAL_DURATION),metrics.getMetric(android.view.FrameMetrics.INPUT_HANDLING_DURATION),metrics.getMetric(android.view.FrameMetrics.LAYOUT_MEASURE_DURATION),metrics.getMetric(android.view.FrameMetrics.DRAW_DURATION),metrics.getMetric(android.view.FrameMetrics.SYNC_DURATION),dropped});
+            withActivity(activity->activity.getWindow().addOnFrameMetricsAvailableListener(listener,new android.os.Handler(thread.getLooper())));
+            try{
+                slowNativeDrag(scenario,".topbar","page");
+                evaluate(scenario,"document.querySelector('.bottom-nav [data-view=calendar]').click()");waitTrue(scenario,"Boolean(document.querySelector('#app .view-calendar'))&&!document.getElementById('app').classList.contains('swipe-busy')");
+                slowNativeDrag(scenario,".calendar-days","calendar");
+                assertFalse("No native frame metrics were captured",samples.isEmpty());
+                org.json.JSONArray report=new org.json.JSONArray();for(long[] sample:samples)report.put(new org.json.JSONArray(sample));
+                android.util.Log.i("DagongrenMotion","SLOW_DRAG_NATIVE_FRAME_NS="+report);
+            }finally{withActivity(activity->activity.getWindow().removeOnFrameMetricsAvailableListener(listener));thread.quitSafely();}
+        }
+    }
+
 
 }
