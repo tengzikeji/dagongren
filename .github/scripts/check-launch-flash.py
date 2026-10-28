@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Detect a bright launch frame briefly replaced by a blank system window."""
 from pathlib import Path
+import json
 import shutil
 import subprocess
 import sys
@@ -26,7 +27,9 @@ def main():
     ffmpeg = sys.argv[2] if len(sys.argv)>2 else shutil.which('ffmpeg')
     if not video or not video.is_file() or not ffmpeg:
         raise SystemExit('Startup video and ffmpeg are required for flash review')
-    p = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '10.0', '-vf', 'fps=20,crop=iw*0.85:ih*0.75:iw*0.075:ih*0.1,scale=80:100,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+    # Include the launcher search field and dock: sampling only the middle of
+    # the wallpaper can mistake a dark blue patch for our solid startup window.
+    p = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '10.0', '-vf', 'fps=20,crop=iw*0.96:ih*0.87:iw*0.02:ih*0.045,scale=80:100,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
     size=80*100
     frames=[p.stdout[i:i+size] for i in range(0, len(p.stdout), size) if len(p.stdout[i:i+size])==size]
     stats=[]
@@ -38,6 +41,7 @@ def main():
     anchor=next((i for i,(mean,sd) in enumerate(stats) if 22<=mean<=36 and sd<2.5),None)
     if anchor is None or len(stats)-anchor<10:
         raise SystemExit('Could not identify enough frames from the blue startup window')
+    print('Solid startup window identified at',f'{anchor/20:.2f}s')
     values=[mean for mean,_ in stats[anchor:anchor+30]]
     flash=detect_flash(values)
     print('Startup window first 1.5s luminance:', ', '.join(f'{x:.1f}' for x in values))
@@ -51,8 +55,7 @@ def main():
     top = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '10.0', '-vf', 'fps=20,crop=iw*0.24:ih*0.012:iw*0.38:ih*0.004,scale=24:4,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True).stdout
     top_means=[sum(top[i:i+96])/96 for i in range(0,len(top),96) if len(top[i:i+96])==96][anchor:anchor+20]
     print('Startup status-bar first 1s luminance:', ', '.join(f'{x:.1f}' for x in top_means))
-    if len(top_means)<10 or max(top_means)-min(top_means)>12 or any(x<=5 or x>=75 for x in top_means):
-        raise SystemExit('Status-bar background changed unexpectedly before launch content')
+    background_error=len(top_means)<10 or max(top_means)-min(top_means)>12 or any(x<=5 or x>=75 for x in top_means)
     # Inspect foreground occupancy too: a stable blue background cannot prove
     # that the clock and system icons have remained visible.
     raw = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '30.0', '-vf', 'fps=20,crop=iw:ih*0.032:0:0,scale=360:20,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True).stdout
@@ -63,12 +66,18 @@ def main():
     end=int((float(done.group(1))+.15)*20) if done else anchor+30
     icon_frames=[raw[i:i+7200] for i in range(0,len(raw),7200) if len(raw[i:i+7200])==7200][anchor+1:end]
     backgrounds=[median(frame[y*360+x] for y in range(4,16) for x in range(150,210)) for frame in icon_frames]
+    review={'anchor_second':anchor/20,'body':stats,'background':top_means,'icons':{}}
+    failures=[]
     for name,start,end in [('clock',0,120),('system',240,360)]:
         counts=[sum(abs(frame[y*360+x]-bg)>55 for y in range(20) for x in range(start,end)) for frame,bg in zip(icon_frames,backgrounds)]
         baseline=median(counts) if counts else 0
+        review['icons'][name]={'baseline':baseline,'counts':counts}
         print('Startup '+name+' icon pixels:', ', '.join(map(str,counts)))
         if baseline<3 or detect_flash(counts,threshold=max(3,baseline*.55)):
-            raise SystemExit('Status-bar '+name+' icons disappeared and returned during startup')
+            failures.append('Status-bar '+name+' icons disappeared and returned during startup')
+    (video.parent/'startup-review.json').write_text(json.dumps(review,indent=2))
+    if background_error:failures.insert(0,'Status-bar background changed unexpectedly before launch content')
+    if failures:raise SystemExit('; '.join(failures))
 
 
 if __name__ == '__main__':
