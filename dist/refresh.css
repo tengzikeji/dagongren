@@ -29,7 +29,7 @@
 .pull-refresh:is([data-state=pulling],[data-state=armed]) .pull-refresh-symbol{width:18px;height:18px;background:transparent}
 .pull-refresh:is([data-state=pulling],[data-state=armed]) .pull-refresh-symbol svg{width:16px;height:16px}
 .pull-refresh:is([data-state=pulling],[data-state=armed]) .pull-refresh-label{display:none}
-body.motion-off .cloud-sync-badge[data-source=pull][data-state=syncing] .sync-spinner{animation:sync-spin .8s linear infinite!important}
+body.motion-off .cloud-sync-badge[data-state=syncing] .sync-spinner{animation:sync-spin .8s linear infinite!important}
 body[data-theme=dark] .cloud-sync-badge{background:transparent;box-shadow:none}
 body[data-theme=dark] .cloud-sync-badge[data-state=success]{color:#55c990}
 body[data-theme=dark] .cloud-sync-badge[data-state=error]{color:#ff7d88}
@@ -39,4 +39,4 @@ body[data-theme=dark] .cloud-sync-badge[data-state=error]{color:#ff7d88}
 @keyframes pull-status-in{from{opacity:0;transform:translate3d(-50%,4px,0) scale(.94)}to{opacity:1;transform:translate3d(-50%,16px,0) scale(1)}}
 @keyframes pull-result-in{from{opacity:.5;transform:translate3d(-50%,12px,0) scale(.96)}to{opacity:1;transform:translate3d(-50%,16px,0) scale(1)}}
 @media(min-width:761px){.cloud-button.sync-cloud-button{width:auto;padding:0 12px}.sync-cloud-button .cloud-label{display:block;max-width:none}}
-@media(prefers-reduced-motion:reduce){body .cloud-sync-badge .sync-spinner,body.motion-off .cloud-sync-badge[data-source=pull][data-state=syncing] .sync-spinner,body .pull-refresh[data-source=pull][data-state],body .pull-refresh[data-source=pull][data-state] :is(.sync-spinner,.sync-result-stroke){animation:none!important}body .pull-refresh[data-source=pull]{transition:none!important}}
+@media(prefers-reduced-motion:reduce){body .cloud-sync-badge .sync-spinner,body.motion-off .cloud-sync-badge[data-state=syncing] .sync-spinner,body .pull-refresh[data-source=pull][data-state],body .pull-refresh[data-source=pull][data-state] :is(.sync-spinner,.sync-result-stroke){animation:none!important}body .pull-refresh[data-source=pull]{transition:none!important}}

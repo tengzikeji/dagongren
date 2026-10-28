@@ -279,5 +279,6 @@ body.intro-playing .launch-page,body.intro-playing[data-theme=dark] .launch-page
 .bottom-nav .nav-top-glyph{position:absolute;inset:0;opacity:0;transform:translateY(3px) scale(.85);transition:opacity .16s ease,transform .16s ease}
 .bottom-nav [data-top=true] .nav-original{opacity:0;transform:translateY(-3px) scale(.85)}
 .bottom-nav [data-top=true] .nav-top-glyph{opacity:1;transform:none;animation:nav-top-ready 1.25s ease-in-out infinite!important}
+body.motion-off .bottom-nav .nav-original,body.motion-off .bottom-nav .nav-top-glyph{transition:opacity .16s ease,transform .16s ease!important}
 @keyframes nav-top-ready{50%{transform:translateY(-2px)}}
-@media(prefers-reduced-motion:reduce){.bottom-nav [data-top=true] .nav-top-glyph{animation:none!important}.bottom-nav .nav-original,.bottom-nav .nav-top-glyph{transition:none!important}}
+@media(prefers-reduced-motion:reduce){.bottom-nav [data-top=true] .nav-top-glyph{animation:none!important}.bottom-nav .nav-original,.bottom-nav .nav-top-glyph,body.motion-off .bottom-nav .nav-original,body.motion-off .bottom-nav .nav-top-glyph{transition:none!important}}

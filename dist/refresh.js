@@ -10,7 +10,7 @@ export function updateCloudFeedback(root,feedback,description=''){
  const state=feedback.state||'idle',source=feedback.source||'auto',revision=String(feedback.revision||0),event=revision+':'+state+':'+source;
  const buttons=[...(root?.querySelectorAll?.('.sync-cloud-button')||[])].filter(button=>!button.closest?.('.page-swipe-preload,.page-swipe-layer'));
  const animateResult=event!==lastCloudEvent&&Number(revision)>0&&['success','error'].includes(state)&&
-  (source==='pull'||!document.body.classList?.contains('motion-off'))&&!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
  for(const button of buttons){
   const badge=button.querySelector('.cloud-sync-badge');button.dataset.syncState=state;button.dataset.syncSource=source;button.setAttribute('aria-busy',String(state==='syncing'));
   button.setAttribute('aria-label','云同步：'+(feedback.message||description||'点击配置')+'；点击查看设置与同步');

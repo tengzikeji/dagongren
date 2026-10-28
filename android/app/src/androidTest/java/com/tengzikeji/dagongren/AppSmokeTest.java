@@ -641,6 +641,8 @@ public class AppSmokeTest {
     @Test public void fourTabsOfferTopShortcutAfterThreeScreens() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
+            evaluate(scenario,"document.querySelector('.bottom-nav [data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('.bottom-nav [data-view=home]').click()");
+            waitTrue(scenario,"document.body.classList.contains('motion-off')&&!document.getElementById('app').classList.contains('nav-lifting')");
             for(String page:new String[]{"home","calendar","records","settings"}){
                 evaluate(scenario,"document.querySelector('.bottom-nav [data-view="+page+"]').click()");
                 waitTrue(scenario,"!document.getElementById('app').classList.contains('nav-lifting')");
@@ -989,7 +991,7 @@ public class AppSmokeTest {
             resetBook(scenario);installSyncReviewFixture(scenario);
             evaluate(scenario,"window.__reviewHoldReads=true;document.querySelector('.sync-cloud-button').click();document.querySelector('[data-action=toggle-auto]').click()");
             waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='syncing'");
-            assertEquals("true",evaluate(scenario,"document.querySelector('.cloud-sync-badge').dataset.source==='auto'&&getComputedStyle(document.querySelector('.cloud-sync-badge svg')).animationName==='none'"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('.cloud-sync-badge').dataset.source==='auto'&&getComputedStyle(document.querySelector('.cloud-sync-badge svg')).animationName==='sync-spin'"));
             evaluate(scenario,"window.__releaseReviewReads()");
             waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='success'");
             assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('.sync-result-stroke')).animationName==='none'"));
