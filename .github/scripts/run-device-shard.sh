@@ -20,6 +20,9 @@ if [ "$result" -eq 0 ]; then
 fi
 kill "$log_pid" 2>/dev/null || true
 adb pull /sdcard/Download/dagongren-test/. "$report/screenshots/" > "$report/pull.log" 2>&1 || true
+if [ -f "/tmp/dagongren-emulator-${DEVICE_SHARD}.log" ]; then
+  cp "/tmp/dagongren-emulator-${DEVICE_SHARD}.log" "$report/emulator.log"
+fi
 if [ "$result" -eq 0 ]; then
   python3 .github/scripts/check-device-shards.py --single "$report/instrumentation.txt" || result=$?
 fi
@@ -27,5 +30,11 @@ if [ "$result" -ne 0 ]; then
   echo "Device shard $DEVICE_SHARD did not complete successfully"
   tail -n 120 "$report/instrumentation.txt" 2>/dev/null || true
   tail -n 80 "$report/device-progress.log" 2>/dev/null || true
+fi
+# All test results and screenshots are already local. Bound a stalled QEMU
+# shutdown without changing or masking the instrumentation exit status.
+if [ "${GITHUB_ACTIONS:-}" = true ]; then
+  nohup python3 .github/scripts/finish-emulator.py "dagongren-ci-${DEVICE_SHARD}" \
+    > "$report/emulator-cleanup.log" 2>&1 < /dev/null &
 fi
 exit "$result"
