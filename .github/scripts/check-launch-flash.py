@@ -77,11 +77,21 @@ def main():
     import re
     progress=video.parent.parent/'device-progress.log'
     done=re.search(r'COMPLETED_SECOND=([0-9.]+)',progress.read_text(errors='replace')) if progress.exists() else None
+    ready=re.search(r'FADE_READY_SECOND=([0-9.]+)',progress.read_text(errors='replace')) if progress.exists() else None
     end=int((float(done.group(1))+.15)*20) if done else anchor+30
     icon_frames=[raw[i:i+7200] for i in range(0,len(raw),7200) if len(raw[i:i+7200])==7200][anchor+1:end]
     backgrounds=[median(frame[y*360+x] for y in range(4,16) for x in range(150,210)) for frame in icon_frames]
     review={'anchor_second':anchor/20,'body':stats,'background':top_means,'icons':{}}
     failures=[]
+    if not ready or not done:
+        failures.append('Missing native/web fade synchronization markers')
+    else:
+        fading=[(i+anchor+1,bg) for i,bg in enumerate(backgrounds) if (i+anchor+1)/20>=float(ready.group(1))]
+        review['bar_handoff']=fading
+        if not any(45<bg<230 for _,bg in fading):
+            failures.append('Status bar did not follow the launch fade')
+        if not any(bg>=235 and index/20<=float(done.group(1))+.1 for index,bg in fading):
+            failures.append('Status bar stayed blue after home was visible')
     for name,start,end in [('clock',0,120),('system',240,360)]:
         counts=[sum(abs(frame[y*360+x]-bg)>55 for y in range(20) for x in range(start,end)) for frame,bg in zip(icon_frames,backgrounds)]
         baseline=median(counts) if counts else 0

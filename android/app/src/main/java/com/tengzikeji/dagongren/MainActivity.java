@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.Choreographer;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -48,6 +49,8 @@ public final class MainActivity extends Activity {
     private boolean firstLaunchFramePresented;
     private int systemBarIconUpdates;
     private Integer paintedWindowColor;
+    private Choreographer.FrameCallback launchBarFrame;
+    private boolean launchBarsFading;
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
@@ -135,6 +138,7 @@ public final class MainActivity extends Activity {
         darkAppearance="dark".equals(mode)||("system".equals(mode)&&systemIsDark());
     }
     private void applyAppearance(){
+        if(launchIntro&&launchBarsFading)return;
         paintAppearance(launchIntro?LAUNCH_COLOR:appearanceColor(),launchIntro||darkAppearance);
     }
     @SuppressWarnings("deprecation") private void paintAppearance(int color,boolean darkBars){
@@ -143,10 +147,10 @@ public final class MainActivity extends Activity {
             getWindow().getDecorView().setBackgroundColor(color);getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
         }
         // Change icon appearance without resetting layout/visibility flags on each frame.
-        if(!launchIntro&&Build.VERSION.SDK_INT>=30){
+        if((!launchIntro||launchBarsFading)&&Build.VERSION.SDK_INT>=30){
             WindowInsetsController controller=getWindow().getInsetsController();
             if(controller!=null){int mask=WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,desired=darkBars?0:mask;if((controller.getSystemBarsAppearance()&mask)!=desired){controller.setSystemBarsAppearance(desired,mask);systemBarIconUpdates++;}}
-        }else if(!launchIntro){
+        }else if(!launchIntro||launchBarsFading){
             View decor=getWindow().getDecorView();int mask=View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
             int flags=decor.getSystemUiVisibility(),next=(flags&~mask)|(darkBars?0:mask);if(flags!=next)decor.setSystemUiVisibility(next);
         }
@@ -155,10 +159,27 @@ public final class MainActivity extends Activity {
         if(webView!=null){if(!launchIntro)webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
     }
     private void fadeLaunchAppearance(int duration){
-        // Keep both the dark bar background and its light icons fixed while the
-        // web scene fades. introStyle(false) applies the home background and
-        // its icon mode together, avoiding light icons fading into a light bar.
+        if(!launchIntro||isDestroyed())return;
+        stopLaunchBarTransition();launchBarsFading=true;
+        final int from=paintedWindowColor==null?LAUNCH_COLOR:paintedWindowColor;
+        if(duration<=0){paintAppearance(appearanceColor(),darkAppearance);launchBarsFading=false;return;}
+        final long began=System.nanoTime(),length=Math.min(duration,2000)*1000000L;
+        final android.view.animation.Interpolator easing=new android.view.animation.PathInterpolator(.42f,0f,.58f,1f);
+        // The web fade and native chrome share one ease-in-out clock. Only the
+        // chrome is repainted on vsync; WebView content and layout stay intact.
+        launchBarFrame=at->{
+            if(!launchIntro||isDestroyed()){stopLaunchBarTransition();return;}
+            float progress=Math.max(0f,Math.min(1f,(at-began)/(float)length)),blend=easing.getInterpolation(progress);
+            int target=appearanceColor(),color=Color.rgb(Math.round(Color.red(from)+(Color.red(target)-Color.red(from))*blend),Math.round(Color.green(from)+(Color.green(target)-Color.green(from))*blend),Math.round(Color.blue(from)+(Color.blue(target)-Color.blue(from))*blend));
+            paintAppearance(color,darkBarColor(color));
+            if(progress<1f)Choreographer.getInstance().postFrameCallback(launchBarFrame);
+            else{launchBarFrame=null;launchBarsFading=false;}
+        };
+        Choreographer.getInstance().postFrameCallback(launchBarFrame);
     }
+    private void stopLaunchBarTransition(){if(launchBarFrame!=null)Choreographer.getInstance().removeFrameCallback(launchBarFrame);launchBarFrame=null;launchBarsFading=false;}
+    private static double luminance(int value){double channel=value/255.0;return channel<=.04045?channel/12.92:Math.pow((channel+.055)/1.055,2.4);}
+    private static boolean darkBarColor(int color){return .2126*luminance(Color.red(color))+.7152*luminance(Color.green(color))+.0722*luminance(Color.blue(color))<=.179;}
     @Override public void onConfigurationChanged(Configuration config){
         super.onConfigurationChanged(config);refreshAppearance();applyAppearance();
         if(webView!=null)webView.evaluateJavascript("globalThis.dagongrenSystemTheme && globalThis.dagongrenSystemTheme("+systemIsDark()+");",null);
@@ -239,7 +260,7 @@ public final class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public void introTransition(int duration){runOnUiThread(()->fadeLaunchAppearance(duration));}
-        @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{if(!active){launchIntro=false;if(webView!=null)webView.getSettings().setOffscreenPreRaster(false);}applyAppearance();});}
+        @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{if(!active){stopLaunchBarTransition();launchIntro=false;if(webView!=null)webView.getSettings().setOffscreenPreRaster(false);}applyAppearance();});}
         @JavascriptInterface public String status(){
             try{return CredentialVault.publicConfig(vault.load()).toString();}
             catch(Exception ignored){return "{\"configured\":false,\"error\":\"原连接配置无法读取，请重新配置。\"}";}
@@ -313,6 +334,7 @@ public final class MainActivity extends Activity {
     @Override protected void onResume(){super.onResume();if(webView!=null)webView.onResume();}
     @Override protected void onPause(){if(webView!=null)webView.onPause();super.onPause();}
     @Override protected void onDestroy(){
+        stopLaunchBarTransition();
         if(Build.VERSION.SDK_INT>=31&&systemSplashView!=null){((android.window.SplashScreenView)systemSplashView).remove();systemSplashView=null;}
         worker.shutdownNow();calendarWorker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
     }

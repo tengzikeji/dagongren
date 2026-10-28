@@ -37,9 +37,9 @@ export function bindPullRefresh(root,api){
  let gesture=null,pulled=null,refreshing=false,rebounding=false,animation=null,frame=0,hideTimer=0,blockedUntil=0,generation=0;
  const cancelFrame=()=>{if(frame)cancelAnimationFrame(frame);frame=0;};
  function show(state,text){clearTimeout(hideTimer);indicator.hidden=false;indicator.dataset.state=state;symbol.innerHTML=syncBadgeMarkup(state==='pulling'||state==='armed'?'syncing':state);symbol.style.transform='';label.textContent=text;}
- function hide(){clearTimeout(hideTimer);indicator.dataset.state='hidden';hideTimer=setTimeout(()=>{indicator.hidden=true;},200);}
+ function hide(immediate=false){clearTimeout(hideTimer);indicator.dataset.state='hidden';if(immediate){indicator.hidden=true;label.textContent='';return;}hideTimer=setTimeout(()=>{indicator.hidden=true;},200);}
  function restore(){if(pulled){pulled.node.style.transform=pulled.transform;pulled.node.style.willChange=pulled.willChange;pulled=null;}root.classList.remove('pull-dragging');}
- function reset(){const active=Boolean(gesture?.active||rebounding);generation++;gesture=null;rebounding=false;refreshing=false;cancelFrame();animation?.cancel();animation=null;restore();hide();if(active)api.onEnd?.();}
+ function reset(){const active=Boolean(gesture?.active||rebounding);generation++;gesture=null;rebounding=false;refreshing=false;cancelFrame();animation?.cancel();animation=null;restore();hide(true);if(active)api.onEnd?.();}
  async function refresh(){
   if(refreshing)return;refreshing=true;const token=++generation;show('syncing','正在同步');indicator.style.setProperty('--pull-y','16px');
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
@@ -79,7 +79,7 @@ export function bindPullRefresh(root,api){
  function end(cancelled=false){
   const g=gesture;if(!g)return;cancelFrame();gesture=null;
   if(!g.touch)try{if(root.hasPointerCapture?.(g.id))root.releasePointerCapture(g.id);}catch{}
-  if(!g.active)return;blockedUntil=Date.now()+350;rebounding=true;const token=++generation,trigger=!cancelled&&pullProgress(g.distance)===1;hide();
+  if(!g.active)return;blockedUntil=Date.now()+350;rebounding=true;const token=++generation,trigger=!cancelled&&pullProgress(g.distance)===1;hide(true);
   const finish=()=>{if(token!==generation)return;rebounding=false;animation=null;restore();api.onEnd?.();if(trigger)refresh();};
   const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   if(pulled?.node.animate&&!reduced){animation=pulled.node.animate([{transform:'translate3d(0,'+pulled.offset+'px,0)'},{transform:'translate3d(0,0,0)'}],{duration:300,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'});const current=animation;current.finished.then(()=>{current.cancel();finish();},finish);}

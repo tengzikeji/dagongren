@@ -174,7 +174,7 @@ function syncStatus() {
 }
 let calendarNavigator=null,deferredRender=false;
 function render(force=false) {
-  if(!force&&(app.classList.contains('swipe-busy')||pageNavigator?.isPending?.()||calendarNavigator?.isPending?.()||pullRefresh?.isDragging?.())){if(app.dataset.swipeTrigger==='tap')pageNavigator?.cancel(false);else{deferredRender=true;return;}}
+  if(!force&&(app.classList.contains('swipe-busy')||pageNavigator?.isPending?.()||calendarNavigator?.isPending?.()||pullRefresh?.isDragging?.())){deferredRender=true;return;}
   deferredRender=false;bookCache=null;
   const appearance=effectiveTheme(activeTheme,systemDark);
   document.body.setAttribute?.('data-theme',appearance);
@@ -281,7 +281,7 @@ function showCalendarSources(){
 }
 
 function appInfoFooter(){
-  const version=isAndroid?'安卓版 1.3.5-beta.2 测试版':'1.3.5-beta.2 网页预览';
+  const version=isAndroid?'安卓版 1.3.5-beta.3 测试版':'1.3.5-beta.3 网页预览';
   const storage=storageBlocked?'存储暂不可用，请及时导出账本。':isAndroid?'账本保存在本机，可自行配置坚果云同步。':'浏览器预览 · 数据保存在浏览器，坚果云同步为演示。';
   return `<footer class="app-info-footer" aria-label="应用信息"><div class="app-info-heading"><strong>打工人</strong><span>${version}</span></div><p class="app-info-storage">${icon('lock')}<span>${storage}</span></p><div class="app-info-divider" aria-hidden="true"></div><p class="app-info-owner">腾子科技·版权所有</p><p class="app-info-phone">联系电话：18937027607</p></footer>`;
 }
@@ -782,7 +782,7 @@ document.addEventListener('click',e=>{
   if(e.target.classList.contains('modal-overlay')){if(!stepBackModal())closeModal();return;}
   const button=e.target.closest('[data-action]');if(!button||button.disabled)return;
   const action=button.dataset.action;
-  if(action!=='nav'){if(pageNavigator?.isBusy())pageNavigator.cancel(false);if(calendarNavigator?.isBusy())calendarNavigator.cancel(false);}
+  if(action!=='nav'){if(pageNavigator?.isBusy())pageNavigator.cancel(false);if(action!=='shift-month'&&calendarNavigator?.isBusy())calendarNavigator.cancel(false);}
   if(nativeSync?.handleClick(action))return;
   if(action==='nav'){if(button.closest('.bottom-nav')&&!button.dataset.tab&&bottomNavigation?.select(button.dataset.view))return;if(button.closest('.side-nav')&&!button.dataset.tab&&pageNavigator?.navigate(button.dataset.view))return;activateNav(button.dataset.view,button.dataset.tab);}
   else if(action==='month-entries'){selectedMonth=button.dataset.month;recordYear=selectedMonth.slice(0,4);detailTab='entries';entryFilter='all';entryMonthScope=selectedMonth;navigateView('records');closeModal();render();window.scrollTo({top:0});}
@@ -830,6 +830,7 @@ document.addEventListener('click',e=>{
   else if(action==='choose-home-period'){if(validMonth(button.dataset.month)){homePeriodMonth=button.dataset.month;closeModal();render();}}
   else if(action==='shift-home-period'){const range=homeRange(),next=payPeriodForDate(shiftDay(Number(button.dataset.delta)<0?range.start:range.end,Number(button.dataset.delta)<0?-1:1),db.defaults);if(validMonth(next.start.slice(0,7))){homePeriodMonth=next.start.slice(0,7);render();}}
   else if(action==='shift-month'){
+    if(view==='calendar'&&calendarNavigator?.navigate(Number(button.dataset.delta)))return;
     const [y,m]=selectedMonth.split('-').map(Number),d=new Date(Date.UTC(y,m-1+Number(button.dataset.delta),1));
     const next=`${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}`;if(validMonth(next)){selectedMonth=next;render();}else toast('预览支持2020至2040年。');
   }
@@ -922,7 +923,7 @@ globalThis.dagongrenSystemTheme=systemThemeChanged;
 pageNavigator=installPageSwipe(app,{current:()=>view,blocked:()=>Boolean(modalRoot.firstElementChild)||Boolean(bottomNavigation?.isBusy?.()),preview:previewPage,navigate:next=>activateNav(next),settled:settledRender});
 calendarNavigator=installCalendarSwipe(app,{blocked:()=>view!=='calendar'||Boolean(modalRoot.firstElementChild)||Boolean(bottomNavigation?.isBusy?.()),preview:previewCalendar,commit:commitCalendar,settled:settledRender});
 pageNavigator?.invalidate?.();calendarNavigator?.invalidate?.();
-bottomNavigation=bindBottomNavigation(app,{current:()=>view,blocked:()=>Boolean(modalRoot.firstElementChild)||Boolean(pullRefresh?.isDragging?.()),before:()=>{pageNavigator?.cancel(false);calendarNavigator?.cancel(false);},navigate:activateNav,settled:settledRender});
+bottomNavigation=bindBottomNavigation(app,{current:()=>view,blocked:()=>Boolean(modalRoot.firstElementChild)||Boolean(pullRefresh?.isDragging?.()),before:()=>{pageNavigator?.cancel(false);calendarNavigator?.cancel(false);},navigate:next=>{if(!pageNavigator?.navigate(next))activateNav(next);},settled:settledRender});
 pullRefresh=bindPullRefresh(app,{
  enabled:()=>['home','calendar','records','settings'].includes(view),
  blocked:()=>Boolean(modalRoot.firstElementChild)||app.classList.contains('swipe-busy'),

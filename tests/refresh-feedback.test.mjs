@@ -24,6 +24,9 @@ test('下拉先移动页面，越过展示距离后出现提示，松手完成�
 test('短拉和取消手势回弹但不触发同步',async()=>{
  for(const cancel of [false,true]){const f=fixture();f.event('touchstart',100);f.event('touchmove',cancel?280:140);f.frame();f.event(cancel?'touchcancel':'touchend',cancel?280:140);await f.bounce();await f.flush();assert.equal(f.refreshes,0);assert.equal(f.content.style.transform,'');assert.equal(f.control.isDragging(),false);}
 });
+test('开启或关闭应用动效，松手后立即隐藏拖动标识并清空松开同步文案',async()=>{
+ for(const motion of [true,false]){const f=fixture({motion});f.event('touchstart',100);f.event('touchmove',280);f.frame();assert.equal(f.indicator.dataset.state,'armed');f.event('touchend',280);assert.equal(f.indicator.hidden,true);assert.equal(f.indicator.querySelector('.pull-refresh-label').textContent,'');assert.equal(f.refreshes,0);f.frame();assert.equal(f.indicator.hidden,true);await f.bounce();assert.equal(f.indicator.dataset.state,'syncing');await f.flush();assert.equal(f.indicator.dataset.state,'success');}
+});
 test('横向滑动及未到页面顶部时不移动页面和触发下拉',async()=>{
  const f=fixture();f.event('touchstart',100);f.event('touchmove',102,200);f.frame();assert.equal(f.content.style.transform,'');f.event('touchend',102,200);f.document.scrollingElement.scrollTop=10;f.event('touchstart',100);f.event('touchmove',270);f.frame();assert.equal(f.content.style.transform,'');assert.equal(f.refreshes,0);
 });
