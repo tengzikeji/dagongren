@@ -17,9 +17,23 @@ def detect_flash(values, threshold=4.0, window=10):
     return None
 
 
+def bar_flickers(values):
+    # The launcher may hand the status bar to the starting window once.
+    # A monotonic light-to-blue handoff is not repeated flashing; reject a
+    # reversal in either direction, then require the bar to settle on blue.
+    return (len(values)<10 or any(x<=5 or x>=240 for x in values)
+            or detect_flash(values,threshold=12) is not None
+            or detect_flash([-x for x in values],threshold=12) is not None
+            or any(not 22<=x<=40 for x in values[-5:]))
+
+
 def main():
     assert detect_flash([26, 26, 37, 26, 26, 37])
     assert detect_flash([26, 26, 27, 29, 32, 37]) is None
+    assert not bar_flickers([188]*5+[29]*15)
+    assert not bar_flickers([29]*20)
+    assert bar_flickers([29]*5+[188]*3+[29]*12)
+    assert bar_flickers([188]*3+[29]*3+[188]*3+[29]*11)
     if '--self-test' in sys.argv:
         print('Flash detector self-test passed')
         return
@@ -55,7 +69,7 @@ def main():
     top = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '10.0', '-vf', 'fps=20,crop=iw*0.24:ih*0.012:iw*0.38:ih*0.004,scale=24:4,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True).stdout
     top_means=[sum(top[i:i+96])/96 for i in range(0,len(top),96) if len(top[i:i+96])==96][anchor:anchor+20]
     print('Startup status-bar first 1s luminance:', ', '.join(f'{x:.1f}' for x in top_means))
-    background_error=len(top_means)<10 or max(top_means)-min(top_means)>12 or any(x<=5 or x>=75 for x in top_means)
+    background_error=bar_flickers(top_means)
     # Inspect foreground occupancy too: a stable blue background cannot prove
     # that the clock and system icons have remained visible.
     raw = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '30.0', '-vf', 'fps=20,crop=iw:ih*0.032:0:0,scale=360:20,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True).stdout
