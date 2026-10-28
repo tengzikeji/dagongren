@@ -934,6 +934,7 @@ public class AppSmokeTest {
         waitReady(scenario);waitTrue(scenario,"document.body.classList.contains('motion-off')&&window.__reviewReads===0");
     }
     private void nativePull(ActivityScenario<MainActivity> scenario) throws Exception {
+        waitTrue(scenario,"!document.getElementById('app').classList.contains('swipe-busy')&&!document.getElementById('app').classList.contains('pull-dragging')");
         evaluate(scenario,"window.__pullPaints=[];window.__pullToastBefore=document.getElementById('toast').textContent;if(!window.__pullPaintWatch){window.__pullPaintWatch=true;document.addEventListener('touchmove',()=>requestAnimationFrame(()=>{const c=document.querySelector('#app .workspace .content'),t=getComputedStyle(c).transform,y=t==='none'?0:new DOMMatrixReadOnly(t).m42;window.__pullPaints.push({y,state:document.querySelector('.pull-refresh').dataset.state})}),{capture:true,passive:true})}");
         evaluate(scenario,"window.scrollTo({top:0,behavior:'instant'});window.__pullTouchEvents=[];if(!window.__pullTouchTracking){window.__pullTouchTracking=true;for(const type of ['touchstart','touchmove','touchend','touchcancel','pointercancel'])document.addEventListener(type,e=>{if(window.__pullTouchEvents.length<60)window.__pullTouchEvents.push({type:e.type,cancelable:e.cancelable,y:e.touches?.[0]?.clientY,state:document.querySelector('.pull-refresh')?.dataset.state})},true)}");awaitInputWindow(scenario);
         int[] origin=new int[2];float[] density=new float[1];
@@ -946,7 +947,7 @@ public class AppSmokeTest {
             resetBook(scenario);installSyncReviewFixture(scenario);
             for(String page:new String[]{"home","calendar","records","settings"}){
                 evaluate(scenario,"document.querySelector('.bottom-nav [data-view="+page+"]').click()");
-                waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='"+page+"'");
+                waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='"+page+"'&&!document.getElementById('app').classList.contains('swipe-busy')");
                 evaluate(scenario,"window.__reviewHoldReads=true");nativePull(scenario);
                 waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='syncing'");
                 assertEquals("true",evaluate(scenario,"(()=>{const badge=document.querySelector('.cloud-sync-badge'),pull=document.querySelector('.pull-refresh');return document.body.classList.contains('motion-off')&&badge.dataset.source==='pull'&&getComputedStyle(badge.querySelector('svg')).animationName==='sync-spin'&&pull.dataset.state==='syncing'&&getComputedStyle(pull.querySelector('svg')).animationName==='sync-spin'})()"));
