@@ -22,9 +22,15 @@ export function prepareBrandIntro(){
   page.dataset.phase='fading';document.body.classList.add('intro-opening');
   const duration=640;
   try{performance.mark('dagongren.launch.fading',{detail:{duration,hold:1700,surfaces:document.querySelectorAll('.launch-page').length,fullScreen:true,homeReady:Boolean(document.querySelector('.view-home .balance-hero')),animated:true}});}catch{}
-  try{bridge?.introTransition?.(duration);}catch{}
-  if(page.animate){const fade=page.animate([{opacity:1},{opacity:0}],{duration,easing:'ease-in-out',fill:'both'});transitions.push(fade);fade.finished.then(done,()=>{});}
-  timer=setTimeout(done,duration+100);
+  if(page.animate){
+   const fade=page.animate([{opacity:1},{opacity:0}],{duration,easing:'ease-in-out',fill:'both'});transitions.push(fade);
+   // A busy renderer may not start this animation immediately. A wall-clock
+   // duration+100 timeout can remove the surface while it is still opaque.
+   timer=setTimeout(done,10000);
+   const ready=()=>{if(finished)return;clearTimeout(timer);try{bridge?.introTransition?.(duration);}catch{}try{performance.mark('dagongren.launch.fade.ready');}catch{}timer=setTimeout(done,Math.max(2500,duration*4));};
+   if(fade.ready)fade.ready.then(ready,done);else ready();
+   fade.finished.then(done,done);
+  }else{try{bridge?.introTransition?.(0);}catch{}page.style.opacity='0';requestAnimationFrame(done);}
  };
  const start=()=>{
   if(started||finished||!nativePainted)return;
