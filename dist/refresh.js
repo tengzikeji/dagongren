@@ -48,6 +48,10 @@ export function bindPullRefresh(root,api){
   const state=['success','error','attention'].includes(result?.state)?result.state:'attention';show(state,result?.message||(state==='success'?'同步成功':'尚未完成同步'));hideTimer=setTimeout(hide,state==='success'?1400:2400);
  }
  const top=()=>Math.max(window.scrollY||0,document.scrollingElement?.scrollTop||0)<=1;
+ // Reserve a top-edge downward pull before the browser can claim it as scrolling.
+ // Native scrolling towards lower content and pinch zoom remain available.
+ const updateReady=()=>root.classList.toggle?.('pull-refresh-ready',Boolean(api.enabled?.()&&top()));
+ updateReady();window.addEventListener?.('scroll',updateReady,{passive:true});
  function begin(x,y,id,touch,event){
   if(gesture||refreshing||rebounding||root.inert||!top()||!api.enabled?.()||api.blocked?.())return;
   if(event.target.closest?.('input,textarea,select,[role=dialog],.bottom-nav,.side-nav,.record-launcher,.profile-name-viewport,.entry-filters'))return;
@@ -91,5 +95,5 @@ export function bindPullRefresh(root,api){
  root.addEventListener('pointercancel',e=>{if(gesture&&!gesture.touch&&e.pointerId===gesture.id)end(true);},{passive:true});
  root.addEventListener('click',e=>{if(e.isTrusted&&Date.now()<blockedUntil){e.preventDefault();e.stopImmediatePropagation();}},true);
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')reset();});
- return {isDragging:()=>Boolean(gesture?.active||rebounding),isRefreshing:()=>refreshing,cancel:reset};
+ return {isDragging:()=>Boolean(gesture?.active||rebounding),isRefreshing:()=>refreshing,cancel:reset,updateReady};
 }

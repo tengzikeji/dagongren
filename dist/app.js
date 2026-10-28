@@ -186,6 +186,7 @@ function render(force=false) {
   const markup=appMarkup();
   renderStable(app,markup,view,db.defaults.motion!==false);
   updateCloudFeedback(app,syncFeedback(),syncStatus());
+  pullRefresh?.updateReady?.();
   if(view==='calendar')calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)));
   pageNavigator?.invalidate?.();calendarNavigator?.invalidate?.();
 }
