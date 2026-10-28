@@ -68,7 +68,7 @@ export function bindPullRefresh(root,api){
  root.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch'&&e.isPrimary!==false&&e.button===0)begin(e.clientX,e.clientY,e.pointerId,false,e);},{passive:true});
  root.addEventListener('pointermove',e=>{if(gesture&&!gesture.touch&&e.pointerId===gesture.id)move(e.clientX,e.clientY,e);},{passive:false});
  root.addEventListener('pointerup',e=>{if(gesture&&!gesture.touch&&e.pointerId===gesture.id)end();},{passive:true});
- root.addEventListener('pointercancel',()=>end(true),{passive:true});
+ root.addEventListener('pointercancel',e=>{if(gesture&&!gesture.touch&&e.pointerId===gesture.id)end(true);},{passive:true});
  root.addEventListener('click',e=>{if(e.isTrusted&&Date.now()<blockedUntil){e.preventDefault();e.stopImmediatePropagation();}},true);
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')reset();});
  return {isDragging:()=>Boolean(gesture?.active),isRefreshing:()=>refreshing,cancel:reset};

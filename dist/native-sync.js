@@ -72,6 +72,7 @@ export function installNativeSync(api){
   if(disposed||busy||cleanupReview)return report('attention','请等待当前网盘操作完成');
   if(db().sync.pendingCleanup){if(!silent)reviewCleanup(db().sync.pendingCleanup.options);return report('attention','请先核对上次云端清理结果');}
   if(!config.configured){if(!silent)showConfig();return report('attention','请先配置坚果云');}
+  if(silent&&api.interacting?.()){schedule(150);return {...feedback};}
   if(api.storageBlocked()){if(!silent)message('本机存储不可用，已暂停同步，请先导出账本。');return report('error','本机存储不可用');}
   if(!online()){lastError='网络已断开，修改保存在本机，联网后会自动补齐。';armPoll();if(!silent)api.toast(lastError);return report('error',lastError);}
   if(api.editing?.()){if(!silent)api.toast('请先保存或取消当前编辑，自动同步会在编辑完成后继续。');schedule();return report('attention','请先保存或取消当前编辑');}

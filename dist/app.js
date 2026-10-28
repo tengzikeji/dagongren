@@ -173,7 +173,7 @@ function syncStatus() {
 }
 let calendarNavigator=null,deferredRender=false;
 function render(force=false) {
-  if(!force&&app.classList.contains('swipe-busy')){if(app.dataset.swipeTrigger==='tap')pageNavigator?.cancel(false);else{deferredRender=true;return;}}
+  if(!force&&(app.classList.contains('swipe-busy')||pageNavigator?.isPending?.()||calendarNavigator?.isPending?.())){if(app.dataset.swipeTrigger==='tap')pageNavigator?.cancel(false);else{deferredRender=true;return;}}
   deferredRender=false;bookCache=null;
   const appearance=effectiveTheme(activeTheme,systemDark);
   document.body.setAttribute?.('data-theme',appearance);
@@ -906,7 +906,7 @@ document.addEventListener('keydown',e=>{
   }
 });
 window.addEventListener('storage',e=>{if(e.key===STORAGE){toast('另一页面更新了账本，刷新可查看最新记录。');}});
-if(isAndroid){nativeSync=installNativeSync({onState:syncFeedbackChanged,getBook:()=>db,replaceBook:value=>{db=value;persistedBook=snapshotBook(db);bookCache=null;},today:()=>today,defaults:defaultSettings,persist,render,toast,showModal,updateModal:(title,body,wide)=>showModal(title,body,wide,true),afterModalOpen,closeModal,esc,storageBlocked:()=>storageBlocked,cleanupComplete:message=>{cleanupDraft.target='local';pendingCleanupPlan=null;cleanupNotice=message;view='cleanup';render();toast(message);},editing:()=>Boolean(modalRoot.querySelector('form'))||Boolean(pageNavigator?.isBusy?.())||Boolean(calendarNavigator?.isBusy?.())});}
+if(isAndroid){nativeSync=installNativeSync({onState:syncFeedbackChanged,getBook:()=>db,replaceBook:value=>{db=value;persistedBook=snapshotBook(db);bookCache=null;},today:()=>today,defaults:defaultSettings,persist,render,toast,showModal,updateModal:(title,body,wide)=>showModal(title,body,wide,true),afterModalOpen,closeModal,esc,storageBlocked:()=>storageBlocked,cleanupComplete:message=>{cleanupDraft.target='local';pendingCleanupPlan=null;cleanupNotice=message;view='cleanup';render();toast(message);},editing:()=>Boolean(modalRoot.querySelector('form')),interacting:()=>Boolean(pageNavigator?.isBusy?.()||pageNavigator?.isPending?.()||calendarNavigator?.isBusy?.()||calendarNavigator?.isPending?.()||pullRefresh?.isDragging?.())});}
 globalThis.dagongrenBack=backOne;
 calendarUpdater=createCalendarUpdater({fetchYear:nativeSync?year=>nativeSync.fetchCalendar(year):null,onChange:()=>{bookCache=null;if(view==='calendar'&&!modalRoot.firstElementChild)render();}});
 ensureAccrualMonths(db,today);persist();

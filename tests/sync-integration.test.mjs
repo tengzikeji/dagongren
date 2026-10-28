@@ -14,7 +14,7 @@ const entry=(id,amount=10000)=>({id,date:'2026-10-20',amountCents:amount,categor
 const names=['calendar-data.js','calendar.js','payroll.js','data-tools.js','sync-tools.js','sync-merge.js','cloud-cleanup.js','native-sync.js'];
 const code=names.map(n=>fs.readFileSync(new URL('../dist/'+n,import.meta.url),'utf8').replace(/^import[^\n]+\n/gm,'').replace(/^export /gm,'')).join('\n')+'\nglobalThis.createSync=installNativeSync;';
 function device(server,initial=seed()){
- let current=copy(initial),modal='',editing=false,writes=0,reads=0;
+ let current=copy(initial),modal='',editing=false,interacting=false,writes=0,reads=0;
  current.sync={auto:true,pending:0,nativeVersion:1,baseline:sha(server.book),baseBook:copy(server.book),logs:[],...copy(initial.sync||{})};
  const timers=new Map(),events={},messages=[],states=[],storage=new Map();let id=0,failStorageKey='';
  const context=vm.createContext({console,Date,Intl,URL,queueMicrotask,navigator:{onLine:true},document:{visibilityState:'visible',getElementById:()=>null,addEventListener:(n,f)=>events[n]=f},window:{addEventListener:(n,f)=>events[n]=f},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>{if(k===failStorageKey)throw new Error('QuotaExceeded');storage.set(k,v)}},setTimeout:(fn,delay)=>{const key={id:++id,unref(){}};timers.set(key,{fn,delay});return key;},clearTimeout:k=>timers.delete(k)});
@@ -24,9 +24,9 @@ function device(server,initial=seed()){
   });
  }};
  vm.runInContext(code,context);
- const api={onState:s=>states.push(copy(s)),getBook:()=>current,replaceBook:n=>current=n,defaults,today:()=> '2026-10-25',storageBlocked:()=>false,editing:()=>editing,persist(){},render(){},toast:m=>messages.push(m),showModal:(t,b)=>modal=t+b,closeModal:()=>modal='',esc:x=>String(x)};
+ const api={onState:s=>states.push(copy(s)),getBook:()=>current,replaceBook:n=>current=n,defaults,today:()=> '2026-10-25',storageBlocked:()=>false,editing:()=>editing,interacting:()=>interacting,persist(){},render(){},toast:m=>messages.push(m),showModal:(t,b)=>modal=t+b,closeModal:()=>modal='',esc:x=>String(x)};
  const sync=context.createSync(api);
- return {sync,states,get:()=>current,failStorage:key=>failStorageKey=key,storage,modal:()=>modal,messages,context,events,setEditing:v=>editing=v,reads:()=>reads,writes:()=>writes,async flush(delay){for(const [k,t] of [...timers])if(t.delay===delay){timers.delete(k);t.fn();}await new Promise(r=>setImmediate(r));}};
+ return {sync,states,get:()=>current,failStorage:key=>failStorageKey=key,storage,modal:()=>modal,messages,context,events,setEditing:v=>editing=v,setInteracting:v=>interacting=v,reads:()=>reads,writes:()=>writes,async flush(delay){for(const [k,t] of [...timers])if(t.delay===delay){timers.delete(k);t.fn();}await new Promise(r=>setImmediate(r));}};
 }
 test('双设备不同新增自动合并且不重复',async()=>{const s={book:seed(),version:1},a=device(s),b=device(s);a.get().months['2026-10'].subsidies.push(entry('a'));b.get().months['2026-10'].subsidies.push(entry('b',20000));await a.sync.run();await b.sync.run();await a.sync.run('normal',true);for(const d of [a,b])assert.deepEqual([...d.get().months['2026-10'].subsidies].map(x=>x.id).sort(),['a','b']);assert.equal(s.book.months['2026-10'].subsidies.length,2);assert.equal(a.modal(),'');assert.equal(b.modal(),'');a.sync.dispose();b.sync.dispose();});
 test('未编辑设备通过前台轮询收到远端新增',async()=>{const s={book:seed(),version:1},a=device(s),b=device(s);await a.sync.run();b.get().months['2026-10'].subsidies.push(entry('remote'));await b.sync.run();const n=a.reads();await a.flush(30000);assert.ok(a.reads()>n);assert.equal(a.get().months['2026-10'].subsidies[0].id,'remote');a.sync.dispose();b.sync.dispose();});
@@ -129,5 +129,11 @@ test('未配置、离线和正在编辑时均不伪报云端同步成功',async(
 test('同笔冲突等待确认时返回待处理状态，保留双方记录',async()=>{
  const initial=seed();initial.months['2026-10'].subsidies=[entry('same')];const s={book:copy(initial),version:1},a=device(s,initial);
  try{a.get().months['2026-10'].subsidies[0].amountCents=20000;s.book.months['2026-10'].subsidies[0].amountCents=30000;s.version++;const result=await a.sync.run('normal',false,{source:'pull'});assert.equal(result.state,'attention');assert.equal(a.states.some(x=>x.state==='success'),false);assert.equal(a.writes(),0);assert.equal(a.get().months['2026-10'].subsidies[0].amountCents,20000);assert.equal(s.book.months['2026-10'].subsidies[0].amountCents,30000);}
+ finally{a.sync.dispose();}
+});
+
+ test('手指正在操作时自动同步延后，手势结束后再读取云端',async()=>{
+ const s={book:seed(),version:1},a=device(s);
+ try{await new Promise(r=>setImmediate(r));a.setInteracting(true);await a.sync.run('normal',true);assert.equal(a.reads(),0);assert.equal(a.states.some(x=>x.state==='syncing'),false);a.setInteracting(false);await a.flush(150);assert.equal(a.reads(),1);assert.equal(a.sync.feedback().state,'success');}
  finally{a.sync.dispose();}
 });

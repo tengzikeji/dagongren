@@ -196,7 +196,7 @@
 .swipe-boundary-label{font-size:11px;line-height:1.6;letter-spacing:2px;writing-mode:vertical-rl;white-space:nowrap;color:var(--muted,#7c90ad)}
 .swipe-boundary-arrow{display:grid;place-items:center;width:12px;height:22px;color:var(--orange,#3276f5);flex-shrink:0}
 .swipe-boundary-arrow svg{width:10px;height:17px;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-:is(.page-swipe-layer,.page-swipe-preload) .swipe-boundary-arrow{animation:swipe-edge-nudge .65s ease-in-out infinite alternate!important}
+.page-swipe-layer .swipe-boundary-arrow{animation:swipe-edge-nudge .65s ease-in-out infinite alternate!important}
 @keyframes swipe-edge-nudge{from{transform:translateX(0)}to{transform:translateX(var(--edge-nudge))}}
 body.motion-off .swipe-boundary-arrow{animation:none!important}
 /* Date paints depend only on their semantic state, never hover or touch press. */

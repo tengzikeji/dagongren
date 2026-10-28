@@ -183,7 +183,7 @@ public final class MainActivity extends Activity {
 
     public boolean isLaunchSurfaceReady(){return launchNotified;}
     public boolean isFirstLaunchFramePresented(){return firstLaunchFramePresented;}
-    public boolean hasBitmapLaunchCover(){return false;}
+    public boolean hasBitmapLaunchCover(){return getWindow().getDecorView().findViewWithTag("dagongren-launch-page")!=null;}
     public boolean isNativeMotionEnabled(){return getSharedPreferences("appearance",MODE_PRIVATE).getBoolean("motionEnabled",true);}
 
     private void reportKeyboard(boolean visible){

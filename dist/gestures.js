@@ -148,12 +148,12 @@ function bindInput(root,config){
  const clear=(flush=true)=>{generation++;cancelFrames();animation?.cancel();animation=null;scene?.dispose();scene=null;staged?.dispose();staged=null;releaseCapture(gesture);gesture=null;busy=false;root.classList.remove('swipe-busy','swipe-dragging','page-transitioning');delete root.dataset.swipeTrigger;if(owners.get(root)===controller)owners.delete(root);if(flush)config.settled?.(false);};
  const width=()=>config.width?.()||globalThis.document?.documentElement?.clientWidth||400;
  const point=(g,x,t)=>{if(!Number.isFinite(t))t=g.samples.at(-1)?.t||0;g.samples.push({x,t});g.samples=g.samples.filter(s=>s.t>=t-160);};
- const selectScene=(g,dx)=>{const delta=dx===0?(scene?.delta||g.delta||1):dx<0?1:-1;if(scene?.delta===delta)return;scene?.dispose();scene=null;if(staged){scene=staged.activate(delta);if(!scene)staged.dispose();staged=null;}if(!scene)scene=config.scene(delta);if(scene){scene.trigger='swipe';root.classList.add('swipe-busy','swipe-dragging');root.dataset.swipeTrigger='swipe';if(config.page)root.classList.add('page-transitioning');}g.delta=delta;};
+ const selectScene=(g,dx)=>{const delta=dx===0?(scene?.delta||g.delta||1):dx<0?1:-1;if(scene?.delta===delta)return;scene?.dispose();scene=null;if(staged){scene=staged.activate(delta);if(!scene)staged.dispose();staged=null;}if(!scene){config.warm?.();scene=config.scene(delta);}if(scene){scene.trigger='swipe';root.classList.add('swipe-busy','swipe-dragging');root.dataset.swipeTrigger='swipe';if(config.page)root.classList.add('page-transitioning');}g.delta=delta;};
  const update=(g,dx)=>{selectScene(g,dx);if(!scene)return;scene.update(dx);};
  const move=(x,y,t,event)=>{const g=gesture;if(!g)return;const dx=x-g.x,dy=y-g.y;point(g,x,t);g.dx=dx;g.axis=swipeAxis(dx,dy,g.axis);if(g.axis!=='x')return;
   if(event.cancelable)event.preventDefault();if(!g.touch)try{root.setPointerCapture?.(g.id);}catch{}
   if(g.firstInputAt===undefined){g.firstInputAt=performance.now();g.firstEvent=t;}
-  g.pending=dx;
+  g.pending=dx;g.pendingEvent=t;
   if(!dragFrame){
    if(typeof requestAnimationFrame!=='function'){update(g,dx);return;}
    dragFrame=requestAnimationFrame(()=>{
@@ -161,7 +161,7 @@ function bindInput(root,config){
     const began=performance.now();update(g,g.pending);
     if(!g.firstCommitted&&scene){
      g.firstCommitted=true;const committed=performance.now(),kind=config.page?'page':'calendar',prepared=scene.prepared===true;
-     mark('dagongren.'+kind+'.input-commit',{eventToCommit:committed-g.firstInputAt,callbackWork:committed-began,sampleAge:Math.max(0,committed-g.firstEvent),prepared,raf:true});
+     mark('dagongren.'+kind+'.input-commit',{eventToCommit:committed-g.firstInputAt,downToCommit:committed-g.downAt,latestSampleAge:Math.max(0,committed-g.pendingEvent),callbackWork:committed-began,sampleAge:Math.max(0,committed-g.firstEvent),prepared,raf:true});
      requestAnimationFrame(at=>mark('dagongren.'+kind+'.first-frame',{eventToNextFrame:performance.now()-g.firstInputAt,commitToNextFrame:performance.now()-committed,rafTimestamp:at,prepared}));
     }
    });
@@ -179,7 +179,7 @@ function bindInput(root,config){
   animation.finished.then(finish,()=>{if(token===generation)clear();});
  };
  const end=(x,y,t,event,cancelled=false)=>{const g=gesture;if(!g)return;g.dx=x-g.x;point(g,x,t);g.axis=swipeAxis(g.dx,y-g.y,g.axis);if(g.axis==='x'){if(event.cancelable)event.preventDefault();const velocity=swipeVelocity(g.samples,t),decision=swipeDecision(g.dx,scene?.width||width(),velocity,g.axis);g.delta=decision.delta;settle(!cancelled&&decision.complete,velocity);}else clear();};
- const begin=(x,y,t,id,touch,event)=>{if(busy||gesture||owners.get(root)||config.blocked?.()||!config.accept(event.target,x))return;gesture={x,y,id,touch,axis:'pending',dx:0,delta:0,samples:[{x,t}]};owners.set(root,controller);};
+ const begin=(x,y,t,id,touch,event)=>{if(busy||gesture||owners.get(root)||config.blocked?.()||!config.accept(event.target,x))return;gesture={x,y,id,touch,axis:'pending',dx:0,delta:0,downAt:performance.now(),samples:[{x,t}]};mark('dagongren.'+(config.page?'page':'calendar')+'.down',{prepared:Boolean(staged)});owners.set(root,controller);};
  root.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'||e.isPrimary===false||e.button>0)return;begin(e.clientX,e.clientY,e.timeStamp,e.pointerId,false,e);},{passive:true});
  root.addEventListener('pointermove',e=>{if(gesture&&!gesture.touch&&e.pointerId===gesture.id)move(e.clientX,e.clientY,e.timeStamp,e);},{passive:false});
  root.addEventListener('pointerup',e=>{if(gesture&&!gesture.touch&&e.pointerId===gesture.id)end(e.clientX,e.clientY,e.timeStamp,e);},{passive:false});
