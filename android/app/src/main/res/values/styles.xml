@@ -2,7 +2,6 @@
 <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
     <item name="android:fontFamily">sans</item>
     <item name="android:windowLightStatusBar">@bool/system_bar_light</item>
-    <item name="android:windowLightNavigationBar">@bool/system_bar_light</item>
     <item name="android:statusBarColor">@color/system_bar_surface</item>
     <item name="android:navigationBarColor">@color/system_bar_surface</item>
     <item name="android:windowActionModeOverlay">true</item>
