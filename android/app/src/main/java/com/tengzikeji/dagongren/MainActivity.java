@@ -91,6 +91,7 @@ public final class MainActivity extends Activity {
         webView.setBackgroundColor(launchIntro?LAUNCH_COLOR:appearanceColor());
         WebSettings settings=webView.getSettings();
         settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
+        settings.setOffscreenPreRaster(launchIntro);
         settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setGeolocationEnabled(false);
@@ -225,7 +226,7 @@ public final class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public void introTransition(int duration){runOnUiThread(()->fadeLaunchAppearance(duration));}
-        @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{if(!active)launchIntro=false;applyAppearance();});}
+        @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{if(!active){launchIntro=false;if(webView!=null)webView.getSettings().setOffscreenPreRaster(false);}applyAppearance();});}
         @JavascriptInterface public String status(){
             try{return CredentialVault.publicConfig(vault.load()).toString();}
             catch(Exception ignored){return "{\"configured\":false,\"error\":\"原连接配置无法读取，请重新配置。\"}";}

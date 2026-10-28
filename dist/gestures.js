@@ -123,22 +123,22 @@ function prepareCalendarScene(root,api,cache,snapshot){
  const width=viewport.getBoundingClientRect().width,oldHeight=grid.getBoundingClientRect().height,track=document.createElement('div');track.className='calendar-swipe-track';track.setAttribute('aria-hidden','true');track.inert=true;track.className='calendar-swipe-preload';track.style.opacity='.001';
  const old=frame('swipe-month calendar-leaving',width);old.style.left='0px';old.appendChild(snapshot);track.appendChild(old);const options=new Map();
  for(const delta of [-1,1]){const item=cache.get(delta),next=item?frame('swipe-month calendar-entering',width):boundaryFrame(width,delta);next.style.left=delta*width+'px';if(item)next.appendChild(item.grid);track.appendChild(next);options.set(delta,{item,next,height:oldHeight});}
- const viewportRect=viewport.getBoundingClientRect();
- Object.assign(track.style,{position:'fixed',left:viewportRect.left+'px',top:viewportRect.top+'px',right:'auto',bottom:'auto',width:width+'px',height:oldHeight+'px',overflow:'hidden',zIndex:'16'});
- document.body.appendChild(track);for(const option of options.values())if(option.item)option.height=option.next.firstElementChild.getBoundingClientRect().height;
+ const viewportRect=viewport.getBoundingClientRect(),layer=document.createElement('div');layer.className='calendar-swipe-layer';layer.setAttribute('aria-hidden','true');layer.inert=true;
+ Object.assign(layer.style,{position:'fixed',left:viewportRect.left+'px',top:viewportRect.top+'px',width:width+'px',height:oldHeight+'px',overflow:'hidden',pointerEvents:'none',zIndex:'16'});
+ layer.appendChild(track);document.body.appendChild(layer);for(const option of options.values())if(option.item)option.height=option.next.firstElementChild.getBoundingClientRect().height;
  mark('dagongren.calendar.prepare',{duration:performance.now()-began,prepared:true});let active=false;
  return {activate(delta){
   if(active||!grid.isConnected)return null;active=true;const started=performance.now(),option=options.get(delta);options.get(-delta).next.remove();const item=option.item,next=option.next,nextHeight=option.height,visibility=grid.style.visibility,height=viewport.style.height;
   for(const node of [old,next])node.style.minHeight=Math.max(oldHeight,nextHeight)+'px';viewport.style.height=oldHeight+'px';grid.style.visibility='hidden';viewport.classList.add('calendar-month-switching');track.className='calendar-swipe-track';track.style.opacity='1';
-  const resize=x=>{const p=item?Math.min(1,Math.abs(x)/width):0;const size=(oldHeight+(nextHeight-oldHeight)*p)+'px';viewport.style.height=size;track.style.height=size;viewport.dataset.swipeProgress=p.toFixed(4);};
+  const resize=x=>{const p=item?Math.min(1,Math.abs(x)/width):0;const size=(oldHeight+(nextHeight-oldHeight)*p)+'px';viewport.style.height=size;layer.style.height=size;viewport.dataset.swipeProgress=p.toFixed(4);};
   mark('dagongren.calendar.activate',{duration:performance.now()-started,prepared:true,from:panel.dataset.calendarMonth,to:item?.month||panel.dataset.calendarMonth});
   return {track,width,boundary:!item,delta,from:panel.dataset.calendarMonth,to:item?.month||panel.dataset.calendarMonth,offset:0,prepared:true,
    update(dx){this.offset=swipeOffset(dx,width,!item);track.style.transform='translate3d('+this.offset+'px,0,0)';resize(this.offset);},progress:resize,
-   dispose(){track.remove();grid.style.visibility=visibility;viewport.style.height=height;viewport.classList.remove('calendar-month-switching');delete viewport.dataset.swipeProgress;},
+   dispose(){layer.remove();grid.style.visibility=visibility;viewport.style.height=height;viewport.classList.remove('calendar-month-switching');delete viewport.dataset.swipeProgress;},
    commit(){if(item)api.commit(delta);},
    notify(completed,velocity,duration){mark(completed?'dagongren.calendar.slide':'dagongren.calendar.rebound',{from:this.from,to:completed?this.to:this.from,direction:delta,duration,velocity,sharedTrack:true,datesOnly:true,boundary:!item,prepared:true});}
   };
- },dispose(){if(!active)track.remove();}};
+ },dispose(){if(!active)layer.remove();}};
 }
 function bindInput(root,config){
  if(!root.addEventListener)return;
@@ -189,7 +189,7 @@ function bindInput(root,config){
  root.addEventListener('touchend',e=>{if(!gesture?.touch)return;const p=[...e.changedTouches].find(p=>p.identifier===gesture.id);if(p)end(p.clientX,p.clientY,e.timeStamp,e);},{passive:false});
  root.addEventListener('touchcancel',e=>{if(gesture?.touch)end(gesture.x+gesture.dx,gesture.y,e.timeStamp,e,true);},{passive:true});
  root.addEventListener('click',e=>{if(e.isTrusted&&Date.now()<blockedUntil&&config.ownsClick(e.target)){e.preventDefault();e.stopImmediatePropagation();}},true);
- const controller={cancel:clear,isBusy:()=>busy||Boolean(scene),isPending:()=>Boolean(gesture&&!scene),discardPrepared(){if(!scene){staged?.dispose();staged=null;}},preload(){if(gesture||busy||scene||config.blocked?.())return false;staged?.dispose();staged=null;config.warm?.();staged=config.prepare?.()||null;return Boolean(staged);},start(delta,trigger='tap'){
+ const controller={cancel:clear,isBusy:()=>busy||Boolean(scene),isPending:()=>Boolean(gesture&&!scene),discardPrepared(){if(!scene){staged?.dispose();staged=null;}},preload(){if(gesture||busy||scene||owners.get(root)||config.blocked?.())return false;staged?.dispose();staged=null;config.warm?.();staged=config.prepare?.()||null;return Boolean(staged);},start(delta,trigger='tap'){
   owners.get(root)?.cancel(false);clear(false);config.warm?.();scene=config.scene(delta);if(!scene)return false;scene.trigger=trigger;root.dataset.swipeTrigger=trigger;root.classList.add('swipe-busy');if(config.page)root.classList.add('page-transitioning');owners.set(root,controller);gesture={x:0,y:0,id:-1,touch:false,axis:'x',dx:0,delta,samples:[{x:0,t:0}]};scene.update(0);if(trigger==='tap'){scene.commit();scene.committed=true;const live=root.querySelector('.workspace .content');if(live)live.style.visibility='hidden';scene.update(0);}settle(true,0);return true;
  }};return controller;
 }

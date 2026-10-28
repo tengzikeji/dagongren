@@ -76,7 +76,7 @@ export function installNativeSync(api){
   if(!online()){lastError='网络已断开，修改保存在本机，联网后会自动补齐。';armPoll();if(!silent)api.toast(lastError);return report('error',lastError);}
   if(api.editing?.()){if(!silent)api.toast('请先保存或取消当前编辑，自动同步会在编辑完成后继续。');schedule();return report('attention','请先保存或取消当前编辑');}
   let succeeded=false;
-  const generation=cleanupGeneration,cancelled=()=>cleanupGeneration!==generation||(silent&&!db().sync.auto);busy=true;clearTimeout(timer);clearTimeout(pollTimer);lastAttempt=Date.now();report('syncing','正在同步');
+  const generation=cleanupGeneration,cancelled=()=>cleanupGeneration!==generation||(silent&&runSource!=='pull'&&!db().sync.auto);busy=true;clearTimeout(timer);clearTimeout(pollTimer);lastAttempt=Date.now();report('syncing','正在同步');
   try{
    for(let attempt=0;attempt<3;attempt++){
     const initialHash=signature(db()),remote=await request('read');if(cancelled())return;
