@@ -688,9 +688,9 @@ function saveSettingsForm(formId,fd,error) {
   }catch(e){error.textContent=e.message;}
 }
 
-function refreshAccrualDay() {
+function refreshAccrualDay(scheduleNext=true) {
   const next=chinaDate();if(next!==today){today=next;ensureAccrualMonths(db,today);if(db.sync.demo||db.sync.connected)db.sync.pending++;persist();render();if((db.sync.demo||db.sync.connected)&&db.sync.auto&&!db.sync.offline)scheduleDemoSync();}
-setTimeout(refreshAccrualDay,60000);
+if(scheduleNext)setTimeout(refreshAccrualDay,60000);
 }
 
 
@@ -925,7 +925,7 @@ pullRefresh=bindPullRefresh(app,{
  blocked:()=>Boolean(modalRoot.firstElementChild)||app.classList.contains('swipe-busy'),
  onStart:()=>{pageNavigator?.cancel(false);calendarNavigator?.cancel(false);},
  onEnd:()=>{pageNavigator?.invalidate?.();calendarNavigator?.invalidate?.();},
- async refresh(){refreshAccrualDay();bookCache=null;render();calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)),{force:true});return await runDemoSync('pull');}
+ async refresh(){refreshAccrualDay(false);bookCache=null;render();calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)),{force:true});return await runDemoSync('pull');}
 });
 setTimeout(refreshAccrualDay,60000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(nativeSync)nativeSync.foreground();calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)));const next=chinaDate();if(next!==today){today=next;ensureAccrualMonths(db,today);if(db.sync.demo||db.sync.connected)db.sync.pending++;persist();render();if((db.sync.demo||db.sync.connected)&&db.sync.auto&&!db.sync.offline)scheduleDemoSync();}}});

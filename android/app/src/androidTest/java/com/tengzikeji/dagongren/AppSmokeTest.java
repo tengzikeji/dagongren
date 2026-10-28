@@ -58,7 +58,9 @@ public class AppSmokeTest {
     }
     private String evaluate(ActivityScenario<MainActivity> scenario,String script) throws Exception {
         CountDownLatch latch=new CountDownLatch(1);AtomicReference<String> result=new AtomicReference<>();
-        if(!withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);if(web==null||web.getProgress()<100){result.set("null");latch.countDown();return;}web.evaluateJavascript(script,value->{result.set(value);latch.countDown();});}))return "null";
+        // Launch observation must begin before the ledger module finishes loading.
+        // Waiting for progress=100 misses the entire short startup transition.
+        if(!withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);if(web==null){result.set("null");latch.countDown();return;}web.evaluateJavascript(script,value->{result.set(value);latch.countDown();});}))return "null";
         assertTrue("WebView evaluation timed out: "+script,latch.await(25,TimeUnit.SECONDS));return result.get();
     }
     private void waitTrue(ActivityScenario<MainActivity> scenario,String script) throws Exception {
