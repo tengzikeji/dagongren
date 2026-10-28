@@ -54,7 +54,7 @@ export function bindPullRefresh(root,api){
   gesture={x,y,id,touch,axis:'pending',distance:0,active:false};
  }
  function paint(g){
-  const offset=pullOffset(g.distance);if(pulled)pulled.node.style.transform='translate3d(0,'+offset+'px,0)';
+  const offset=pullOffset(g.distance);if(pulled){pulled.offset=offset;pulled.node.style.transform='translate3d(0,'+offset+'px,0)';}
   if(g.distance<32){indicator.hidden=true;return;}
   const progress=pullProgress(g.distance),state=progress===1?'armed':'pulling';
   if(indicator.hidden||!['pulling','armed'].includes(indicator.dataset.state))show(state,'下拉同步');indicator.dataset.state=state;indicator.style.setProperty('--pull-y',(5+offset*.12)+'px');indicator.style.setProperty('--pull-progress',String(Math.min(1,(g.distance-32)/52)));
@@ -66,7 +66,7 @@ export function bindPullRefresh(root,api){
    if(Math.max(Math.abs(dx),Math.abs(dy))<6)return;
    if(Math.abs(dx)>Math.abs(dy)*1.05||dy<=0||!top()){gesture=null;return;}
    if(dy<Math.abs(dx)*1.05)return;g.axis='y';g.active=true;api.onStart?.();
-   const node=root.querySelector('.workspace .content');if(node)pulled={node,transform:node.style.transform,willChange:node.style.willChange};if(pulled)pulled.node.style.willChange='transform';root.classList.add('pull-dragging');
+   const node=root.querySelector('.workspace .content');if(node)pulled={node,offset:0,transform:node.style.transform,willChange:node.style.willChange};if(pulled)pulled.node.style.willChange='transform';root.classList.add('pull-dragging');
    if(!g.touch)try{root.setPointerCapture?.(g.id);}catch{}
   }
   if(event.cancelable)event.preventDefault();g.distance=Math.max(0,dy);
@@ -78,7 +78,7 @@ export function bindPullRefresh(root,api){
   if(!g.active)return;blockedUntil=Date.now()+350;rebounding=true;const token=++generation,trigger=!cancelled&&pullProgress(g.distance)===1;hide();
   const finish=()=>{if(token!==generation)return;rebounding=false;animation=null;restore();api.onEnd?.();if(trigger)refresh();};
   const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  if(pulled?.node.animate&&!reduced){animation=pulled.node.animate([{transform:'translate3d(0,'+pullOffset(g.distance)+'px,0)'},{transform:'translate3d(0,0,0)'}],{duration:300,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'});const current=animation;current.finished.then(()=>{current.cancel();finish();},finish);}
+  if(pulled?.node.animate&&!reduced){animation=pulled.node.animate([{transform:'translate3d(0,'+pulled.offset+'px,0)'},{transform:'translate3d(0,0,0)'}],{duration:300,easing:'cubic-bezier(.2,.75,.25,1)',fill:'both'});const current=animation;current.finished.then(()=>{current.cancel();finish();},finish);}
   else finish();
  }
  root.addEventListener('touchstart',e=>{if(e.touches.length!==1){end(true);return;}const p=e.touches[0];begin(p.clientX,p.clientY,p.identifier,true,e);},{passive:true});
