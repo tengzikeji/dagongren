@@ -136,7 +136,9 @@ public final class MainActivity extends Activity {
         windowCanvas.setColor(color);getWindow().setBackgroundDrawable(windowCanvas);
         getWindow().getDecorView().setBackgroundColor(color);getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
         getWindow().getDecorView().setSystemUiVisibility(darkBars?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        if(webView!=null){webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
+        // The live HTML covers the WebView during the intro; changing its native
+        // background every animation frame unnecessarily invalidates Chromium.
+        if(webView!=null){if(!launchIntro)webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
     }
     private void fadeLaunchAppearance(int duration){
         if(!launchIntro||isDestroyed())return;
