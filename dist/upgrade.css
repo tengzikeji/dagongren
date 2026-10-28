@@ -147,7 +147,7 @@
 :is(.page-swipe-layer,.page-swipe-preload) .page-swipe-outgoing{contain:layout style}
 #app.is-paging .workspace .content,.calendar-panel.is-swiping .calendar-days{transition:none!important}
 #app.page-transitioning .data-chart *,#app.page-transitioning .data-chart{animation:none!important}
-.motion-off .workspace .content,.motion-off .calendar-days{transform:none!important}
+
 @media(prefers-reduced-motion:reduce){#app.is-paging .workspace .content,.calendar-panel.is-swiping .calendar-days{transform:none!important}}
 
 /* Update charts from their current value without rebuilding or replaying them. */
@@ -231,7 +231,7 @@ body[data-theme=dark] .calendar-day.has-entry{--date-border:#58759e}
 @keyframes launch-rise{from{opacity:.7;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes launch-card-in{from{opacity:.7;transform:translateY(28px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes launch-line{from{transform:scaleX(.15);opacity:.2}to{transform:scaleX(1);opacity:1}}@keyframes launch-bar{from{transform:scaleY(.15);opacity:.1}to{transform:scaleY(1);opacity:1}}@keyframes launch-sheen{to{transform:translateX(70%)}}@keyframes launch-orbit{from{transform:translate(-50%,-50%) rotate(-34deg);opacity:.1}to{transform:translate(-50%,-50%) rotate(-18deg);opacity:1}}@keyframes launch-dot{50%{opacity:.2;transform:translateY(-3px)}}
 .intro-playing #app{opacity:0;pointer-events:none}.intro-playing #app *,.intro-playing #app *:before,.intro-playing #app *:after{animation:none!important}.intro-opening #app{opacity:1}
 
-/* Native window, native cover and web launch surface share one blue canvas. */
+/* The native window and live launch surface share one blue canvas. */
 body.intro-playing .launch-page,body.intro-playing[data-theme=dark] .launch-page{background:#101e3d;color:#e5edf9}
 .launch-page .launch-grid{opacity:.22}
 .launch-page .launch-header strong,.launch-page .launch-copy h2,body[data-theme=dark] .launch-page .launch-copy h2{color:#e5edf9}
@@ -255,7 +255,7 @@ body.intro-playing .launch-page,body.intro-playing[data-theme=dark] .launch-page
 .launch-page :is(.launch-ledger,.launch-value-line,.launch-bars i,.launch-ready i){will-change:transform,opacity}
 @media(prefers-reduced-motion:reduce){:is(.page-swipe-layer,.page-swipe-preload) .swipe-boundary-arrow,.launch-page *{animation:none!important}}
 
-/* Identical native and web first frames dissolve into the live startup scene. */
+/* Launch content fades in over a stable, opaque native-blue background. */
 
 
 /* Compact application information below the last settings card. */
@@ -267,3 +267,7 @@ body.intro-playing .launch-page,body.intro-playing[data-theme=dark] .launch-page
 /* Keep a restrained card highlight moving if the home data needs more time. */
 .launch-loading-sheen{position:absolute;inset:-40% -60%;background:linear-gradient(110deg,transparent 42%,#c3dcff09 49%,#c3dcff12 50%,transparent 58%);transform:translateX(-70%);pointer-events:none}
 .launch-page[data-phase] .launch-loading-sheen{animation:launch-sheen 1.35s .4s ease-in-out both}
+
+.launch-page[data-phase=preparing] .launch-scene{opacity:0}
+.launch-page:is([data-phase=playing],[data-phase=fading]) .launch-scene{animation:launch-content-in .42s ease-out both}
+@keyframes launch-content-in{from{opacity:0}to{opacity:1}}

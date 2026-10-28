@@ -70,13 +70,14 @@ export function installNativeSync(api){
  }
  async function performRun(resolution='normal',silent=false,source='manual'){
   runSource=source;
+  const notify=()=>!silent&&runSource!=='pull';
   if(disposed||busy||cleanupReview)return report('attention','请等待当前网盘操作完成');
   if(db().sync.pendingCleanup){if(!silent)reviewCleanup(db().sync.pendingCleanup.options);return report('attention','请先核对上次云端清理结果');}
-  if(!config.configured){if(!silent)showConfig();return report('attention','请先配置坚果云');}
+  if(!config.configured){if(notify())showConfig();return report('attention','请先配置坚果云');}
   if(silent&&api.interacting?.()){schedule(150);return {...feedback};}
-  if(api.storageBlocked()){if(!silent)message('本机存储不可用，已暂停同步，请先导出账本。');return report('error','本机存储不可用');}
-  if(!online()){lastError='网络已断开，修改保存在本机，联网后会自动补齐。';armPoll();if(!silent)api.toast(lastError);return report('error',lastError);}
-  if(api.editing?.()){if(!silent)api.toast('请先保存或取消当前编辑，自动同步会在编辑完成后继续。');schedule();return report('attention','请先保存或取消当前编辑');}
+  if(api.storageBlocked()){if(notify())message('本机存储不可用，已暂停同步，请先导出账本。');return report('error','本机存储不可用');}
+  if(!online()){lastError='网络已断开，修改保存在本机，联网后会自动补齐。';armPoll();if(notify())api.toast(lastError);return report('error',lastError);}
+  if(api.editing?.()){if(notify())api.toast('请先保存或取消当前编辑，自动同步会在编辑完成后继续。');schedule();return report('attention','请先保存或取消当前编辑');}
   let succeeded=false;
   const generation=cleanupGeneration,cancelled=()=>cleanupGeneration!==generation||(silent&&runSource!=='pull'&&!db().sync.auto);busy=true;clearTimeout(timer);clearTimeout(pollTimer);lastAttempt=Date.now();report('syncing','正在同步');
   try{
@@ -99,12 +100,12 @@ export function installNativeSync(api){
     }else if(choosing)action=resolution;
     if(action==='conflict'){lastError='请先确认这次同步要保留的账本。';conflictDialog(remoteHash,localHash);return;}
     if(choosing)api.closeModal();
-    if(action==='same'){adopt(local,local);succeeded=true;if(!silent)api.toast('本机与网盘账本一致。');return;}
+    if(action==='same'){adopt(local,local);succeeded=true;if(notify())api.toast('本机与网盘账本一致。');return;}
     if(action==='download')candidate=canMerge?candidate:remoteBook;
     if(!candidate)throw new Error('网盘账本不存在，本机记录保留。');
     candidate=migrateBook(snapshotBook(candidate),api.defaults,api.today());ensureAccrualMonths(candidate,api.today());
     rememberDeletions(candidate,local,requestPrefix+'-'+(++sequence));calculateBook(candidate.months,candidate.defaults,api.today());candidate=snapshotBook(candidate);
-    if(action==='download'&&signature(candidate)===remoteHash){saveBeforeReplace(db());adopt(candidate,remoteBook);succeeded=true;if(!silent)api.toast('网盘的新记录已合并到本机。');return;}
+    if(action==='download'&&signature(candidate)===remoteHash){saveBeforeReplace(db());adopt(candidate,remoteBook);succeeded=true;if(notify())api.toast('网盘的新记录已合并到本机。');return;}
     if(remote.exists&&(!remote.etag||remote.etag.startsWith('W/')))throw new Error('网盘未提供可用于防冲突的版本标识，本次未覆盖网盘账本。');
     saveBeforeReplace(db());
     try{await request('write',{content:canonicalJSON(candidate),exists:remote.exists,etag:remote.etag||''});}
@@ -117,12 +118,12 @@ export function installNativeSync(api){
      if(rebased.conflicts.length){lastError='同步期间同一笔记录又有修改，请确认冲突部分。';conflictDialog(signature(candidate),signature(db()),rebased.conflicts,true);}
     }else adopt(candidate,candidate);
     succeeded=!conflict&&!db().sync.pending;
-    if(!silent&&!conflict)api.toast(action==='merge'?'两端不同的新记录已自动合并。':'账本已同步到坚果云。');return;
+    if(notify()&&!conflict)api.toast(action==='merge'?'两端不同的新记录已自动合并。':'账本已同步到坚果云。');return;
    }
   }catch(error){
    if(cancelled())return;
    failures++;lastError=/[\u4e00-\u9fff]/.test(error.message||'')?error.message:'同步未完成，修改保存在本机，稍后会自动重试。';
-   if(error.code===429)failures=Math.max(failures,4);if(!silent)api.toast(lastError);
+   if(error.code===429)failures=Math.max(failures,4);if(notify())api.toast(lastError);
   }finally{
    busy=false;
    if(cancelled())report('idle','同步已暂停');

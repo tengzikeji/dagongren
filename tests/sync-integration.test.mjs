@@ -12,6 +12,7 @@ const defaults={salaryCents:600000,company:'测试公司',joinDate:'2026-10-01',
 const seed=()=>({version:2,defaults:{...defaults},months:{'2026-10':{...defaults,leaves:[],overtime:[],subsidies:[],deductions:[],advances:[],payments:[],payment:null}},excludedMonths:[]});
 const entry=(id,amount=10000)=>({id,date:'2026-10-20',amountCents:amount,category:'补贴',note:''});
 const names=['calendar-data.js','calendar.js','payroll.js','data-tools.js','sync-tools.js','sync-merge.js','cloud-cleanup.js','native-sync.js'];
+test('下拉同步的成功与失败不关联底部提示框',async()=>{for(const failure of [false,true]){const s={book:seed(),version:1,...(failure?{readError:'连接失败'}:{})},a=device(s);try{const result=await a.sync.run('normal',false,{source:'pull'});assert.equal(result.state,failure?'error':'success');assert.deepEqual(a.messages,[]);}finally{a.sync.dispose();}}});
 const code=names.map(n=>fs.readFileSync(new URL('../dist/'+n,import.meta.url),'utf8').replace(/^import[^\n]+\n/gm,'').replace(/^export /gm,'')).join('\n')+'\nglobalThis.createSync=installNativeSync;';
 function device(server,initial=seed()){
  let current=copy(initial),modal='',editing=false,interacting=false,writes=0,reads=0;

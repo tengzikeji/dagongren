@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -51,6 +52,10 @@ public final class MainActivity extends Activity {
     public void onCreate(Bundle state) {
         super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;
         refreshAppearance();
+        // Match the starting theme before attaching content or changing insets.
+        getWindow().setBackgroundDrawable(windowCanvas);
+        if(Build.VERSION.SDK_INT>=29){getWindow().setStatusBarContrastEnforced(false);getWindow().setNavigationBarContrastEnforced(false);}
+        applyAppearance();
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         FrameLayout root=new FrameLayout(this);root.setBackgroundColor(launchIntro?LAUNCH_COLOR:appearanceColor());
         if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(window->{
@@ -133,9 +138,16 @@ public final class MainActivity extends Activity {
         paintAppearance(launchIntro?LAUNCH_COLOR:appearanceColor(),launchIntro||darkAppearance);
     }
     @SuppressWarnings("deprecation") private void paintAppearance(int color,boolean darkBars){
-        windowCanvas.setColor(color);getWindow().setBackgroundDrawable(windowCanvas);
+        windowCanvas.setColor(color);
         getWindow().getDecorView().setBackgroundColor(color);getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
-        getWindow().getDecorView().setSystemUiVisibility(darkBars?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        // Change icon appearance without resetting layout/visibility flags on each frame.
+        if(Build.VERSION.SDK_INT>=30){
+            WindowInsetsController controller=getWindow().getInsetsController();
+            if(controller!=null){int mask=WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;controller.setSystemBarsAppearance(darkBars?0:mask,mask);}
+        }else{
+            View decor=getWindow().getDecorView();int mask=View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            int flags=decor.getSystemUiVisibility(),next=(flags&~mask)|(darkBars?0:mask);if(flags!=next)decor.setSystemUiVisibility(next);
+        }
         // The live HTML covers the WebView during the intro; changing its native
         // background every animation frame unnecessarily invalidates Chromium.
         if(webView!=null){if(!launchIntro)webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}

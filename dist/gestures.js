@@ -20,7 +20,8 @@ export function swipeDecision(dx,width,velocity=0,axis='x'){
 export function swipeOffset(dx,width,boundary=false){return boundary?Math.sign(dx)*Math.min(width*.35,Math.abs(dx)*.4):Math.max(-width,Math.min(width,dx));}
 export function calendarSwipeDelta(dx,dy,duration=0,width=400){if(duration>30000||swipeAxis(dx,dy)!=='x')return 0;const d=swipeDecision(dx,width,duration>0?dx*1000/duration:0);return d.complete?d.delta:0;}
 const owners=new WeakMap();
-const reduced=()=>document.body.classList.contains('motion-off')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+// Direct manipulation and its settling animation are independent of decorative motion.
+const reduced=()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const mark=(name,detail)=>{try{performance.mark(name,{detail});}catch{}};
 function stripIds(node){node.removeAttribute?.('id');for(const n of node.querySelectorAll?.('[id]')||[])n.removeAttribute('id');return node;}
 function copy(node){return stripIds(node.cloneNode(true));}

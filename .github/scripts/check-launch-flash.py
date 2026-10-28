@@ -46,6 +46,13 @@ def main():
     if flash:
         raise SystemExit(f'Launch brightness disappeared and returned around {(anchor+flash[0])/20:.2f}s (drops {flash[1]:.1f}, {flash[2]:.1f})')
     print('No bright-dark-bright flash detected during the native window handoff')
+    # Sample the status-bar background between clock and system icons, beginning
+    # at the same solid-blue window anchor, before the home color handoff.
+    top = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '10.0', '-vf', 'fps=20,crop=iw*0.24:ih*0.012:iw*0.38:ih*0.004,scale=24:4,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True).stdout
+    top_means=[sum(top[i:i+96])/96 for i in range(0,len(top),96) if len(top[i:i+96])==96][anchor:anchor+20]
+    print('Startup status-bar first 1s luminance:', ', '.join(f'{x:.1f}' for x in top_means))
+    if len(top_means)<10 or max(top_means)-min(top_means)>12 or any(x<=5 or x>=75 for x in top_means):
+        raise SystemExit('Status-bar background changed unexpectedly before launch content')
 
 
 if __name__ == '__main__':

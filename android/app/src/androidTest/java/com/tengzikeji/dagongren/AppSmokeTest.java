@@ -368,6 +368,7 @@ public class AppSmokeTest {
         device.executeShellCommand("settings put global animator_duration_scale 1");
         try(ActivityScenario<MainActivity> prepared=ActivityScenario.launch(MainActivity.class)){
             resetBook(prepared);
+            evaluate(prepared,"const b=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));b.defaults.motion=false;localStorage.setItem('dagongren.paybook.v1',JSON.stringify(b))");
             waitTrue(prepared,"!matchMedia('(prefers-reduced-motion: reduce)').matches");
         }
         // Leave the instrumentation activity before recording a real launch from Home.
@@ -386,8 +387,10 @@ public class AppSmokeTest {
             waitTrueLoading(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1);if(!entry)return false;window.__launchObserved=entry.detail;if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='fading'){const rect=page.getBoundingClientRect(),style=getComputedStyle(page);window.__launchBlendSamples.push({opacity:Number(style.opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height,left:rect.left,top:rect.top,transform:style.transform,radius:style.borderRadius})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
             assertEquals("1",evaluateLoading(scenario,"window.__launchObserved.surfaces"));
             assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertFalse(activity.hasBitmapLaunchCover());assertTrue(activity.getWindow().getDecorView().isHardwareAccelerated());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
-            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.4'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface"));
+            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.1'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface"));
             assertEquals("false",evaluateLoading(scenario,"window.__launchObserved.oldBrand"));
+            assertEquals("true",evaluateLoading(scenario,"!document.querySelector('.launch-edition')&&window.__launchObserved.animationNames.includes('launch-content-in')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false"));
+            assertTrue(withActivity(activity->{assertFalse(activity.getWindow().isStatusBarContrastEnforced());assertFalse(activity.getWindow().isNavigationBarContrastEnforced());int mask=android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;assertEquals(0,activity.getWindow().getInsetsController().getSystemBarsAppearance()&mask);}));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.inert"));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.animated&&['launch-soft-in','launch-line','launch-bar','launch-sheen','launch-orbit','launch-dot'].every(name=>window.__launchObserved.animationNames.includes(name))"));
             waitTrueLoading(scenario,"performance.getEntriesByName('dagongren.app.render').length>0");
@@ -719,7 +722,7 @@ public class AppSmokeTest {
                 paintedScreenshot(scenario,"theme-"+theme+"-profile");
             evaluate(scenario,"document.querySelector('.app-info-footer').scrollIntoView({block:'center',behavior:'instant'})");
             waitTrue(scenario,"!document.getElementById('toast').classList.contains('show')");
-            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.4 正式版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.1 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
                 paintedScreenshot(scenario,"theme-"+theme+"-copyright");
             evaluate(scenario,"document.querySelector('#app .profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 swipeRegion(scenario,".employment-progress",-1);
@@ -914,6 +917,7 @@ public class AppSmokeTest {
         waitReady(scenario);waitTrue(scenario,"document.body.classList.contains('motion-off')&&window.__reviewReads===0");
     }
     private void nativePull(ActivityScenario<MainActivity> scenario) throws Exception {
+        evaluate(scenario,"window.__pullPaints=[];window.__pullToastBefore=document.getElementById('toast').textContent;if(!window.__pullPaintWatch){window.__pullPaintWatch=true;document.addEventListener('touchmove',()=>requestAnimationFrame(()=>{const c=document.querySelector('#app .workspace .content'),t=getComputedStyle(c).transform,y=t==='none'?0:new DOMMatrixReadOnly(t).m42;window.__pullPaints.push({y,state:document.querySelector('.pull-refresh').dataset.state})}),{capture:true,passive:true})}");
         evaluate(scenario,"window.scrollTo({top:0,behavior:'instant'});window.__pullTouchEvents=[];if(!window.__pullTouchTracking){window.__pullTouchTracking=true;for(const type of ['touchstart','touchmove','touchend','touchcancel','pointercancel'])document.addEventListener(type,e=>{if(window.__pullTouchEvents.length<60)window.__pullTouchEvents.push({type:e.type,cancelable:e.cancelable,y:e.touches?.[0]?.clientY,state:document.querySelector('.pull-refresh')?.dataset.state})},true)}");awaitInputWindow(scenario);
         int[] origin=new int[2];float[] density=new float[1];
         assertTrue(withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(origin);density[0]=activity.getResources().getDisplayMetrics().density;}));
@@ -932,6 +936,7 @@ public class AppSmokeTest {
                 evaluate(scenario,"window.__releaseReviewReads()");
                 waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='success'&&document.querySelector('.pull-refresh').dataset.state==='success'");
                 assertEquals("true",evaluate(scenario,"(()=>{const b=document.querySelector('.sync-cloud-button'),r=b.getBoundingClientRect(),data=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));return r.width>=40&&r.height>=34&&r.right<=innerWidth&&getComputedStyle(b.querySelector('.cloud-sync-badge')).color==='rgb(22, 134, 82)'&&!data.defaults.motion&&!data.sync.auto&&window.__reviewWrites===0})()"));
+                assertEquals("true",evaluate(scenario,"(()=>{const b=document.querySelector('.sync-cloud-button'),cloud=b.querySelector('.cloud-icon>svg').getBoundingClientRect(),badge=b.querySelector('.cloud-sync-badge').getBoundingClientRect(),content=document.querySelector('#app .workspace .content');return window.__pullPaints.some(f=>f.y>15)&&getComputedStyle(content).transform==='none'&&badge.left>=cloud.left&&badge.right<=cloud.right&&badge.top>=cloud.top&&badge.bottom<=cloud.bottom&&document.getElementById('toast').textContent===window.__pullToastBefore})()"));
                 paintedScreenshot(scenario,"pull-sync-"+page);
             }
             assertEquals("4",evaluate(scenario,"window.__reviewReads"));
@@ -958,15 +963,33 @@ public class AppSmokeTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);installSyncReviewFixture(scenario);
             evaluate(scenario,"window.__pullNode=document.querySelector('.topbar');window.__pullEvent=(type,x,y)=>window.__pullNode.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:795,isPrimary:true,button:0,clientX:x,clientY:y}));window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,100);window.__pullEvent('pointerup',180,100)");
+            waitTrue(scenario,"!document.getElementById('app').classList.contains('pull-dragging')");
             assertEquals("0",evaluate(scenario,"window.__reviewReads"));
             evaluate(scenario,"window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,190);window.__pullEvent('pointercancel',180,190)");
+            waitTrue(scenario,"!document.getElementById('app').classList.contains('pull-dragging')");
             assertEquals("0",evaluate(scenario,"window.__reviewReads"));
             evaluate(scenario,"window.scrollTo({top:150,behavior:'instant'});window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,200);window.__pullEvent('pointerup',180,200)");
+            waitTrue(scenario,"!document.getElementById('app').classList.contains('pull-dragging')");
             assertEquals("0",evaluate(scenario,"window.__reviewReads"));
             evaluate(scenario,"window.scrollTo({top:0,behavior:'instant'});window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,200);window.__pullEvent('pointerup',180,200)");
             waitTrue(scenario,"window.__reviewReads===1&&document.querySelector('.cloud-sync-badge').dataset.state==='success'");
         }
     }
+    @Test public void motionSwitchKeepsNativePageAndCalendarTracks() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('[data-view=home]').click()");
+            waitTrue(scenario,"document.body.classList.contains('motion-off')&&!document.getElementById('app').classList.contains('swipe-busy')");
+            evaluate(scenario,"window.__motionTrackFrames=[];window.__motionTrackWatch=true;const sample=()=>{if(!window.__motionTrackWatch)return;for(const kind of ['page','calendar']){const track=document.querySelector('.'+kind+'-swipe-track');if(track){const transform=getComputedStyle(track).transform;window.__motionTrackFrames.push({kind,x:transform==='none'?0:new DOMMatrixReadOnly(transform).m41,animated:track.getAnimations().length>0})}}requestAnimationFrame(sample)};requestAnimationFrame(sample)");
+            swipeRegion(scenario,".topbar",1);
+            waitTrue(scenario,"Boolean(document.querySelector('#app .view-calendar'))&&!document.getElementById('app').classList.contains('swipe-busy')");
+            swipeCalendar(scenario,1);
+            waitTrue(scenario,"performance.getEntriesByName('dagongren.calendar.slide').length>0&&!document.getElementById('app').classList.contains('swipe-busy')");
+            assertEquals("true",evaluate(scenario,"['page','calendar'].every(kind=>window.__motionTrackFrames.some(f=>f.kind===kind&&Math.abs(f.x)>5))&&document.body.classList.contains('motion-off')"));
+            evaluate(scenario,"window.__motionTrackWatch=false");
+        }
+    }
+
     private void slowNativeDrag(ActivityScenario<MainActivity> scenario,String selector,String kind) throws Exception {
         evaluate(scenario,"document.querySelector('"+selector+"').scrollIntoView({block:'center',behavior:'instant'})");awaitInputWindow(scenario);
         waitTrue(scenario,"Boolean(document.querySelector('"+(kind.equals("page")?".page-swipe-preload":".calendar-swipe-preload")+"'))");
@@ -1000,3 +1023,4 @@ public class AppSmokeTest {
 
 
 }
+
