@@ -1,7 +1,7 @@
 import {themeCatalog,resolveTheme,effectiveTheme,themePicker} from './themes.js';
 import {settlementChart,dailyWageChart,annualWageChart,profileChart} from './charts.js';
 import {createCalendarUpdater} from './holiday-updates.js';
-import {renderStable,chartNumberMarkup,enhanceModalChoices,closeChoicePicker,playBrandIntro,playHomeStartupGlare,installCalendarSwipe,installPageSwipe} from './interaction.js';
+import {renderStable,chartNumberMarkup,enhanceModalChoices,closeChoicePicker,playBrandIntro,installCalendarSwipe,installPageSwipe} from './interaction.js';
 import {calendarRights} from './calendar-rights.js';
 import {calendarDay,calendarCoverage} from './calendar.js';
 import { daysInMonth, validMonth, validDate, holiday, makeupWorkday, datesBetween, calculate, formatMoney, statutoryDates, isStatutory, isAdjustedDay, overtimeAmount, wagePayments, chinaDate, shiftDay, leaveDeducts, calculateBook, migrateBook, ensureAccrualMonths, payPeriodForDate, rebuildAccrualFromJoin, salaryRateForDate } from './payroll.js';
@@ -10,8 +10,13 @@ import { copyRecords, canonicalJSON, makeCleanupPlan, applyCleanupPlan, mergeDem
 import {snapshotBook} from './sync-tools.js';
 import {rememberDeletions} from './sync-merge.js';
 import { installNativeSync } from './native-sync.js';
+import {cloudButtonMarkup,updateCloudFeedback,bindPullRefresh} from './refresh.js';
 const isAndroid=typeof globalThis.AndroidFiles?.request==='function';
 let nativeSync=null;
+let pullRefresh=null,demoSyncTask=null,demoFeedback={state:'idle',source:'auto',message:'',revision:0};
+function syncFeedback(){return nativeSync?.feedback?.()||demoFeedback;}
+function syncFeedbackChanged(feedback){updateCloudFeedback(document,feedback,nativeSync?.status?.()||feedback.message);const button=document.querySelector?.('.sync-actions [data-action="sync-now"]');if(button){button.disabled=feedback.state==='syncing';button.textContent=feedback.state==='syncing'?'正在同步…':'立即同步';}}
+function demoReport(state,message,source='manual'){demoFeedback={state,message,source,revision:demoFeedback.revision+1};syncFeedbackChanged(demoFeedback);return {...demoFeedback};}
 let calendarUpdater=null;
 
 const paths = {
@@ -180,13 +185,14 @@ function render(force=false) {
   app.classList.toggle('motion-off',db.defaults.motion===false);
   const markup=appMarkup();
   renderStable(app,markup,view,db.defaults.motion!==false);
+  updateCloudFeedback(app,syncFeedback(),syncStatus());
   if(view==='calendar')calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)));
   pageNavigator?.invalidate?.();calendarNavigator?.invalidate?.();
 }
 function appMarkup(){
   const home=view==='home',mine=view==='settings';
   return `<aside class="sidebar"><div class="brand"><div class="brand-icon">${icon('bag')}</div><div><div class="brand-name">打工人</div><div class="brand-sub">工资有数，生活有底。</div></div></div><nav class="side-nav" aria-label="主导航">${navItems.map(([key,i,label])=>`<button class="nav-item ${navActive(key)?'active':''}" data-action="nav" data-view="${key}" ${navActive(key)?'aria-current="page"':''}>${icon(i)}<span>${label}</span></button>`).join('')}</nav><div class="side-bottom"><div class="side-status"><span class="status-dot ${db.sync.demo&&!db.sync.offline?'good':''}"></span>${storageBlocked?'临时保存模式':'本机账本'}${icon('lock')}</div><p>${isAndroid?'本机账本 · 可配置坚果云同步':'交互预览 · 坚果云同步为演示'}</p></div></aside>
-  <main class="workspace"><div class="content"><header class="topbar"><div class="page-heading">${home?`<div class="brand-icon">${icon('bag')}</div>`:''}<div><p class="hello">${home?'你的每一份努力，都有记录。':view==='calendar'?'每日计薪与工作记录':view==='records'?'计薪、收款与变动，逐笔可查。':mine?'工资档案与账本管理':view==='cleanup'?'按范围管理你的账本':'账本与数据同步'}</p><h1 class="page-title">${home?'打工人':titles[view]}</h1></div></div><div class="top-actions"><button class="cloud-button ${db.sync.demo&&!db.sync.offline?'connected':''}" data-action="nav" data-view="sync" aria-label="查看坚果云同步">${icon('cloud')}<span>${syncStatus()}</span></button></div></header>${storageBlocked?'<div class="notice">当前仅临时保存，请通过“我的”导出账本备份。</div>':''}<div id="view-content" class="view-${view}">${home?homeView():view==='calendar'?calendarPage():view==='records'?recordsView():view==='sync'?syncView():view==='cleanup'?cleanupView():settingsView()}</div>${mine?appInfoFooter():`<footer class="page-foot">${icon('lock')}${isAndroid?'账本保存在本机':'交互预览 · 示例账本'} · ${storageBlocked?'修改仅在当前页面保留':isAndroid?'可在“我的”配置坚果云':'修改保存在当前浏览器'}</footer>`}</div></main>
+  <main class="workspace"><div class="content"><header class="topbar"><div class="page-heading">${home?`<div class="brand-icon">${icon('bag')}</div>`:''}<div><p class="hello">${home?'你的每一份努力，都有记录。':view==='calendar'?'每日计薪与工作记录':view==='records'?'计薪、收款与变动，逐笔可查。':mine?'工资档案与账本管理':view==='cleanup'?'按范围管理你的账本':'账本与数据同步'}</p><h1 class="page-title">${home?'打工人':titles[view]}</h1></div></div><div class="top-actions"><button class="cloud-button sync-cloud-button" data-action="nav" data-view="sync" aria-busy="${syncFeedback().state==='syncing'}" aria-label="云同步：${esc(syncFeedback().message||syncStatus())}，点击查看坚果云同步">${cloudButtonMarkup(syncFeedback(),syncStatus())}</button></div></header>${storageBlocked?'<div class="notice">当前仅临时保存，请通过“我的”导出账本备份。</div>':''}<div id="view-content" class="view-${view}">${home?homeView():view==='calendar'?calendarPage():view==='records'?recordsView():view==='sync'?syncView():view==='cleanup'?cleanupView():settingsView()}</div>${mine?appInfoFooter():`<footer class="page-foot">${icon('lock')}${isAndroid?'账本保存在本机':'交互预览 · 示例账本'} · ${storageBlocked?'修改仅在当前页面保留':isAndroid?'可在“我的”配置坚果云':'修改保存在当前浏览器'}</footer>`}</div></main>
   <button class="record-launcher" data-action="record-entry" aria-label="记一笔：请假、加班、补贴、扣款、预支或发工资"><span class="record-plus">${icon('plus')}</span><span>记一笔</span></button><nav class="bottom-nav" aria-label="底部导航">${navItems.map(([key,i,label])=>`<button class="${navActive(key)?'active':''}" data-action="nav" data-view="${key}" ${navActive(key)?'aria-current="page"':''}>${icon(i)}<span>${label}</span></button>`).join('')}</nav>`;
 }
 function previewPage(next){
@@ -273,7 +279,7 @@ function showCalendarSources(){
 }
 
 function appInfoFooter(){
-  const version=isAndroid?'安卓版 1.3.3 正式版':'1.3.3 网页预览';
+  const version=isAndroid?'安卓版 1.3.4 正式版':'1.3.4 网页预览';
   const storage=storageBlocked?'存储暂不可用，请及时导出账本。':isAndroid?'账本保存在本机，可自行配置坚果云同步。':'浏览器预览 · 数据保存在浏览器，坚果云同步为演示。';
   return `<footer class="app-info-footer" aria-label="应用信息"><div class="app-info-heading"><strong>打工人</strong><span>${version}</span></div><p class="app-info-storage">${icon('lock')}<span>${storage}</span></p><div class="app-info-divider" aria-hidden="true"></div><p class="app-info-owner">腾子科技·版权所有</p><p class="app-info-phone">联系电话：18937027607</p></footer>`;
 }
@@ -441,22 +447,22 @@ function cancelDemoSync() { clearTimeout(syncTimer);clearTimeout(syncRunTimer);s
 function scheduleDemoSync() {
   if(nativeSync){nativeSync.schedule();return;}
   clearTimeout(syncTimer);
-  if((db.sync.demo||db.sync.connected)&&db.sync.auto&&!db.sync.offline)syncTimer=setTimeout(runDemoSync,700);
+  if((db.sync.demo||db.sync.connected)&&db.sync.auto&&!db.sync.offline)syncTimer=setTimeout(()=>runDemoSync('auto'),700);
 }
-function runDemoSync() {
-  if(nativeSync){nativeSync.run();return;}
-  if(!db.sync.demo){showConnection();return;}
-  if(db.sync.offline){toast('演示离线中，请关闭“模拟离线”再试。');return;}
-  if(syncBusy)return;
-  ensureDemoCloud();syncBusy=true;const generation=++syncGeneration;render();
-  syncRunTimer=setTimeout(()=>{
-    if(generation!==syncGeneration)return;
+function runDemoSync(source='manual') {
+  if(nativeSync)return nativeSync.run('normal',false,{source});
+  if(!db.sync.demo){showConnection();return demoReport('attention','请先配置坚果云',source);}
+  if(db.sync.offline){toast('演示离线中，请关闭“模拟离线”再试。');return demoReport('error','当前离线，本机记录已保留',source);}
+  if(syncBusy)return demoSyncTask;
+  ensureDemoCloud();syncBusy=true;const generation=++syncGeneration;demoReport('syncing','正在同步',source);render();
+  demoSyncTask=new Promise(resolve=>{syncRunTimer=setTimeout(()=>{
+    if(generation!==syncGeneration){resolve(demoReport('attention','同步已暂停',source));return;}
     syncBusy=false;
-    if(db.sync.offline){addLog('演示同步暂停，修改留在本机','wifi');persist();render();return;}
+    if(db.sync.offline){addLog('演示同步暂停，修改留在本机','wifi');persist();render();resolve(demoReport('error','当前离线，本机记录已保留',source));return;}
     const merged=mergeDemoRecords(db.months,db.sync.cloudMonths);
     db.months=copyRecords(merged);db.sync.cloudMonths=copyRecords(merged);db.sync.cloudDefaults=copyRecords(db.defaults);
-    db.sync.pending=0;db.sync.last=Date.now();addLog('本地与云端演示账本已合并，未上传数据');persist();render();
-  },1000);
+    db.sync.pending=0;db.sync.last=Date.now();addLog('本地与云端演示账本已合并，未上传数据');persist();render();resolve(demoReport('success','演示同步完成，未上传真实云端',source));
+  },1000);});return demoSyncTask;
 }
 function cleanupLabel(options) { return options.scope==='all'?'全部账本':options.scope==='year'?options.year+'年':fullMonth(options.month); }
 function cleanupTargetLabel(target) { return target==='local'?'本地':target==='cloud'?'云端（演示）':'本地与云端（演示）'; }
@@ -900,20 +906,27 @@ document.addEventListener('keydown',e=>{
   }
 });
 window.addEventListener('storage',e=>{if(e.key===STORAGE){toast('另一页面更新了账本，刷新可查看最新记录。');}});
-if(isAndroid){nativeSync=installNativeSync({getBook:()=>db,replaceBook:value=>{db=value;persistedBook=snapshotBook(db);bookCache=null;},today:()=>today,defaults:defaultSettings,persist,render,toast,showModal,updateModal:(title,body,wide)=>showModal(title,body,wide,true),afterModalOpen,closeModal,esc,storageBlocked:()=>storageBlocked,cleanupComplete:message=>{cleanupDraft.target='local';pendingCleanupPlan=null;cleanupNotice=message;view='cleanup';render();toast(message);},editing:()=>Boolean(modalRoot.querySelector('form'))});}
+if(isAndroid){nativeSync=installNativeSync({onState:syncFeedbackChanged,getBook:()=>db,replaceBook:value=>{db=value;persistedBook=snapshotBook(db);bookCache=null;},today:()=>today,defaults:defaultSettings,persist,render,toast,showModal,updateModal:(title,body,wide)=>showModal(title,body,wide,true),afterModalOpen,closeModal,esc,storageBlocked:()=>storageBlocked,cleanupComplete:message=>{cleanupDraft.target='local';pendingCleanupPlan=null;cleanupNotice=message;view='cleanup';render();toast(message);},editing:()=>Boolean(modalRoot.querySelector('form'))||Boolean(pageNavigator?.isBusy?.())||Boolean(calendarNavigator?.isBusy?.())});}
 globalThis.dagongrenBack=backOne;
 calendarUpdater=createCalendarUpdater({fetchYear:nativeSync?year=>nativeSync.fetchCalendar(year):null,onChange:()=>{bookCache=null;if(view==='calendar'&&!modalRoot.firstElementChild)render();}});
 ensureAccrualMonths(db,today);persist();
 calendarUpdater.refresh(Number(today.slice(0,4)));
 try{performance.mark('dagongren.app.render');}catch{}
 render();
-playBrandIntro(db.defaults.motion!==false,()=>{if(view==='home')playHomeStartupGlare(app,db.defaults.motion!==false);});
+playBrandIntro(db.defaults.motion!==false,()=>{pageNavigator?.invalidate?.();calendarNavigator?.invalidate?.();});
 const systemThemeChanged=dark=>{systemDark=Boolean(dark);if(activeTheme==='system')render();};
 systemTheme?.addEventListener?.('change',event=>{if(!isAndroid)systemThemeChanged(event.matches);});
 globalThis.dagongrenSystemTheme=systemThemeChanged;
 pageNavigator=installPageSwipe(app,{current:()=>view,blocked:()=>Boolean(modalRoot.firstElementChild),preview:previewPage,navigate:next=>activateNav(next),settled:settledRender});
 calendarNavigator=installCalendarSwipe(app,{blocked:()=>view!=='calendar'||Boolean(modalRoot.firstElementChild),preview:previewCalendar,commit:commitCalendar,settled:settledRender});
 pageNavigator?.invalidate?.();calendarNavigator?.invalidate?.();
+pullRefresh=bindPullRefresh(app,{
+ enabled:()=>['home','calendar','records','settings'].includes(view),
+ blocked:()=>Boolean(modalRoot.firstElementChild)||app.classList.contains('swipe-busy'),
+ onStart:()=>{pageNavigator?.cancel(false);calendarNavigator?.cancel(false);},
+ onEnd:()=>{pageNavigator?.invalidate?.();calendarNavigator?.invalidate?.();},
+ async refresh(){refreshAccrualDay();bookCache=null;render();calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)),{force:true});return await runDemoSync('pull');}
+});
 setTimeout(refreshAccrualDay,60000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(nativeSync)nativeSync.foreground();calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)));const next=chinaDate();if(next!==today){today=next;ensureAccrualMonths(db,today);if(db.sync.demo||db.sync.connected)db.sync.pending++;persist();render();if((db.sync.demo||db.sync.connected)&&db.sync.auto&&!db.sync.offline)scheduleDemoSync();}}});
 window.addEventListener('online',()=>calendarUpdater?.refresh(Number(selectedMonth.slice(0,4)),{force:true}));

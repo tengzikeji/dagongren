@@ -67,13 +67,13 @@ function pageScene(root,api,cache,delta,target=null){
   notify(completed,velocity,duration){mark(completed?'dagongren.page.slide':'dagongren.page.rebound',{from,to:completed?(to||from):from,direction:delta,duration,velocity,sharedTrack:true,trigger:this.trigger||'swipe',boundary:!to});}
  };
 }
-// Build and lay out both adjacent pages while the finger is down, before motion starts.
+// Build, measure and submit adjacent pages during idle time, before touch-down.
 function preparePageScene(root,api,cache,snapshot){
  const began=performance.now(),content=root.querySelector('.workspace .content'),workspace=root.querySelector('.workspace');if(!content?.getBoundingClientRect||!snapshot)return null;
  const from=api.current(),width=document.documentElement.clientWidth,rect=content.getBoundingClientRect(),stickyRect=content.querySelector('.calendar-panel-header')?.getBoundingClientRect(),nav=root.querySelector('.bottom-nav')?.getBoundingClientRect(),padding=parseFloat(getComputedStyle(workspace).paddingTop)||0;
  const targets=new Map([-1,1].map(delta=>[delta,pageSwipeTarget(from,delta)]));
  for(const to of targets.values())if(to&&!cache.has(to))return null;
- const layer=document.createElement('div'),track=document.createElement('div');layer.className='page-swipe-layer';track.className='page-swipe-track';layer.setAttribute('aria-hidden','true');layer.inert=true;layer.style.visibility='hidden';layer.style.opacity='0';
+ const layer=document.createElement('div'),track=document.createElement('div');layer.className='page-swipe-preload';track.className='page-swipe-track';layer.setAttribute('aria-hidden','true');layer.inert=true;layer.style.opacity='.001';
  if(nav?.height)layer.style.bottom=Math.max(0,innerHeight-nav.top)+'px';
  const old=frame('swipe-page page-swipe-outgoing',width);old.style.left='0px';
  Object.assign(snapshot.style,{position:'absolute',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:'auto',margin:'0',visibility:'visible'});old.appendChild(snapshot);track.appendChild(old);
@@ -86,14 +86,15 @@ function preparePageScene(root,api,cache,snapshot){
  for(const option of options.values())if(option.incoming)api.fitPreview?.(option.incoming);
  for(const selector of ['.profile-name-viewport','.entry-filters']){const sources=[...content.querySelectorAll(selector)],copies=[...snapshot.querySelectorAll(selector)];sources.forEach((node,i)=>{if(copies[i])copies[i].scrollLeft=node.scrollLeft;});}
  const sticky=snapshot.querySelector('.calendar-panel-header');if(sticky&&stickyRect){sticky.style.position='relative';sticky.style.top='auto';sticky.style.transform='translateY('+(stickyRect.top-sticky.getBoundingClientRect().top)+'px)';}
- const navStyles=navigationStyles(root,from);
+ const navStyles=navigationStyles(root,from),edges=new Map();
+ for(const [delta,option] of options)if(!option.to){const edge=boundaryFeedback(delta);edges.set(delta,edge);layer.appendChild(edge.node);}
  mark('dagongren.page.prepare',{duration:performance.now()-began,prepared:true});let active=false;
  return {activate(delta){
-  if(active||api.current()!==from)return null;active=true;const started=performance.now(),option=options.get(delta),other=options.get(-delta);other.next.remove();
-  const to=option.to,edge=!to?boundaryFeedback(delta):null;if(edge){layer.classList.add('page-swipe-at-boundary');layer.insertBefore(edge.node,track);}
-  const navProgress=navigationProgress(root,from,to,navStyles),visibility=content.style.visibility;api.before?.();content.style.visibility='hidden';layer.style.visibility='visible';layer.style.opacity='1';
+  if(active||api.current()!==from)return null;active=true;const started=performance.now(),option=options.get(delta);options.get(-delta).next.remove();
+  const to=option.to,edge=edges.get(delta);if(edge)layer.classList.add('page-swipe-at-boundary');
+  const navProgress=navigationProgress(root,from,to,navStyles),visibility=content.style.visibility;api.before?.();content.style.visibility='hidden';layer.className='page-swipe-layer'+(!to?' page-swipe-at-boundary':'');layer.style.opacity='1';
   mark('dagongren.page.activate',{duration:performance.now()-started,prepared:true,from,to});
-  return {track,width,boundary:!to,delta,from,to,offset:0,
+  return {track,width,boundary:!to,delta,from,to,offset:0,prepared:true,
    update(dx){this.offset=swipeOffset(dx,width,!to);track.style.transform='translate3d('+this.offset+'px,0,0)';navProgress.set(to?Math.abs(this.offset)/width:0);edge?.set(this.offset);},
    progress(x){navProgress.set(to?Math.abs(x)/width:0);edge?.set(x);},
    dispose(){layer.remove();content.style.visibility=visibility;navProgress.clear();},
@@ -119,17 +120,19 @@ function calendarScene(root,api,cache,delta){
 // Measure adjacent month grids before horizontal movement, keeping the current grid visible.
 function prepareCalendarScene(root,api,cache,snapshot){
  const began=performance.now(),viewport=root.querySelector('.view-calendar .calendar-grid-viewport'),grid=viewport?.querySelector(':scope>.calendar-days'),panel=viewport?.closest('[data-calendar-swipe]');if(!grid?.getBoundingClientRect||!snapshot)return null;
- const width=viewport.getBoundingClientRect().width,oldHeight=grid.getBoundingClientRect().height,track=document.createElement('div');track.className='calendar-swipe-track';track.setAttribute('aria-hidden','true');track.inert=true;track.style.visibility='hidden';track.style.opacity='0';
+ const width=viewport.getBoundingClientRect().width,oldHeight=grid.getBoundingClientRect().height,track=document.createElement('div');track.className='calendar-swipe-track';track.setAttribute('aria-hidden','true');track.inert=true;track.className='calendar-swipe-preload';track.style.opacity='.001';
  const old=frame('swipe-month calendar-leaving',width);old.style.left='0px';old.appendChild(snapshot);track.appendChild(old);const options=new Map();
  for(const delta of [-1,1]){const item=cache.get(delta),next=item?frame('swipe-month calendar-entering',width):boundaryFrame(width,delta);next.style.left=delta*width+'px';if(item)next.appendChild(item.grid);track.appendChild(next);options.set(delta,{item,next,height:oldHeight});}
- viewport.appendChild(track);for(const option of options.values())if(option.item)option.height=option.next.firstElementChild.getBoundingClientRect().height;
+ const viewportRect=viewport.getBoundingClientRect();
+ Object.assign(track.style,{position:'fixed',left:viewportRect.left+'px',top:viewportRect.top+'px',right:'auto',bottom:'auto',width:width+'px',height:oldHeight+'px',overflow:'hidden',zIndex:'16'});
+ document.body.appendChild(track);for(const option of options.values())if(option.item)option.height=option.next.firstElementChild.getBoundingClientRect().height;
  mark('dagongren.calendar.prepare',{duration:performance.now()-began,prepared:true});let active=false;
  return {activate(delta){
-  if(active||!grid.isConnected)return null;active=true;const started=performance.now(),option=options.get(delta),other=options.get(-delta);other.next.remove();const item=option.item,next=option.next,nextHeight=option.height,visibility=grid.style.visibility,height=viewport.style.height;
-  for(const node of [old,next])node.style.minHeight=Math.max(oldHeight,nextHeight)+'px';viewport.style.height=oldHeight+'px';grid.style.visibility='hidden';viewport.classList.add('calendar-month-switching');track.style.visibility='visible';track.style.opacity='1';
-  const resize=x=>{const p=item?Math.min(1,Math.abs(x)/width):0;viewport.style.height=(oldHeight+(nextHeight-oldHeight)*p)+'px';viewport.dataset.swipeProgress=p.toFixed(4);};
+  if(active||!grid.isConnected)return null;active=true;const started=performance.now(),option=options.get(delta);options.get(-delta).next.remove();const item=option.item,next=option.next,nextHeight=option.height,visibility=grid.style.visibility,height=viewport.style.height;
+  for(const node of [old,next])node.style.minHeight=Math.max(oldHeight,nextHeight)+'px';viewport.style.height=oldHeight+'px';grid.style.visibility='hidden';viewport.classList.add('calendar-month-switching');track.className='calendar-swipe-track';track.style.opacity='1';
+  const resize=x=>{const p=item?Math.min(1,Math.abs(x)/width):0;const size=(oldHeight+(nextHeight-oldHeight)*p)+'px';viewport.style.height=size;track.style.height=size;viewport.dataset.swipeProgress=p.toFixed(4);};
   mark('dagongren.calendar.activate',{duration:performance.now()-started,prepared:true,from:panel.dataset.calendarMonth,to:item?.month||panel.dataset.calendarMonth});
-  return {track,width,boundary:!item,delta,from:panel.dataset.calendarMonth,to:item?.month||panel.dataset.calendarMonth,offset:0,
+  return {track,width,boundary:!item,delta,from:panel.dataset.calendarMonth,to:item?.month||panel.dataset.calendarMonth,offset:0,prepared:true,
    update(dx){this.offset=swipeOffset(dx,width,!item);track.style.transform='translate3d('+this.offset+'px,0,0)';resize(this.offset);},progress:resize,
    dispose(){track.remove();grid.style.visibility=visibility;viewport.style.height=height;viewport.classList.remove('calendar-month-switching');delete viewport.dataset.swipeProgress;},
    commit(){if(item)api.commit(delta);},
@@ -149,7 +152,20 @@ function bindInput(root,config){
  const update=(g,dx)=>{selectScene(g,dx);if(!scene)return;scene.update(dx);};
  const move=(x,y,t,event)=>{const g=gesture;if(!g)return;const dx=x-g.x,dy=y-g.y;point(g,x,t);g.dx=dx;g.axis=swipeAxis(dx,dy,g.axis);if(g.axis!=='x')return;
   if(event.cancelable)event.preventDefault();if(!g.touch)try{root.setPointerCapture?.(g.id);}catch{}
-  g.pending=dx;if(!scene&&staged){update(g,dx);return;}if(!dragFrame){if(typeof requestAnimationFrame!=='function'){update(g,dx);return;}dragFrame=requestAnimationFrame(()=>{dragFrame=0;if(gesture===g)update(g,g.pending);});}
+  if(g.firstInputAt===undefined){g.firstInputAt=performance.now();g.firstEvent=t;}
+  g.pending=dx;
+  if(!dragFrame){
+   if(typeof requestAnimationFrame!=='function'){update(g,dx);return;}
+   dragFrame=requestAnimationFrame(()=>{
+    dragFrame=0;if(gesture!==g)return;
+    const began=performance.now();update(g,g.pending);
+    if(!g.firstCommitted&&scene){
+     g.firstCommitted=true;const committed=performance.now(),kind=config.page?'page':'calendar',prepared=scene.prepared===true;
+     mark('dagongren.'+kind+'.input-commit',{eventToCommit:committed-g.firstInputAt,callbackWork:committed-began,sampleAge:Math.max(0,committed-g.firstEvent),prepared,raf:true});
+     requestAnimationFrame(at=>mark('dagongren.'+kind+'.first-frame',{eventToNextFrame:performance.now()-g.firstInputAt,commitToNextFrame:performance.now()-committed,rafTimestamp:at,prepared}));
+    }
+   });
+  }
  };
  const settle=(complete,velocity=0)=>{
   const g=gesture;if(!g)return;cancelFrames();if(g.axis==='x'&&(g.dx!==0||!scene))update(g,g.dx);releaseCapture(g);gesture=null;root.classList.remove('swipe-dragging');
@@ -163,7 +179,7 @@ function bindInput(root,config){
   animation.finished.then(finish,()=>{if(token===generation)clear();});
  };
  const end=(x,y,t,event,cancelled=false)=>{const g=gesture;if(!g)return;g.dx=x-g.x;point(g,x,t);g.axis=swipeAxis(g.dx,y-g.y,g.axis);if(g.axis==='x'){if(event.cancelable)event.preventDefault();const velocity=swipeVelocity(g.samples,t),decision=swipeDecision(g.dx,scene?.width||width(),velocity,g.axis);g.delta=decision.delta;settle(!cancelled&&decision.complete,velocity);}else clear();};
- const begin=(x,y,t,id,touch,event)=>{if(busy||gesture||owners.get(root)||config.blocked?.()||!config.accept(event.target,x))return;config.warm?.();staged=config.prepare?.()||null;gesture={x,y,id,touch,axis:'pending',dx:0,delta:0,samples:[{x,t}]};owners.set(root,controller);};
+ const begin=(x,y,t,id,touch,event)=>{if(busy||gesture||owners.get(root)||config.blocked?.()||!config.accept(event.target,x))return;gesture={x,y,id,touch,axis:'pending',dx:0,delta:0,samples:[{x,t}]};owners.set(root,controller);};
  root.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'||e.isPrimary===false||e.button>0)return;begin(e.clientX,e.clientY,e.timeStamp,e.pointerId,false,e);},{passive:true});
  root.addEventListener('pointermove',e=>{if(gesture&&!gesture.touch&&e.pointerId===gesture.id)move(e.clientX,e.clientY,e.timeStamp,e);},{passive:false});
  root.addEventListener('pointerup',e=>{if(gesture&&!gesture.touch&&e.pointerId===gesture.id)end(e.clientX,e.clientY,e.timeStamp,e);},{passive:false});
@@ -173,7 +189,7 @@ function bindInput(root,config){
  root.addEventListener('touchend',e=>{if(!gesture?.touch)return;const p=[...e.changedTouches].find(p=>p.identifier===gesture.id);if(p)end(p.clientX,p.clientY,e.timeStamp,e);},{passive:false});
  root.addEventListener('touchcancel',e=>{if(gesture?.touch)end(gesture.x+gesture.dx,gesture.y,e.timeStamp,e,true);},{passive:true});
  root.addEventListener('click',e=>{if(e.isTrusted&&Date.now()<blockedUntil&&config.ownsClick(e.target)){e.preventDefault();e.stopImmediatePropagation();}},true);
- const controller={cancel:clear,isBusy:()=>busy||Boolean(scene),isPending:()=>Boolean(gesture&&!scene),start(delta,trigger='tap'){
+ const controller={cancel:clear,isBusy:()=>busy||Boolean(scene),isPending:()=>Boolean(gesture&&!scene),discardPrepared(){if(!scene){staged?.dispose();staged=null;}},preload(){if(gesture||busy||scene||config.blocked?.())return false;staged?.dispose();staged=null;config.warm?.();staged=config.prepare?.()||null;return Boolean(staged);},start(delta,trigger='tap'){
   owners.get(root)?.cancel(false);clear(false);config.warm?.();scene=config.scene(delta);if(!scene)return false;scene.trigger=trigger;root.dataset.swipeTrigger=trigger;root.classList.add('swipe-busy');if(config.page)root.classList.add('page-transitioning');owners.set(root,controller);gesture={x:0,y:0,id:-1,touch:false,axis:'x',dx:0,delta,samples:[{x:0,t:0}]};scene.update(0);if(trigger==='tap'){scene.commit();scene.committed=true;const live=root.querySelector('.workspace .content');if(live)live.style.visibility='hidden';scene.update(0);}settle(true,0);return true;
  }};return controller;
 }
@@ -187,8 +203,9 @@ export function bindPageSwipe(root,api){
   settled:(completed,to)=>{cache.clear();snapshot=null;api.settled?.(completed,to);},commit:delta=>{const to=pageSwipeTarget(api.current(),delta);if(to)api.navigate(to);}
  });
  if(!controller)return;
- controller.invalidate=()=>{if(controller.isPending())controller.cancel(false);cache.clear();snapshot=null;if(idle){if(typeof cancelIdleCallback==='function')cancelIdleCallback(idle);else clearTimeout(idle);}const prepare=()=>{idle=0;if(!root.inert&&!controller.isBusy())warm();};idle=typeof requestIdleCallback==='function'?requestIdleCallback(prepare,{timeout:500}):setTimeout(prepare,0);};
- controller.prepare=warm;
+ controller.invalidate=()=>{if(controller.isPending())controller.cancel(false);controller.discardPrepared();cache.clear();snapshot=null;if(idle){if(typeof cancelIdleCallback==='function')cancelIdleCallback(idle);else clearTimeout(idle);}const prepare=()=>{idle=0;if(!root.inert&&!controller.isBusy())controller.preload();};idle=typeof requestIdleCallback==='function'?requestIdleCallback(prepare,{timeout:300}):setTimeout(prepare,0);};
+ controller.prepare=()=>controller.preload();
+ let scrollTimer=0;globalThis.window?.addEventListener?.('scroll',()=>{controller.discardPrepared();clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>controller.invalidate(),80);},{passive:true});globalThis.window?.addEventListener?.('resize',()=>controller.invalidate(),{passive:true});
  controller.navigate=to=>{const from=api.current(),a=VIEWS.indexOf(from),b=VIEWS.indexOf(to);if(a<0||b<0||a===b||api.blocked?.())return false;tapTarget=to;warm();const ok=controller.start(Math.sign(b-a),'tap');if(!ok){tapTarget=null;api.navigate(to);api.settled?.(true,to);}return true;};return controller;
 }
 export function bindCalendarSwipe(root,api){
@@ -196,5 +213,6 @@ export function bindCalendarSwipe(root,api){
  const warm=()=>{for(const delta of [-1,1])if(!cache.has(delta)){const p=api.preview?.(delta);if(p){const grid=contentFrom(p.markup,'.calendar-days');if(grid)cache.set(delta,{month:p.month,grid:stripIds(grid)});}}if(!snapshot){const grid=root.querySelector('.view-calendar .calendar-grid-viewport>.calendar-days');if(grid)snapshot=copy(grid);}};
  const controller=bindInput(root,{width:()=>root.querySelector('.view-calendar .calendar-grid-viewport')?.clientWidth||400,blocked:()=>api.blocked?.(),accept:target=>Boolean(target.closest?.('.view-calendar .calendar-grid-viewport')),ownsClick:target=>Boolean(target.closest?.('.calendar-grid-viewport')),warm,
   prepare:()=>prepareCalendarScene(root,api,cache,snapshot),scene:delta=>calendarScene(root,api,cache,delta),commit:delta=>api.commit(delta),settled:completed=>{cache.clear();snapshot=null;api.settled?.(completed);}});
- if(!controller)return;controller.prepare=warm;controller.invalidate=()=>{if(controller.isPending())controller.cancel(false);cache.clear();snapshot=null;if(idle)clearTimeout(idle);idle=setTimeout(()=>{idle=0;if(!root.inert&&!controller.isBusy())warm();},0);};return controller;
+ if(!controller)return;controller.prepare=()=>controller.preload();controller.invalidate=()=>{if(controller.isPending())controller.cancel(false);controller.discardPrepared();cache.clear();snapshot=null;if(idle)clearTimeout(idle);idle=setTimeout(()=>{idle=0;if(!root.inert&&!controller.isBusy()&&!api.blocked?.())controller.preload();},0);};
+ let scrollTimer=0;globalThis.window?.addEventListener?.('scroll',()=>{controller.discardPrepared();clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>controller.invalidate(),80);},{passive:true});globalThis.window?.addEventListener?.('resize',()=>controller.invalidate(),{passive:true});return controller;
 }

@@ -33,10 +33,7 @@ public final class MainActivity extends Activity {
     private static final String HOME="https://appassets.androidplatform.net/assets/www/index.html";
     private static final int SAVE_FILE=7101;
     private WebView webView;
-    private FrameLayout launchCover,launchAmbientClip;
-    private View launchAmbientBand;
-    private android.animation.ObjectAnimator launchAmbient;
-    private boolean launchAmbientStarted;
+    private View systemSplashView;
     private static final int LAUNCH_COLOR=Color.rgb(16,30,61);
     private boolean darkAppearance;
     private android.animation.ValueAnimator launchTransition;
@@ -48,8 +45,7 @@ public final class MainActivity extends Activity {
     private Boolean reportedKeyboard;
     private volatile boolean launchIntro=true;
     private boolean launchSurfacePrepared=false,launchNotified=false;
-    private boolean firstLaunchFramePresented,firstLaunchDrawn,launchFadeStarted;
-    private boolean systemSplashGone=Build.VERSION.SDK_INT<31;
+    private boolean firstLaunchFramePresented;
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
@@ -58,8 +54,10 @@ public final class MainActivity extends Activity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         FrameLayout root=new FrameLayout(this);root.setBackgroundColor(launchIntro?LAUNCH_COLOR:appearanceColor());
         if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(window->{
-            window.remove();systemSplashGone=true;
-            root.post(()->{startLaunchIntro(root);if(launchSurfacePrepared)completeLaunchSurface();});
+            // Keep the real system splash over the attached, hardware-rendered WebView.
+            // Never hold pre-draw: WebView must be allowed to submit its first frame.
+            if(launchNotified)window.remove();
+            else{systemSplashView=window;if(launchSurfacePrepared)completeLaunchSurface();}
         });
         if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
         root.setOnApplyWindowInsetsListener((v,insets)->{
@@ -82,67 +80,11 @@ public final class MainActivity extends Activity {
                 reportKeyboard(root.getRootView().getHeight()-visibleFrame.bottom>getResources().getDisplayMetrics().density*150);
             }
         });
-        if(launchIntro){
-            launchCover=new FrameLayout(this);launchCover.setTag("dagongren-launch-page");launchCover.setBackgroundColor(LAUNCH_COLOR);launchCover.setAlpha(.1f);
-            android.widget.ImageView scene=new android.widget.ImageView(this);scene.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-            try(java.io.InputStream image=getAssets().open("www/launch-scene.webp")){scene.setImageBitmap(android.graphics.BitmapFactory.decodeStream(image));}
-            catch(java.io.IOException missing){throw new IllegalStateException("Launch scene missing",missing);}
-            launchCover.addView(scene,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
-            launchAmbientClip=new FrameLayout(this);launchAmbientClip.setTag("dagongren-launch-ambient");launchAmbientClip.setClipToOutline(true);
-            launchAmbientClip.setOutlineProvider(new android.view.ViewOutlineProvider(){
-                @Override public void getOutline(View view,android.graphics.Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),Math.min(view.getWidth(),view.getHeight())*.11f);}
-            });
-            launchAmbientBand=new View(this);launchAmbientBand.setRotation(-18f);
-            launchAmbientBand.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,new int[]{Color.TRANSPARENT,Color.argb(7,195,220,255),Color.argb(15,195,220,255),Color.TRANSPARENT}));
-            launchAmbientClip.addView(launchAmbientBand,new FrameLayout.LayoutParams(1,1));
-            launchCover.addView(launchAmbientClip,new FrameLayout.LayoutParams(1,1));
-            launchCover.addOnLayoutChangeListener((view,left,top,right,bottom,oldLeft,oldTop,oldRight,oldBottom)->{
-                if(right-left!=oldRight-oldLeft||bottom-top!=oldBottom-oldTop)layoutLaunchAmbient(right-left,bottom-top);
-            });
-            root.addView(launchCover,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
-        }
         setContentView(root);root.requestApplyInsets();applyAppearance();
         if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
-        if(launchCover!=null){
-            root.getViewTreeObserver().addOnDrawListener(new android.view.ViewTreeObserver.OnDrawListener(){
-                private boolean submitted;
-                @Override public void onDraw(){if(submitted)return;submitted=true;firstLaunchDrawn=true;firstLaunchFramePresented=launchCover!=null&&launchCover.getAlpha()>0f&&webView==null;
-                    root.post(()->{
-                        root.getViewTreeObserver().removeOnDrawListener(this);
-                        if(systemSplashGone)startLaunchIntro(root);
-                        else root.postDelayed(()->startLaunchIntro(root),500);
-                    });}
-            });
-        }else root.post(()->{if(!isDestroyed())initializeWebView(root);});
+        // Start loading immediately; there is no bitmap cover, fade-in or 400ms delay.
+        initializeWebView(root);
     }
-
-    private void startLaunchIntro(FrameLayout root){
-        if(!firstLaunchDrawn||launchFadeStarted||isDestroyed())return;
-        launchFadeStarted=true;
-        // Begin only after the system window leaves, so it cannot hide an already bright scene.
-        if(launchCover!=null){startLaunchAmbient();launchCover.animate().alpha(1f).setDuration(380).start();}
-        // Keep WebView setup out of the first fade; the fallback above avoids waiting forever.
-        root.postDelayed(()->{if(!isDestroyed())initializeWebView(root);},400);
-    }
-
-    private void layoutLaunchAmbient(int width,int height){
-        if(launchAmbientClip==null||launchAmbientBand==null||width<=0||height<=0)return;
-        float scale=Math.min(width/393f,height/777f),originX=(width-393f*scale)/2f,originY=(height-777f*scale)/2f;
-        int clipWidth=Math.max(1,Math.round(345f*scale)),clipHeight=Math.max(1,Math.round(210f*scale));
-        FrameLayout.LayoutParams clip=new FrameLayout.LayoutParams(clipWidth,clipHeight);
-        clip.leftMargin=Math.round(originX+24f*scale);clip.topMargin=Math.round(originY+428.4375f*scale);launchAmbientClip.setLayoutParams(clip);
-        FrameLayout.LayoutParams band=new FrameLayout.LayoutParams(Math.max(1,Math.round(140f*scale)),clipHeight*2);
-        band.topMargin=-clipHeight/2;launchAmbientBand.setLayoutParams(band);
-    }
-    private void startLaunchAmbient(){
-        if(launchCover==null||launchAmbientClip==null||launchAmbientBand==null||isDestroyed()||!android.animation.ValueAnimator.areAnimatorsEnabled()||!getSharedPreferences("appearance",MODE_PRIVATE).getBoolean("motionEnabled",true))return;
-        if(launchAmbient!=null)launchAmbient.cancel();
-        float bandWidth=Math.max(1,launchAmbientBand.getLayoutParams().width),clipWidth=Math.max(1,launchAmbientClip.getLayoutParams().width);
-        launchAmbient=android.animation.ObjectAnimator.ofFloat(launchAmbientBand,View.TRANSLATION_X,-bandWidth,clipWidth+bandWidth);
-        launchAmbient.setDuration(1900);launchAmbient.setRepeatCount(android.animation.ValueAnimator.INFINITE);
-        launchAmbient.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());launchAmbientStarted=true;launchAmbient.start();
-    }
-    private void stopLaunchAmbient(){if(launchAmbient!=null){launchAmbient.cancel();launchAmbient=null;}}
 
     private void initializeWebView(FrameLayout root){
         webView=new WebView(this);webView.setId(R.id.web_view);
@@ -212,20 +154,24 @@ public final class MainActivity extends Activity {
     private void prepareLaunchSurface(){
         if(webView==null||isDestroyed()||launchSurfacePrepared)return;
         webView.postVisualStateCallback(1,new WebView.VisualStateCallback(){
-            @Override public void onComplete(long requestId){launchSurfacePrepared=true;completeLaunchSurface();}
+            @Override public void onComplete(long requestId){
+                // The next draw contains the DOM submitted before this callback.
+                // Wait for that draw to finish before removing the system surface.
+                webView.getViewTreeObserver().addOnDrawListener(new android.view.ViewTreeObserver.OnDrawListener(){
+                    private boolean submitted;
+                    @Override public void onDraw(){if(submitted)return;submitted=true;
+                        webView.post(()->{if(isDestroyed())return;webView.getViewTreeObserver().removeOnDrawListener(this);firstLaunchFramePresented=true;launchSurfacePrepared=true;completeLaunchSurface();});
+                    }
+                });
+                webView.invalidate();
+            }
         });
     }
 
-    private boolean launchCoverFading;
     private void completeLaunchSurface(){
-        if(launchNotified||launchCoverFading||isDestroyed())return;
-        if(launchCover!=null){
-            FrameLayout cover=launchCover;launchCover=null;launchCoverFading=true;
-            cover.animate().alpha(0f).setDuration(220).withEndAction(()->{
-                stopLaunchAmbient();if(cover.getParent() instanceof FrameLayout)((FrameLayout)cover.getParent()).removeView(cover);
-                launchAmbientClip=null;launchAmbientBand=null;launchCoverFading=false;notifyLaunchSurface();
-            }).start();
-        }else notifyLaunchSurface();
+        if(launchNotified||!launchSurfacePrepared||isDestroyed())return;
+        if(Build.VERSION.SDK_INT>=31&&systemSplashView!=null){((android.window.SplashScreenView)systemSplashView).remove();systemSplashView=null;}
+        notifyLaunchSurface();
     }
     private void notifyLaunchSurface(){
         if(!launchNotified&&webView!=null&&!isDestroyed()){
@@ -236,7 +182,7 @@ public final class MainActivity extends Activity {
 
     public boolean isLaunchSurfaceReady(){return launchNotified;}
     public boolean isFirstLaunchFramePresented(){return firstLaunchFramePresented;}
-    public boolean wasLaunchAmbientStarted(){return launchAmbientStarted;}
+    public boolean hasBitmapLaunchCover(){return false;}
     public boolean isNativeMotionEnabled(){return getSharedPreferences("appearance",MODE_PRIVATE).getBoolean("motionEnabled",true);}
 
     private void reportKeyboard(boolean visible){
@@ -263,11 +209,10 @@ public final class MainActivity extends Activity {
     }
     public final class NativeFiles {
         @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
-        @JavascriptInterface public boolean nativeLaunchPage(){return launchIntro;}
+        @JavascriptInterface public boolean nativeLaunchPage(){return false;}
         @JavascriptInterface public void motionStyle(boolean enabled){
             android.content.SharedPreferences preferences=getSharedPreferences("appearance",MODE_PRIVATE);
             if(!preferences.contains("motionEnabled")||preferences.getBoolean("motionEnabled",true)!=enabled)preferences.edit().putBoolean("motionEnabled",enabled).apply();
-            if(!enabled)runOnUiThread(MainActivity.this::stopLaunchAmbient);
         }
         @JavascriptInterface public void introReady(){runOnUiThread(()->{if(launchNotified&&webView!=null&&!isDestroyed())webView.evaluateJavascript("globalThis.dagongrenLaunchReady && globalThis.dagongrenLaunchReady();",null);else prepareLaunchSurface();});}
         @JavascriptInterface public boolean systemDark(){return systemIsDark();}
@@ -354,6 +299,7 @@ public final class MainActivity extends Activity {
     @Override protected void onResume(){super.onResume();if(webView!=null)webView.onResume();}
     @Override protected void onPause(){if(webView!=null)webView.onPause();super.onPause();}
     @Override protected void onDestroy(){
-        stopLaunchAmbient();if(launchTransition!=null){launchTransition.cancel();launchTransition=null;}worker.shutdownNow();calendarWorker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
+        if(Build.VERSION.SDK_INT>=31&&systemSplashView!=null){((android.window.SplashScreenView)systemSplashView).remove();systemSplashView=null;}
+        if(launchTransition!=null){launchTransition.cancel();launchTransition=null;}worker.shutdownNow();calendarWorker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
     }
 }
