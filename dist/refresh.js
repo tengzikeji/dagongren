@@ -27,8 +27,8 @@ export function updateCloudFeedback(root,feedback,description=''){
  }
  if(buttons.length)lastCloudEvent=event;
 }
-export function pullProgress(distance){return Math.max(0,Math.min(1,distance/84));}
-export function pullOffset(distance){return Math.min(112,Math.max(0,distance)*.62);}
+export function pullProgress(distance){return Math.max(0,Math.min(1,distance/148));}
+export function pullOffset(distance){return Math.min(120,Math.max(0,distance-10)*.56);}
 export function bindPullRefresh(root,api){
  if(!root?.addEventListener||!document.body?.appendChild)return null;
  const indicator=document.createElement('div');indicator.className='pull-refresh';indicator.dataset.state='hidden';indicator.dataset.source='pull';indicator.setAttribute('role','status');indicator.setAttribute('aria-live','polite');indicator.hidden=true;
@@ -59,9 +59,9 @@ export function bindPullRefresh(root,api){
  }
  function paint(g){
   const offset=pullOffset(g.distance);if(pulled){pulled.offset=offset;pulled.node.style.transform='translate3d(0,'+offset+'px,0)';}
-  if(g.distance<32){indicator.hidden=true;return;}
+  if(g.distance<84){indicator.hidden=true;return;}
   const progress=pullProgress(g.distance),state=progress===1?'armed':'pulling';
-  if(indicator.hidden||!['pulling','armed'].includes(indicator.dataset.state))show(state,'下拉同步');indicator.dataset.state=state;indicator.style.setProperty('--pull-y',(5+offset*.12)+'px');indicator.style.setProperty('--pull-progress',String(Math.min(1,(g.distance-32)/52)));
+  if(indicator.hidden||!['pulling','armed'].includes(indicator.dataset.state))show(state,'下拉同步');indicator.dataset.state=state;indicator.style.setProperty('--pull-y',(8+offset*.16)+'px');indicator.style.setProperty('--pull-progress',String(Math.min(1,(g.distance-84)/64)));
   symbol.style.transform='rotate('+(progress*240)+'deg)';label.textContent=progress===1?'松开同步':'下拉同步';
  }
  function move(x,y,event){

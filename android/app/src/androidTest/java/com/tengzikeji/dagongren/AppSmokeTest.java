@@ -141,7 +141,7 @@ public class AppSmokeTest {
             waitTrue(scenario,"[...document.querySelectorAll('#app .data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
             paintedScreenshot(scenario,"charts-records");
             evaluate(scenario,"document.querySelector('[data-view=settings]').click()");
-            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&Boolean(document.querySelector('#app .employment-chart'))&&!document.querySelector('#app .record-mix-chart')");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')&&Boolean(document.querySelector('#app .employment-chart'))&&!document.querySelector('#app .record-mix-chart')");
             waitTrue(scenario,"!document.querySelector('#app .employment-chart .number-roll-strip')");
             assertEquals("true",evaluate(scenario,"document.querySelectorAll('#app .employment-metrics [data-stat]').length===3"));
             assertEquals("true",evaluate(scenario,"(()=>{const e=document.querySelector('#app .employment-chart'),days=Math.round((Date.parse(e.dataset.asOf)-Date.parse('2026-09-21'))/86400000)+1;return parseInt(e.querySelector('[data-stat=days]').textContent)===days})()"));
@@ -400,12 +400,13 @@ public class AppSmokeTest {
             waitTrueLoading(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1);if(!entry)return false;window.__launchObserved=entry.detail;if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='fading'){const rect=page.getBoundingClientRect(),style=getComputedStyle(page);window.__launchBlendSamples.push({opacity:Number(style.opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height,left:rect.left,top:rect.top,transform:style.transform,radius:style.borderRadius})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
             assertEquals("1",evaluateLoading(scenario,"window.__launchObserved.surfaces"));
             assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertFalse(activity.hasBitmapLaunchCover());assertTrue(activity.getWindow().getDecorView().isHardwareAccelerated());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
-            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.1'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface"));
+            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.2'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface"));
             assertEquals("false",evaluateLoading(scenario,"window.__launchObserved.oldBrand"));
             assertEquals("true",evaluateLoading(scenario,"!document.querySelector('.launch-edition')&&window.__launchObserved.animationNames.includes('launch-content-in')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false"));
             android.util.Log.i("DagongrenLaunchReview","NATIVE_BARS_BEFORE_CONTENT="+launchBarModes);
             assertFalse("No native startup frames were sampled",launchBarModes.isEmpty());
             for(int mode:launchBarModes)assertEquals("Startup icons changed before first WebView frame",0,mode);
+            assertTrue(withActivity(activity->assertTrue("Repeated SystemUI icon writes",activity.getSystemBarIconUpdateCount()<=1)));
             assertTrue(withActivity(activity->{assertFalse(activity.getWindow().isStatusBarContrastEnforced());assertFalse(activity.getWindow().isNavigationBarContrastEnforced());}));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.inert"));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.animated&&['launch-soft-in','launch-line','launch-bar','launch-sheen','launch-orbit','launch-dot'].every(name=>window.__launchObserved.animationNames.includes(name))"));
@@ -449,6 +450,7 @@ public class AppSmokeTest {
     private void awaitInputWindow(ActivityScenario<MainActivity> scenario) throws Exception {
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         String expected=InstrumentationRegistry.getInstrumentation().getTargetContext().getPackageName();
+        waitTrue(scenario,"!document.getElementById('app').classList.contains('nav-lifting')&&!document.getElementById('app').classList.contains('nav-scrolling')");
         long deadline=System.currentTimeMillis()+15000;
         while(System.currentTimeMillis()<deadline){
             dismissEmulatorLauncherAnr();
@@ -580,7 +582,7 @@ public class AppSmokeTest {
                     assertEquals(diagnostic,"true",evaluate(scenario,"window.__pushSamples.every(s=>s.gap<.6&&s.navStable&&s.transparent&&s.end&&s.navOutside)"));
                     if(direction==1&&((step==0&&theme.equals("light"))||(step==2&&theme.equals("dark"))))paintedScreenshot(scenario,"push-"+theme+"-"+step);
                     evaluate(scenario,"window.__heldPush.finish()");
-                    waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('page-transitioning')&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'");
+                    waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')&&!document.getElementById('app').classList.contains('page-transitioning')&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'");
                 }
                 assertEquals("true",evaluate(scenario,"(()=>{const b=document.querySelector('.balance-primary');return !!b&&[b,b.querySelector('strong'),...b.querySelectorAll('.number-roll-anchor,.number-roll,.number-roll-slot,.number-roll-strip')].every(e=>getComputedStyle(e).backgroundColor==='rgba(0, 0, 0, 0)')})()"));
             }
@@ -636,17 +638,38 @@ public class AppSmokeTest {
     }
 
 
+    @Test public void fourTabsOfferTopShortcutAfterThreeScreens() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);
+            for(String page:new String[]{"home","calendar","records","settings"}){
+                evaluate(scenario,"document.querySelector('.bottom-nav [data-view="+page+"]').click()");
+                waitTrue(scenario,"!document.getElementById('app').classList.contains('nav-lifting')");
+                evaluate(scenario,"const space=document.createElement('div');space.className='review-long-page';space.style.height=(innerHeight*6)+'px';document.querySelector('#app .workspace .content').appendChild(space);window.scrollTo({top:innerHeight*2.5,behavior:'instant'})");
+                waitTrue(scenario,"scrollY>innerHeight*2");
+                assertEquals("false",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.top==='true'"));
+                evaluate(scenario,"window.scrollTo({top:innerHeight*3.5,behavior:'instant'})");
+                waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.top==='true'&&getComputedStyle(document.querySelector('.bottom-nav [aria-current=page] .nav-top-glyph')).opacity==='1'");
+                assertEquals("true",evaluate(scenario,"(()=>{const button=document.querySelector('.bottom-nav [aria-current=page]'),s=getComputedStyle(button.querySelector('.nav-top-glyph'));return s.opacity==='1'&&s.animationName==='nav-top-ready'})()"));
+                paintedScreenshot(scenario,"nav-top-"+page);
+                evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').click()");
+                waitTrue(scenario,"scrollY===0&&!document.getElementById('app').classList.contains('nav-scrolling')");
+                assertEquals("true",evaluate(scenario,"performance.getEntriesByName('dagongren.nav.top').at(-1).detail.duration<=320&&document.querySelector('.bottom-nav [aria-current=page]').dataset.top==='false'"));
+                evaluate(scenario,"document.querySelector('.review-long-page')?.remove()");
+            }
+        }
+    }
+
     @Test public void navigationTapsPushOnceAndRapidTapsReachLastPage() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
             evaluate(scenario,"window.__tapNav=document.querySelector('.bottom-nav')");
             for(String next:new String[]{"calendar","settings","records","home"}){
-                assertEquals("true",evaluate(scenario,"window.__tapCount=performance.getEntriesByName('dagongren.page.slide').length;document.querySelector('.bottom-nav [data-view="+next+"]').click();(()=>{const t=document.querySelector('.page-swipe-track'),a=t?.getAnimations()[0];return !!t&&t.children.length===2&&t.getAnimations().length===1&&a.effect.getTiming().duration===280&&document.getElementById('app').dataset.swipeTrigger==='tap'&&document.querySelector('.bottom-nav')===window.__tapNav})()"));
-                waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'");
-                assertEquals("true",evaluate(scenario,"(()=>{const marks=performance.getEntriesByName('dagongren.page.slide'),d=marks.at(-1)?.detail;return marks.length===window.__tapCount+1&&d?.trigger==='tap'&&d.to==='"+next+"'&&d.duration===280&&d.sharedTrack})()"));
+                assertEquals("true",evaluate(scenario,"window.__tapCount=performance.getEntriesByName('dagongren.nav.lift').length;document.querySelector('.bottom-nav [data-view="+next+"]').click();(()=>{const t=document.querySelector('.workspace .content'),a=t?.getAnimations()[0];return !!t&&t.getAnimations().length===1&&a.effect.getTiming().duration===220&&document.getElementById('app').classList.contains('nav-lifting')&&document.querySelector('.bottom-nav')===window.__tapNav})()"));
+                waitTrue(scenario,"!document.getElementById('app').classList.contains('nav-lifting')&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'");
+                assertEquals("true",evaluate(scenario,"(()=>{const marks=performance.getEntriesByName('dagongren.nav.lift'),d=marks.at(-1)?.detail;return marks.length===window.__tapCount+1&&d?.direction==='up'&&d.view==='"+next+"'&&d.duration===220})()"));
             }
             evaluate(scenario,"document.querySelector('.bottom-nav [data-view=calendar]').click();document.querySelector('.bottom-nav [data-view=records]').click();document.querySelector('.bottom-nav [data-view=settings]').click()");
-            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='settings'&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'");
+            waitTrue(scenario,"!document.getElementById('app').classList.contains('nav-lifting')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='settings'&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'");
             assertEquals("true",evaluate(scenario,"document.querySelector('.bottom-nav')===window.__tapNav"));
         }
     }
@@ -662,34 +685,34 @@ public class AppSmokeTest {
             assertEquals("true",evaluate(scenario,"(()=>{const t=document.querySelector('.page-swipe-track'),a=t.children[0].getBoundingClientRect(),b=t.children[1].getBoundingClientRect(),m=new DOMMatrix(getComputedStyle(t).transform),p=Number(document.querySelector('.bottom-nav').dataset.swipeProgress);return Math.abs(m.m41+innerWidth*.14)<.6&&Math.abs(a.right-b.left)<.6&&Math.abs(p-.14)<.01&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='home'&&Math.abs(document.querySelector('.bottom-nav').getBoundingClientRect().top-window.__barTop)<.1})()"));
             evaluate(scenario,"window.__dragInput('pointermove',innerWidth*.65,350,1100)");nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.page-swipe-track')).transform).m41+innerWidth*.15)<.6"));
-            evaluate(scenario,"window.__dragInput('pointerup',innerWidth*.65,350,1500)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            evaluate(scenario,"window.__dragInput('pointerup',innerWidth*.65,350,1500)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')");
             assertEquals("true",evaluate(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.page.rebound').at(-1)?.detail;return d?.duration===200&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='home'&&getComputedStyle(document.querySelector('.workspace .content')).visibility==='visible'&&localStorage.getItem('dagongren.paybook.v1')===window.__gestureBook})()"));
             evaluate(scenario,"window.__dragInput('pointerdown',300,100,2000,'.topbar');window.__dragInput('pointermove',302,160,2050);window.__dragInput('pointermove',80,165,2100);window.__dragInput('pointerup',80,165,2150)");
-            assertEquals("true",evaluate(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='home'"));
+            assertEquals("true",evaluate(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='home'"));
         }
     }
     @Test public void shortFastFlickAndBoundaryDampingStayAdjacent() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);assertEquals("true",evaluate(scenario,"window.__dragInput=(name,x,y,t,selector)=>{if(name==='pointerdown')window.__dragNode=document.querySelector(selector);const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:771,isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});window.__dragNode.dispatchEvent(e);};window.__nextFrames=()=>{window.__framesReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>window.__framesReady=true));};true"));
-            evaluate(scenario,"window.__dragInput('pointerdown',250,100,0,'.topbar');window.__dragInput('pointermove',210,102,40);window.__dragInput('pointerup',210,102,50)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='calendar'");
+            evaluate(scenario,"window.__dragInput('pointerdown',250,100,0,'.topbar');window.__dragInput('pointermove',210,102,40);window.__dragInput('pointerup',210,102,50)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='calendar'");
             evaluate(scenario,"window.__dragInput('pointerdown',innerWidth*.8,100,1000,'.topbar');window.__dragInput('pointermove',-innerWidth*1.2,100,2000)");nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.page-swipe-track')).transform).m41+innerWidth)<.6&&document.querySelectorAll('.page-swipe-track>.swipe-page').length===2"));
-            evaluate(scenario,"window.__dragInput('pointerup',-innerWidth*1.2,100,2400)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'");
-            evaluate(scenario,"document.querySelector('.bottom-nav [data-view=settings]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            evaluate(scenario,"window.__dragInput('pointerup',-innerWidth*1.2,100,2400)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'");
+            evaluate(scenario,"document.querySelector('.bottom-nav [data-view=settings]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')");
             evaluate(scenario,"window.__edgeToast=document.getElementById('toast').textContent;window.__dragInput('pointerdown',250,100,3000,'.topbar');window.__dragInput('pointermove',230,100,3100)");nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"Number(getComputedStyle(document.querySelector('.swipe-boundary-hint')).opacity)===0"));
             evaluate(scenario,"window.__dragInput('pointermove',70,100,4000)");nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.page-swipe-track')).transform).m41+72)<.6"));
             assertEquals("true",evaluate(scenario,"(()=>{const h=document.querySelector('.swipe-boundary-hint'),r=h.getBoundingClientRect(),o=document.querySelector('.page-swipe-outgoing').getBoundingClientRect();return h.textContent==='已到底'&&r.left>=o.right&&r.right<=innerWidth&&getComputedStyle(document.querySelector('.swipe-boundary-label')).writingMode==='vertical-rl'})()&&document.querySelector('.swipe-boundary-arrow').getAnimations().length===1&&document.getElementById('toast').textContent===window.__edgeToast"));
             paintedScreenshot(scenario,"boundary-end-behind-page");
-            evaluate(scenario,"window.__dragInput('pointerup',70,100,4500)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            evaluate(scenario,"window.__dragInput('pointerup',70,100,4500)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')");
             assertEquals("true",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='settings'&&performance.getEntriesByName('dagongren.page.rebound').at(-1).detail.boundary&&document.getElementById('toast').textContent===window.__edgeToast"));
-            evaluate(scenario,"document.querySelector('.bottom-nav [data-view=home]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            evaluate(scenario,"document.querySelector('.bottom-nav [data-view=home]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')");
             evaluate(scenario,"window.__dragInput('pointerdown',150,100,5000,'.topbar');window.__dragInput('pointermove',330,100,6000)");nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.page-swipe-track')).transform).m41-72)<.6"));
             assertEquals("true",evaluate(scenario,"(()=>{const h=document.querySelector('.swipe-boundary-hint'),r=h.getBoundingClientRect(),o=document.querySelector('.page-swipe-outgoing').getBoundingClientRect();return h.textContent==='已到首页'&&r.left>=0&&r.right<=o.left})()"));
             paintedScreenshot(scenario,"boundary-home-behind-page");
-            evaluate(scenario,"window.__dragInput('pointerup',330,100,6500)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            evaluate(scenario,"window.__dragInput('pointerup',330,100,6500)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')");
             assertEquals("true",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='home'"));
         }
     }
@@ -698,7 +721,7 @@ public class AppSmokeTest {
             resetBook(scenario);assertEquals("true",evaluate(scenario,"window.__dragInput=(name,x,y,t,selector)=>{if(name==='pointerdown')window.__dragNode=document.querySelector(selector);const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:771,isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});window.__dragNode.dispatchEvent(e);};window.__nextFrames=()=>{window.__framesReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>window.__framesReady=true));};true"));
             evaluate(scenario,"document.querySelector('[data-view=calendar]').click();document.querySelector('[data-action=month-picker]').click();while(!document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]')){const y=parseInt(document.querySelector('.month-year>span').textContent);document.querySelector('[data-action=picker-year][data-delta=\"'+(y<2027?1:-1)+'\"]').click()}document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]').click()");
             evaluate(scenario,"window.__dragInput('pointerdown',250,200,0,'.calendar-panel-header');window.__dragInput('pointermove',230,200,1000);window.__dragInput('pointerup',230,200,1400)");
-            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')");
             assertEquals("true",evaluate(scenario,"!document.querySelector('.calendar-swipe-track')&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2027-02'"));
             evaluate(scenario,"window.__monthWidth=document.querySelector('.calendar-grid-viewport').clientWidth;window.__monthHeight=document.querySelector('.calendar-grid-viewport').getBoundingClientRect().height;window.__dragInput('pointerdown',250,300,2000,'.calendar-days');window.__dragInput('pointermove',250-window.__monthWidth*.5,300,3000)");nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"(()=>{const p=document.querySelector('.calendar-grid-viewport'),t=document.querySelector('.calendar-swipe-track'),a=t.children[0].getBoundingClientRect(),b=t.children[1].getBoundingClientRect(),next=t.children[1].querySelector('.calendar-days').getBoundingClientRect().height;return Math.abs(new DOMMatrix(getComputedStyle(t).transform).m41+window.__monthWidth*.5)<.6&&Math.abs(a.right-b.left)<.6&&Math.abs(p.getBoundingClientRect().height-(window.__monthHeight+next)/2)<.7&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2027-02'})()"));
@@ -739,7 +762,7 @@ public class AppSmokeTest {
                 paintedScreenshot(scenario,"theme-"+theme+"-profile");
             evaluate(scenario,"document.querySelector('.app-info-footer').scrollIntoView({block:'center',behavior:'instant'})");
             waitTrue(scenario,"!document.getElementById('toast').classList.contains('show')");
-            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.1 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.2 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
                 paintedScreenshot(scenario,"theme-"+theme+"-copyright");
             evaluate(scenario,"document.querySelector('#app .profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 swipeRegion(scenario,".employment-progress",-1);
@@ -866,7 +889,7 @@ public class AppSmokeTest {
             nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.page-swipe-track')).transform).m41+4)<.6"));
             evaluate(scenario,"window.__dragInput('pointermove',280,100,35);window.__dragInput('pointerup',280,100,40)");
-            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='calendar'");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='calendar'");
             waitTrue(scenario,"Boolean(document.querySelector('.calendar-swipe-preload'))");
             evaluate(scenario,"window.__thumbMonth=document.querySelector('[data-calendar-month]').dataset.calendarMonth;window.__dragInput('pointerdown',280,300,100,'.calendar-days')");
             assertEquals("true",evaluate(scenario,"(()=>{const track=document.querySelector('.calendar-swipe-preload'),grid=document.querySelector('.calendar-grid-viewport>.calendar-days');return !!track&&Number(getComputedStyle(track).opacity)<.01&&getComputedStyle(grid).visibility==='visible'})()"));
@@ -874,11 +897,11 @@ public class AppSmokeTest {
             nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"(()=>{const track=document.querySelector('.calendar-swipe-track'),mark=performance.getEntriesByName('dagongren.calendar.activate').at(-1);return !!track&&getComputedStyle(track).opacity==='1'&&track.children.length===2&&Math.abs(new DOMMatrix(getComputedStyle(track).transform).m41+4)<.6&&mark?.detail?.prepared===true})()"));
             nextGestureFrames(scenario);
-            assertEquals("true",evaluate(scenario,"!document.querySelector('.page-swipe-layer')&&Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.calendar-swipe-track')).transform).m41+4)<.6"));
+            assertEquals("true",evaluate(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')&&Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.calendar-swipe-track')).transform).m41+4)<.6"));
             evaluate(scenario,"window.__dragInput('pointermove',260,300,135);window.__dragInput('pointerup',260,300,140)");
             waitTrue(scenario,"!document.querySelector('.calendar-swipe-track')&&document.querySelector('[data-calendar-month]').dataset.calendarMonth!==window.__thumbMonth");
             evaluate(scenario,"window.__dragInput('pointerdown',innerWidth*.7,100,1000,'.topbar');window.__dragInput('pointermove',innerWidth*.49,100,2000);window.__dragInput('pointerup',innerWidth*.49,100,2500)");
-            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'");
         }
     }
     @Test public void calendarPaintsStayStableAndNonDateRegionsNavigatePages() throws Exception {
@@ -888,7 +911,7 @@ public class AppSmokeTest {
             evaluate(scenario,"window.__datePaint=s=>[...document.querySelector(s).querySelectorAll('[data-date]')].map(n=>{const s=getComputedStyle(n);return [n.dataset.date,s.color,s.backgroundColor,s.borderColor,...[...n.querySelectorAll('.day-number,.lunar-label,.day-wage,.day-badge')].map(x=>getComputedStyle(x).color)]})");
             for(String theme:new String[]{"light","dark"}){
                 evaluate(scenario,"document.querySelector('.bottom-nav [data-view=settings]').click();document.querySelector('[data-action=theme-settings]').click();document.querySelector('[data-action=choose-theme][data-theme="+theme+"]').click();document.querySelector('.bottom-nav [data-view=calendar]').click()");
-            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')");
                 selectCalendarMonth(scenario,"2026-10");
             evaluate(scenario,"window.__paintBefore=JSON.stringify(window.__datePaint('.calendar-days'));window.__dateWidth=document.querySelector('.calendar-grid-viewport').clientWidth;window.__dragInput('pointerdown',280,300,3000,'.calendar-days [data-date]');window.__dragInput('pointermove',280-window.__dateWidth*.45,300,4000)");
                 nextGestureFrames(scenario);
@@ -897,11 +920,11 @@ public class AppSmokeTest {
             waitTrue(scenario,"!document.querySelector('.calendar-swipe-track')");
             assertEquals("true",evaluate(scenario,"JSON.stringify(window.__datePaint('.calendar-days'))===window.__paintNext&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2026-11'"));
             evaluate(scenario,"window.__dragInput('pointerdown',280,250,5000,'.calendar-week');window.__dragInput('pointermove',80,250,6000);window.__dragInput('pointerup',80,250,6500)");
-            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'");
             evaluate(scenario,"document.querySelector('.bottom-nav [data-view=calendar]').click()");
-            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')");
             evaluate(scenario,"window.__dragInput('pointerdown',80,250,7000,'.month-control');window.__dragInput('pointermove',280,250,8000);window.__dragInput('pointerup',280,250,8500)");
-            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='home'");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='home'");
             }
         }
     }
@@ -941,7 +964,7 @@ public class AppSmokeTest {
         int[] origin=new int[2];float[] density=new float[1];
         assertTrue(withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(origin);density[0]=activity.getResources().getDisplayMetrics().density;}));
         float x=Float.parseFloat(evaluate(scenario,"innerWidth*.45"));
-        assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(origin[0]+Math.round(x*density[0]),origin[1]+Math.round(65*density[0]),origin[0]+Math.round(x*density[0]),origin[1]+Math.round(230*density[0]),45));
+        assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(origin[0]+Math.round(x*density[0]),origin[1]+Math.round(65*density[0]),origin[0]+Math.round(x*density[0]),origin[1]+Math.round(270*density[0]),60));
     }
     @Test public void fourMainPagesPullSyncEvenWhenMotionIsDisabled() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
@@ -987,7 +1010,7 @@ public class AppSmokeTest {
             evaluate(scenario,"window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,190);window.__pullEvent('pointercancel',180,190)");
             waitTrue(scenario,"!document.getElementById('app').classList.contains('pull-dragging')");
             assertEquals("0",evaluate(scenario,"window.__reviewReads"));
-            evaluate(scenario,"window.scrollTo({top:150,behavior:'instant'});window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,200);window.__pullEvent('pointerup',180,200)");
+            evaluate(scenario,"window.scrollTo({top:150,behavior:'instant'});window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,250);window.__pullEvent('pointerup',180,250)");
             waitTrue(scenario,"!document.getElementById('app').classList.contains('pull-dragging')");
             assertEquals("0",evaluate(scenario,"window.__reviewReads"));
             evaluate(scenario,"window.scrollTo({top:0,behavior:'instant'});window.__pullEvent('pointerdown',180,70);window.__pullEvent('pointermove',180,200);window.__pullEvent('pointerup',180,200)");

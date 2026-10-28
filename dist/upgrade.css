@@ -271,3 +271,13 @@ body.intro-playing .launch-page,body.intro-playing[data-theme=dark] .launch-page
 .launch-page[data-phase=preparing] .launch-scene{opacity:0}
 .launch-page:is([data-phase=playing],[data-phase=fading]) .launch-scene{animation:launch-content-in .42s ease-out both}
 @keyframes launch-content-in{from{opacity:0}to{opacity:1}}
+
+/* Navigation glyph replacement keeps the four button hit areas stable. */
+.bottom-nav .nav-symbol{display:block;position:relative;width:24px;height:24px;margin:0 auto}
+.bottom-nav .nav-original{display:block;transition:opacity .16s ease,transform .16s ease}
+.bottom-nav .nav-symbol svg{width:24px;height:24px;display:block;margin:0}
+.bottom-nav .nav-top-glyph{position:absolute;inset:0;opacity:0;transform:translateY(3px) scale(.85);transition:opacity .16s ease,transform .16s ease}
+.bottom-nav [data-top=true] .nav-original{opacity:0;transform:translateY(-3px) scale(.85)}
+.bottom-nav [data-top=true] .nav-top-glyph{opacity:1;transform:none;animation:nav-top-ready 1.25s ease-in-out infinite!important}
+@keyframes nav-top-ready{50%{transform:translateY(-2px)}}
+@media(prefers-reduced-motion:reduce){.bottom-nav [data-top=true] .nav-top-glyph{animation:none!important}.bottom-nav .nav-original,.bottom-nav .nav-top-glyph{transition:none!important}}

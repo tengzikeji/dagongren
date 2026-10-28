@@ -53,6 +53,17 @@ def main():
     print('Startup status-bar first 1s luminance:', ', '.join(f'{x:.1f}' for x in top_means))
     if len(top_means)<10 or max(top_means)-min(top_means)>12 or any(x<=5 or x>=75 for x in top_means):
         raise SystemExit('Status-bar background changed unexpectedly before launch content')
+    # Inspect foreground occupancy too: a stable blue background cannot prove
+    # that the clock and system icons have remained visible.
+    raw = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '10.0', '-vf', 'fps=20,crop=iw:ih*0.032:0:0,scale=360:20,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True).stdout
+    from statistics import median
+    icon_frames=[raw[i:i+7200] for i in range(0,len(raw),7200) if len(raw[i:i+7200])==7200][anchor+1:anchor+30]
+    for name,start,end in [('clock',0,120),('system',240,360)]:
+        counts=[sum(frame[y*360+x]>150 for y in range(20) for x in range(start,end)) for frame in icon_frames]
+        baseline=median(counts) if counts else 0
+        print('Startup '+name+' icon pixels:', ', '.join(map(str,counts)))
+        if baseline<3 or detect_flash(counts,threshold=max(3,baseline*.55)):
+            raise SystemExit('Status-bar '+name+' icons disappeared and returned during startup')
 
 
 if __name__ == '__main__':

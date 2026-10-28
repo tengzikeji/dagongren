@@ -47,6 +47,8 @@ public final class MainActivity extends Activity {
     private volatile boolean launchIntro=true;
     private boolean launchSurfacePrepared=false,launchNotified=false;
     private boolean firstLaunchFramePresented;
+    private int systemBarIconUpdates;
+    private Integer paintedWindowColor;
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
@@ -138,13 +140,15 @@ public final class MainActivity extends Activity {
         paintAppearance(launchIntro?LAUNCH_COLOR:appearanceColor(),launchIntro||darkAppearance);
     }
     @SuppressWarnings("deprecation") private void paintAppearance(int color,boolean darkBars){
-        windowCanvas.setColor(color);
-        getWindow().getDecorView().setBackgroundColor(color);getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
+        if(paintedWindowColor==null||paintedWindowColor!=color){
+            paintedWindowColor=color;windowCanvas.setColor(color);
+            getWindow().getDecorView().setBackgroundColor(color);getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
+        }
         // Change icon appearance without resetting layout/visibility flags on each frame.
-        if(Build.VERSION.SDK_INT>=30){
+        if(!launchIntro&&Build.VERSION.SDK_INT>=30){
             WindowInsetsController controller=getWindow().getInsetsController();
-            if(controller!=null){int mask=WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;controller.setSystemBarsAppearance(darkBars?0:mask,mask);}
-        }else{
+            if(controller!=null){int mask=WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,desired=darkBars?0:mask;if((controller.getSystemBarsAppearance()&mask)!=desired){controller.setSystemBarsAppearance(desired,mask);systemBarIconUpdates++;}}
+        }else if(!launchIntro){
             View decor=getWindow().getDecorView();int mask=View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
             int flags=decor.getSystemUiVisibility(),next=(flags&~mask)|(darkBars?0:mask);if(flags!=next)decor.setSystemUiVisibility(next);
         }
@@ -158,7 +162,9 @@ public final class MainActivity extends Activity {
         launchTransition=android.animation.ValueAnimator.ofArgb(LAUNCH_COLOR,appearanceColor());
         launchTransition.setDuration(Math.max(0,Math.min(1000,duration)));
         launchTransition.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
-        launchTransition.addUpdateListener(animation->{if(!isDestroyed())paintAppearance((Integer)animation.getAnimatedValue(),darkAppearance||animation.getAnimatedFraction()<.6f);});
+        // Keep launch icons in the theme's light mode throughout the scene.
+        // Switching once after the handoff avoids repeated SystemUI icon transactions.
+        launchTransition.addUpdateListener(animation->{if(!isDestroyed())paintAppearance((Integer)animation.getAnimatedValue(),true);});
         launchTransition.start();
     }
     @Override public void onConfigurationChanged(Configuration config){
@@ -197,6 +203,7 @@ public final class MainActivity extends Activity {
 
     public boolean isLaunchSurfaceReady(){return launchNotified;}
     public boolean isFirstLaunchFramePresented(){return firstLaunchFramePresented;}
+    public int getSystemBarIconUpdateCount(){return systemBarIconUpdates;}
     public boolean hasBitmapLaunchCover(){return getWindow().getDecorView().findViewWithTag("dagongren-launch-page")!=null;}
     public boolean isNativeMotionEnabled(){return getSharedPreferences("appearance",MODE_PRIVATE).getBoolean("motionEnabled",true);}
 

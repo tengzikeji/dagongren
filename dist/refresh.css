@@ -1,11 +1,11 @@
 /* The status sits inside the cloud while the button keeps its 44 x 36 size. */
 #app.pull-refresh-ready{touch-action:pan-x pan-down pinch-zoom}
 .cloud-button.sync-cloud-button{position:relative;width:44px;min-width:44px;height:36px;padding:0;display:flex;justify-content:center;gap:7px;overflow:visible;flex-shrink:0;border-radius:12px}
-.sync-cloud-button .cloud-icon{position:relative;display:block;overflow:visible;width:30px;height:30px;max-width:none}
-.sync-cloud-button .cloud-icon>svg{display:block;width:30px;height:30px;margin:0;color:var(--muted,#7385a0)}
-.sync-cloud-button .cloud-sync-badge{position:absolute;left:50%;top:59%;transform:translate(-50%,-50%);display:grid;place-items:center;max-width:none;width:12px;height:12px;border-radius:50%;background:transparent;box-shadow:none;color:var(--orange,#3276f5);overflow:visible}
+.sync-cloud-button .cloud-icon{position:relative;display:block;overflow:visible;width:27px;height:27px;max-width:none}
+.sync-cloud-button .cloud-icon>svg{display:block;width:27px;height:27px;margin:0;color:var(--muted,#7385a0)}
+.sync-cloud-button .cloud-sync-badge{position:absolute;left:50%;top:55%;transform:translate(-50%,-50%);display:grid;place-items:center;max-width:none;width:15px;height:15px;border-radius:50%;background:transparent;box-shadow:none;color:var(--orange,#3276f5);overflow:visible}
 .sync-cloud-button .cloud-sync-badge[data-state=idle]{display:none}
-.sync-cloud-button .cloud-sync-badge svg{width:12px;height:12px}
+.sync-cloud-button .cloud-sync-badge svg{width:15px;height:15px}
 .sync-cloud-button .cloud-label{display:none}
 .cloud-sync-badge[data-state=success],.pull-refresh[data-state=success] .pull-refresh-symbol{color:#168652}
 .cloud-sync-badge[data-state=error],.pull-refresh[data-state=error] .pull-refresh-symbol{color:#d8444e}
@@ -25,6 +25,10 @@
 .pull-refresh[data-state=success] .sync-result-stroke,.pull-refresh[data-state=error] .sync-result-stroke{stroke-dasharray:36;animation:sync-draw .4s ease-out both!important}
 .pull-refresh[data-source=pull]{transition:transform .18s ease-out,opacity .18s ease-out!important}
 .pull-refresh:is([data-state=pulling],[data-state=armed]){transition:opacity .12s linear!important}
+.pull-refresh:is([data-state=pulling],[data-state=armed]){gap:0;width:30px;min-height:30px;height:30px;padding:5px;border-radius:50%;box-shadow:0 3px 12px #17396312}
+.pull-refresh:is([data-state=pulling],[data-state=armed]) .pull-refresh-symbol{width:18px;height:18px;background:transparent}
+.pull-refresh:is([data-state=pulling],[data-state=armed]) .pull-refresh-symbol svg{width:16px;height:16px}
+.pull-refresh:is([data-state=pulling],[data-state=armed]) .pull-refresh-label{display:none}
 body.motion-off .cloud-sync-badge[data-source=pull][data-state=syncing] .sync-spinner{animation:sync-spin .8s linear infinite!important}
 body[data-theme=dark] .cloud-sync-badge{background:transparent;box-shadow:none}
 body[data-theme=dark] .cloud-sync-badge[data-state=success]{color:#55c990}
