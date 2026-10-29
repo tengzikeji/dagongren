@@ -54,6 +54,7 @@ public final class MainActivity extends Activity {
         // Resolve the saved app theme before the first DecorView is created.
         refreshAppearance();
         super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;
+        refreshAppearance();
         // Match the starting theme before attaching content or changing insets.
         getWindow().setBackgroundDrawable(windowCanvas);
         if(Build.VERSION.SDK_INT>=29){getWindow().setStatusBarContrastEnforced(false);getWindow().setNavigationBarContrastEnforced(false);}

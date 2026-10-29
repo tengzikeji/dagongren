@@ -46,7 +46,7 @@ def review(video, ffmpeg, dark=False):
         raise SystemExit('Could not identify enough frames from the themed startup window')
     print('Solid startup window identified at',f'{anchor/20:.2f}s')
     values=[mean for mean,_ in stats[anchor:anchor+30]]
-    flash=detect_flash(values)
+    flash=detect_flash([-x for x in values] if dark else values)
     print('Startup window first 1.5s luminance:', ', '.join(f'{x:.1f}' for x in values))
     if any(x<=5 for x in values) or (not dark and any(mean<75 and sd<2.5 for mean,sd in stats[anchor:anchor+30])):
         raise SystemExit('A dark blank screen appeared after the light startup window')
@@ -101,6 +101,7 @@ def main():
     assert not bar_flickers([188]*5+[245]*15)
     assert not bar_flickers([245]*20)
     assert not bar_flickers([29]*20,expected=29)
+    assert detect_flash([-x for x in [23,23,245,23,23]])
     assert bar_flickers([245]*5+[29]*3+[245]*12)
     assert bar_flickers([188]*3+[245]*3+[188]*3+[245]*11)
     if '--self-test' in sys.argv:

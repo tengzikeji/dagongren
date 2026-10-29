@@ -391,14 +391,17 @@ public class AppSmokeTest {
         long recordingStarted=System.currentTimeMillis();Thread.sleep(1500);
         ActivityScenario<MainActivity> scenario=null;
         android.content.Context target=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        java.util.List<Boolean> launchThemeMatches=new java.util.concurrent.CopyOnWriteArrayList<>();
         java.util.List<Integer> launchBarModes=new java.util.concurrent.CopyOnWriteArrayList<>();
         java.util.List<Integer> launchBarColors=new java.util.concurrent.CopyOnWriteArrayList<>();
         androidx.test.runner.lifecycle.ActivityLifecycleCallback launchBarObserver=(activity,stage)->{
             if(activity instanceof MainActivity&&stage==androidx.test.runner.lifecycle.Stage.CREATED){
                 MainActivity launched=(MainActivity)activity;
                 android.util.TypedValue statusStyle=new android.util.TypedValue();
-                assertTrue(launched.getTheme().resolveAttribute(android.R.attr.windowLightStatusBar,statusStyle,true));
-                assertEquals("The first native theme must match the saved app theme",dark?0:1,statusStyle.data);
+                boolean resolved=launched.getTheme().resolveAttribute(android.R.attr.windowLightStatusBar,statusStyle,true);
+                boolean match=resolved&&((statusStyle.data!=0)==!dark);
+                launchThemeMatches.add(match);
+                android.util.Log.i("DagongrenLaunchReview",marker+"INITIAL_THEME="+statusStyle.data+" saved="+launched.getSharedPreferences("appearance",Context.MODE_PRIVATE).getString("mode","system"));
                 launched.getWindow().getDecorView().getViewTreeObserver().addOnDrawListener(()->{
                     launchBarColors.add(((android.graphics.drawable.ColorDrawable)((android.view.View)launched.findViewById(R.id.web_view).getParent()).getBackground()).getColor());
                     {
@@ -420,6 +423,7 @@ public class AppSmokeTest {
             assertEquals("true",evaluateLoading(scenario,"!document.querySelector('.launch-edition')&&window.__launchObserved.animationNames.includes('launch-content-in')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false"));
             android.util.Log.i("DagongrenLaunchReview",marker+"NATIVE_BARS_BEFORE_CONTENT="+launchBarModes);
             assertFalse("No native startup frames were sampled",launchBarModes.isEmpty());
+            assertTrue("The first native theme must match the saved app theme",!launchThemeMatches.isEmpty()&&launchThemeMatches.stream().allMatch(Boolean::booleanValue));
             for(int mode:launchBarModes)assertEquals("Startup icons do not match the home scheme",bars,mode);
             assertTrue(withActivity(activity->assertTrue("Repeated SystemUI icon writes",activity.getSystemBarIconUpdateCount()<=1)));
             assertTrue(withActivity(activity->{assertFalse(activity.getWindow().isStatusBarContrastEnforced());assertFalse(activity.getWindow().isNavigationBarContrastEnforced());}));
