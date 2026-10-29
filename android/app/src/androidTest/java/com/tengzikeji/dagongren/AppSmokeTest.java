@@ -376,7 +376,12 @@ public class AppSmokeTest {
         try(ActivityScenario<MainActivity> prepared=ActivityScenario.launch(MainActivity.class)){
             resetBook(prepared);
             evaluate(prepared,"const b=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));b.defaults.motion=false;localStorage.setItem('dagongren.paybook.v1',JSON.stringify(b))");
-            evaluate(prepared,"localStorage.setItem('dagongren.theme.v1','"+theme+"');AndroidFiles.themeStyle('"+theme+"')");
+            evaluate(prepared,"document.querySelector('.bottom-nav [data-view=settings]').click()");
+            waitTrue(prepared,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='settings'&&!document.querySelector('.page-swipe-layer')");
+            evaluate(prepared,"document.querySelector('[data-action=theme-settings]').click()");
+            waitTrue(prepared,"Boolean(document.querySelector('[data-action=choose-theme][data-theme="+theme+"]'))");
+            evaluate(prepared,"document.querySelector('[data-action=choose-theme][data-theme="+theme+"]').click()");
+            waitTrue(prepared,"document.body.dataset.theme==='"+theme+"'&&document.body.dataset.themePreference==='"+theme+"'&&!document.querySelector('#modal-root .modal-overlay')");
             assertTrue(withActivity(activity->assertEquals(theme,activity.getSharedPreferences("appearance",Context.MODE_PRIVATE).getString("mode","system"))));
             waitTrue(prepared,"!matchMedia('(prefers-reduced-motion: reduce)').matches");
         }
