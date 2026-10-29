@@ -571,6 +571,7 @@ public class AppSmokeTest {
         waitTrue(scenario,"Boolean(document.querySelector('"+selector+"'))&&!document.querySelector('.page-swipe-layer')");
         evaluate(scenario,"document.querySelector('"+selector+"').scrollIntoView({block:'center',behavior:'instant'})");
         awaitInputWindow(scenario);
+        Thread.sleep(250);
         return new JSONObject(new org.json.JSONTokener(evaluate(scenario,"JSON.stringify((()=>{const r=document.querySelector('"+selector+"').getBoundingClientRect();return {left:r.left,right:r.right,y:r.top+r.height/2,width:innerWidth}})())")).nextValue().toString());
     }
     private void swipeFromControl(ActivityScenario<MainActivity> scenario,String selector,int direction) throws Exception {
@@ -579,7 +580,9 @@ public class AppSmokeTest {
         int[] origin=new int[2];float[] density=new float[1];
         assertTrue(withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(origin);density[0]=activity.getResources().getDisplayMetrics().density;}));
         int steps=Math.abs(to-from)<width/5?3:20;
+        evaluate(scenario,"window.__controlInput={selector:\""+selector+"\",from:"+from+",to:"+to+",y:"+y+",steps:"+steps+",prepared:Boolean(document.querySelector('.page-swipe-preload')),events:[]};if(!window.__controlInputWatch){window.__controlInputWatch=true;for(const name of ['touchstart','touchmove','touchend','touchcancel'])document.addEventListener(name,e=>{if(window.__controlInput)window.__controlInput.events.push({name,x:e.touches[0]?.clientX,y:e.touches[0]?.clientY,target:e.target.closest('[data-action]')?.dataset.action})},true)}");
         assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(origin[0]+Math.round((float)from*density[0]),origin[1]+Math.round((float)y*density[0]),origin[0]+Math.round((float)to*density[0]),origin[1]+Math.round((float)y*density[0]),steps));
+        android.util.Log.i("DagongrenMotion","CONTROL_INPUT="+evaluate(scenario,"JSON.stringify(window.__controlInput)"));
     }
     private void tapControl(ActivityScenario<MainActivity> scenario,String selector) throws Exception {
         JSONObject r=controlRect(scenario,selector);double x=(r.getDouble("left")+r.getDouble("right"))/2,y=r.getDouble("y");
