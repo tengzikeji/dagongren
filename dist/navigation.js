@@ -8,7 +8,9 @@ export function bindBottomNavigation(root,api){
  const reduced=()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
  const mark=(name,detail)=>{try{performance.mark(name,{detail});}catch{}};
  function update(){
-  const height=window.visualViewport?.height||window.innerHeight,top=Math.max(window.scrollY||0,document.scrollingElement?.scrollTop||0);
+  // WebView can report a fractional visual height while innerHeight and scroll
+  // positions round to CSS pixels. Use the same pixel boundary for one screen.
+  const height=Math.round(window.visualViewport?.height||window.innerHeight),top=Math.max(window.scrollY||0,document.scrollingElement?.scrollTop||0);
   for(const button of root.querySelectorAll('.bottom-nav [data-view]')){
    const show=button.dataset.view===api.current()&&topIconVisible(top,height);if(button.dataset.top!==String(show))button.dataset.top=String(show);
    const label=button.querySelector('span:not(.nav-symbol):not(.nav-original)')?.textContent||button.dataset.view;

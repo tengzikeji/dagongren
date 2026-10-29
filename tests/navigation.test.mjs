@@ -15,6 +15,7 @@ function fixture(reduced=false){
  const nav=context.bind(root,{current:()=>current,navigate:view=>{navigations.push(view);current=view;}});
  return {nav,window,document,positions,events,buttons,animations,marks,navigations,frame(at){for(const [id,f] of [...frames]){frames.delete(id);f(at);}}};
 }
+test('安卓小数视口高度不会把刚好一屏误判为未到边界',()=>{const f=fixture();f.window.visualViewport={height:600.19};f.window.scrollY=599;f.nav.update();assert.equal(f.buttons[0].dataset.top,'false');f.window.scrollY=600;f.nav.update();assert.equal(f.buttons[0].dataset.top,'true');});
 test('当前页面一键快速置顶且滚动单调向上，不切换账本页面',()=>{const f=fixture();f.window.scrollY=2400;f.document.scrollingElement.scrollTop=2400;f.nav.update();assert.equal(f.buttons[0].dataset.top,'true');assert.equal(f.buttons[1].dataset.top,'false');f.nav.select('home');for(const at of [0,80,160,240,320])f.frame(at);assert.equal(f.window.scrollY,0);assert.equal(f.nav.isBusy(),false);assert.ok(f.positions.every((p,i)=>!i||p<=f.positions[i-1]));assert.equal(f.buttons[0].dataset.top,'false');});
 test('点击其它主页面交给完整页面推进，导航自身不再下拉内容',()=>{const f=fixture();f.nav.select('calendar');assert.deepEqual(f.navigations,['calendar']);assert.equal(f.animations.length,0);assert.equal(f.marks.length,0);assert.equal(f.nav.isBusy(),false);});
 test('已经在顶部时重复点击当前导航不移动、不重绘、不触发内容动画',()=>{const f=fixture();for(let i=0;i<3;i++)f.nav.select('home');assert.deepEqual(f.positions,[]);assert.deepEqual(f.navigations,[]);assert.equal(f.animations.length,0);assert.equal(f.marks.length,0);});
