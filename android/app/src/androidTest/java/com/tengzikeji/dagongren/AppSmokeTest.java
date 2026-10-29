@@ -658,7 +658,14 @@ public class AppSmokeTest {
             String cssColor="dark".equals(theme)?"rgb(16, 24, 39)":"rgb(243, 245, 249)";
             try(ActivityScenario<MainActivity> prepared=ActivityScenario.launch(MainActivity.class)){
                 resetBook(prepared);
-                evaluate(prepared,"localStorage.setItem('dagongren.theme.v1','"+theme+"');AndroidFiles.themeStyle('"+theme+"');const b=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));b.defaults.motion=false;localStorage.setItem('dagongren.paybook.v1',JSON.stringify(b));AndroidFiles.motionStyle(false)");
+                evaluate(prepared,"document.querySelector('.bottom-nav [data-view=settings]').click()");
+                waitTrue(prepared,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='settings'&&!document.querySelector('.page-swipe-layer')");
+                evaluate(prepared,"document.querySelector('[data-action=theme-settings]').click()");
+                waitTrue(prepared,"Boolean(document.querySelector('[data-action=choose-theme][data-theme="+theme+"]'))");
+                evaluate(prepared,"document.querySelector('[data-action=choose-theme][data-theme="+theme+"]').click()");
+                waitTrue(prepared,"document.body.dataset.theme==='"+theme+"'&&!document.querySelector('#modal-root .modal-overlay')");
+                evaluate(prepared,"document.querySelector('[data-action=toggle-motion]').click()");
+                waitTrue(prepared,"document.body.dataset.theme==='"+theme+"'&&document.body.classList.contains('motion-off')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false");
                 assertTrue(withActivity(activity->assertEquals(theme,activity.getSharedPreferences("appearance",android.content.Context.MODE_PRIVATE).getString("mode","system"))));
             }
             try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
