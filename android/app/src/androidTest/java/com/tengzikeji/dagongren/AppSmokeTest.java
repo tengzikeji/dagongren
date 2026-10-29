@@ -361,7 +361,14 @@ public class AppSmokeTest {
             paintedScreenshot(scenario,"stable-date-query");
         }
     }
-    @Test public void coldStartupUsesOneSurfaceAndFlowsIntoHome() throws Exception {
+    @Test public void coldStartupUsesOneSurfaceAndFlowsIntoHome() throws Exception {reviewColdStartup("light");}
+    @Test public void darkColdStartupKeepsSystemIconsStable() throws Exception {reviewColdStartup("dark");}
+    private void reviewColdStartup(String theme) throws Exception {
+        final boolean dark="dark".equals(theme);
+        final int color=dark?android.graphics.Color.rgb(16,24,39):android.graphics.Color.rgb(243,245,249);
+        final int bars=dark?0:android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+        final String marker=dark?"DARK_":"";
+        final String video=dark?"startup-transition-dark.mp4":"startup-transition.mp4";
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         device.executeShellCommand("settings put global window_animation_scale 1");
         device.executeShellCommand("settings put global transition_animation_scale 1");
@@ -369,12 +376,14 @@ public class AppSmokeTest {
         try(ActivityScenario<MainActivity> prepared=ActivityScenario.launch(MainActivity.class)){
             resetBook(prepared);
             evaluate(prepared,"const b=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));b.defaults.motion=false;localStorage.setItem('dagongren.paybook.v1',JSON.stringify(b))");
+            evaluate(prepared,"localStorage.setItem('dagongren.theme.v1','"+theme+"');AndroidFiles.themeStyle('"+theme+"')");
+            assertTrue(withActivity(activity->assertEquals(theme,activity.getSharedPreferences("appearance",Context.MODE_PRIVATE).getString("mode","system"))));
             waitTrue(prepared,"!matchMedia('(prefers-reduced-motion: reduce)').matches");
         }
         // Leave the instrumentation activity before recording a real launch from Home.
         device.pressHome();device.waitForIdle(2000);dismissEmulatorLauncherAnr();
         device.executeShellCommand("mkdir -p /sdcard/Download/dagongren-test");
-        Thread recording=new Thread(()->{try{device.executeShellCommand("screenrecord --size 720x1280 --bit-rate 2000000 --time-limit 30 /sdcard/Download/dagongren-test/startup-transition.mp4");}catch(Exception ignored){}},"startup-recording");recording.setDaemon(true);recording.start();
+        Thread recording=new Thread(()->{try{device.executeShellCommand("screenrecord --size 720x1280 --bit-rate 2000000 --time-limit 30 /sdcard/Download/dagongren-test/"+video);}catch(Exception ignored){}},"startup-recording");recording.setDaemon(true);recording.start();
         // Wait for the recorder to capture the launcher before starting the app.
         long readyDeadline=System.currentTimeMillis()+10000;String recordingPid="";
         while(recording.isAlive()&&System.currentTimeMillis()<readyDeadline){recordingPid=device.executeShellCommand("pidof screenrecord").trim();if(!recordingPid.isEmpty())break;Thread.sleep(100);}
@@ -387,9 +396,12 @@ public class AppSmokeTest {
         androidx.test.runner.lifecycle.ActivityLifecycleCallback launchBarObserver=(activity,stage)->{
             if(activity instanceof MainActivity&&stage==androidx.test.runner.lifecycle.Stage.CREATED){
                 MainActivity launched=(MainActivity)activity;
+                android.util.TypedValue statusStyle=new android.util.TypedValue();
+                assertTrue(launched.getTheme().resolveAttribute(android.R.attr.windowLightStatusBar,statusStyle,true));
+                assertEquals("The first native theme must match the saved app theme",dark?0:1,statusStyle.data);
                 launched.getWindow().getDecorView().getViewTreeObserver().addOnDrawListener(()->{
                     launchBarColors.add(((android.graphics.drawable.ColorDrawable)((android.view.View)launched.findViewById(R.id.web_view).getParent()).getBackground()).getColor());
-                    if(!launched.isFirstLaunchFramePresented()){
+                    {
                         int mask=android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
                         launchBarModes.add(launched.getWindow().getInsetsController().getSystemBarsAppearance()&mask);
                     }
@@ -402,13 +414,13 @@ public class AppSmokeTest {
             waitTrueLoading(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1),page=document.querySelector('.launch-page'),scene=document.querySelector('.launch-scene');if(!entry||!page||!scene)return false;window.__launchObserved=entry.detail;window.__launchObservedColors=[getComputedStyle(page).backgroundColor,getComputedStyle(scene).backgroundColor];if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];window.__launchContentSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='content-fading'){window.__launchContentSamples.push({opacity:Number(getComputedStyle(page).opacity),contentOpacity:Number(getComputedStyle(page.querySelector('.launch-scene')).opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity)})}if(page.dataset.phase==='fading'){const rect=page.getBoundingClientRect(),style=getComputedStyle(page);window.__launchBlendSamples.push({opacity:Number(style.opacity),contentOpacity:Number(getComputedStyle(page.querySelector('.launch-scene')).opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height,left:rect.left,top:rect.top,transform:style.transform,radius:style.borderRadius})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
             assertEquals("1",evaluateLoading(scenario,"window.__launchObserved.surfaces"));
             assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertFalse(activity.hasBitmapLaunchCover());assertTrue(activity.getWindow().getDecorView().isHardwareAccelerated());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
-            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.8'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface&&window.__launchObserved.strokeRenderer==='transform-clips'&&window.__launchObserved.appReleaseDelay===2100"));
+            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.9'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface&&window.__launchObserved.strokeRenderer==='transform-clips'&&window.__launchObserved.appReleaseDelay===2100"));
             assertEquals("false",evaluateLoading(scenario,"window.__launchObserved.oldBrand"));
-            assertEquals("true",evaluateLoading(scenario,"window.__launchObservedColors.length===2&&window.__launchObservedColors.every(color=>color==='rgb(243, 245, 249)')"));
+            assertEquals("true",evaluateLoading(scenario,"window.__launchObservedColors.length===2&&window.__launchObservedColors.every(color=>color==='"+(dark?"rgb(16, 24, 39)":"rgb(243, 245, 249)")+"')"));
             assertEquals("true",evaluateLoading(scenario,"!document.querySelector('.launch-edition')&&window.__launchObserved.animationNames.includes('launch-content-in')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false"));
-            android.util.Log.i("DagongrenLaunchReview","NATIVE_BARS_BEFORE_CONTENT="+launchBarModes);
+            android.util.Log.i("DagongrenLaunchReview",marker+"NATIVE_BARS_BEFORE_CONTENT="+launchBarModes);
             assertFalse("No native startup frames were sampled",launchBarModes.isEmpty());
-            for(int mode:launchBarModes)assertEquals("Startup icons do not match the home scheme",android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,mode);
+            for(int mode:launchBarModes)assertEquals("Startup icons do not match the home scheme",bars,mode);
             assertTrue(withActivity(activity->assertTrue("Repeated SystemUI icon writes",activity.getSystemBarIconUpdateCount()<=1)));
             assertTrue(withActivity(activity->{assertFalse(activity.getWindow().isStatusBarContrastEnforced());assertFalse(activity.getWindow().isNavigationBarContrastEnforced());}));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.inert"));
@@ -416,20 +428,21 @@ public class AppSmokeTest {
             waitTrueLoading(scenario,"performance.getEntriesByName('dagongren.app.render').length>0");
             assertEquals("true",evaluateLoading(scenario,"(()=>{const created=performance.getEntriesByName('dagongren.launch.created')[0],painted=performance.getEntriesByName('dagongren.launch.painted')[0],render=performance.getEntriesByName('dagongren.app.render')[0],playing=performance.getEntriesByName('dagongren.launch.playing')[0];return !!created&&!!painted&&!!render&&created.startTime<=painted.startTime&&painted.startTime<=playing.startTime&&render.startTime-playing.startTime>=2090})()"));
             double playingSecond=(Double.parseDouble(evaluateLoading(scenario,"window.__launchObserved.at"))-recordingStarted)/1000.0;
-            android.util.Log.i("DagongrenLaunchReview","PLAYING_SECOND="+playingSecond);
+            android.util.Log.i("DagongrenLaunchReview",marker+"PLAYING_SECOND="+playingSecond);
             waitTrueLoading(scenario,"window.__launchBlendSamples.some(frame=>frame.opacity>0&&frame.opacity<1&&frame.homeOpacity===1&&Math.abs(frame.width-innerWidth)<1&&Math.abs(frame.height-innerHeight)<1)");
             waitTrueLoading(scenario,"!document.querySelector('.launch-page')");
             double fadingSecond=(Double.parseDouble(evaluateLoading(scenario,"performance.timeOrigin+performance.getEntriesByName('dagongren.launch.fading').at(-1).startTime"))-recordingStarted)/1000.0;
-            android.util.Log.i("DagongrenLaunchReview","FADING_SECOND="+fadingSecond);
+            android.util.Log.i("DagongrenLaunchReview",marker+"FADING_SECOND="+fadingSecond);
             double fadeReadySecond=(Double.parseDouble(evaluateLoading(scenario,"performance.timeOrigin+performance.getEntriesByName('dagongren.launch.fade.ready').at(-1).startTime"))-recordingStarted)/1000.0;
-            android.util.Log.i("DagongrenLaunchReview","FADE_READY_SECOND="+fadeReadySecond);
+            android.util.Log.i("DagongrenLaunchReview",marker+"FADE_READY_SECOND="+fadeReadySecond);
             double completedSecond=(Double.parseDouble(evaluateLoading(scenario,"performance.timeOrigin+performance.getEntriesByName('dagongren.launch.complete').at(-1).startTime"))-recordingStarted)/1000.0;
-            android.util.Log.i("DagongrenLaunchReview","COMPLETED_SECOND="+completedSecond);
-            assertTrue("Native launch chrome did not remain in the home scheme",!launchBarColors.isEmpty()&&launchBarColors.stream().allMatch(color->color==android.graphics.Color.rgb(243,245,249)));
-            assertTrue(withActivity(activity->{assertEquals(android.graphics.Color.rgb(243,245,249),((android.graphics.drawable.ColorDrawable)((android.view.View)activity.findViewById(R.id.web_view).getParent()).getBackground()).getColor());assertTrue("Icon mode toggled repeatedly",activity.getSystemBarIconUpdateCount()<=1);}));
-            android.util.Log.i("DagongrenLaunchReview","BLEND_REVIEW="+evaluateLoading(scenario,"JSON.stringify({detail:performance.getEntriesByName('dagongren.launch.fading').at(-1)?.detail,viewport:[innerWidth,innerHeight],sampleCount:window.__launchBlendSamples.length,samples:window.__launchBlendSamples.slice(0,12)})"));
-            assertEquals("true",evaluateLoading(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.launch.fading').at(-1)?.detail,s=window.__launchBlendSamples;return !!d&&d.duration===650&&d.contentDuration===420&&d.contentGone&&d.hold===2800&&d.surfaces===1&&d.fullScreen&&d.homeReady&&s.length>=3&&s.every((f,i)=>f.contentOpacity===0&&f.homeOpacity===1&&Math.abs(f.width-innerWidth)<1&&Math.abs(f.height-innerHeight)<1&&f.left===0&&f.top===0&&f.transform==='none'&&f.radius==='0px'&&(!i||f.opacity<=s[i-1].opacity+.001))})()"));
-            assertEquals("true",evaluateLoading(scenario,"(()=>{const s=window.__launchContentSamples,a=performance.getEntriesByName('dagongren.launch.content.fading').at(-1),b=performance.getEntriesByName('dagongren.launch.content.complete').at(-1),c=performance.getEntriesByName('dagongren.launch.fading').at(-1);return s.length>=3&&s.every(f=>f.opacity===1&&f.homeOpacity===1)&&s.some(f=>f.contentOpacity>0&&f.contentOpacity<1)&&a.detail.duration===420&&b.startTime<=c.startTime})()"));
+            android.util.Log.i("DagongrenLaunchReview",marker+"COMPLETED_SECOND="+completedSecond);
+            assertTrue("Native launch chrome did not remain in the home scheme",!launchBarColors.isEmpty()&&launchBarColors.stream().allMatch(sampleColor->sampleColor==color));
+            assertTrue(withActivity(activity->{assertEquals(color,((android.graphics.drawable.ColorDrawable)((android.view.View)activity.findViewById(R.id.web_view).getParent()).getBackground()).getColor());assertTrue("Icon mode toggled repeatedly",activity.getSystemBarIconUpdateCount()<=1);}));
+            for(int mode:launchBarModes)assertEquals("System icons changed during startup",bars,mode);
+            android.util.Log.i("DagongrenLaunchReview",marker+"BLEND_REVIEW="+evaluateLoading(scenario,"JSON.stringify({detail:performance.getEntriesByName('dagongren.launch.fading').at(-1)?.detail,viewport:[innerWidth,innerHeight],sampleCount:window.__launchBlendSamples.length,samples:window.__launchBlendSamples.slice(0,12)})"));
+            assertEquals("true",evaluateLoading(scenario,"(()=>{const d=performance.getEntriesByName('dagongren.launch.fading').at(-1)?.detail,s=window.__launchBlendSamples;return !!d&&d.duration===650&&d.contentDuration===300&&d.contentGone&&d.hold===2800&&d.surfaces===1&&d.fullScreen&&d.homeReady&&s.length>=3&&s.every((f,i)=>f.contentOpacity===0&&f.homeOpacity===1&&Math.abs(f.width-innerWidth)<1&&Math.abs(f.height-innerHeight)<1&&f.left===0&&f.top===0&&f.transform==='none'&&f.radius==='0px'&&(!i||f.opacity<=s[i-1].opacity+.001))})()"));
+            assertEquals("true",evaluateLoading(scenario,"(()=>{const s=window.__launchContentSamples,a=performance.getEntriesByName('dagongren.launch.content.fading').at(-1),b=performance.getEntriesByName('dagongren.launch.content.complete').at(-1),c=performance.getEntriesByName('dagongren.launch.fading').at(-1);return s.length>=3&&s.every(f=>f.opacity===1&&f.homeOpacity===1)&&s.some(f=>f.contentOpacity>0&&f.contentOpacity<1)&&a.detail.duration===300&&b.startTime<=c.startTime})()"));
             assertEquals("false",evaluateLoading(scenario,"document.getElementById('app').inert"));
             assertEquals("\"none\"",evaluateLoading(scenario,"getComputedStyle(document.getElementById('view-content')).animationName"));
             assertEquals("true",evaluateLoading(scenario,"Boolean(document.querySelector('.bottom-nav'))"));
@@ -838,7 +851,7 @@ public class AppSmokeTest {
                 paintedScreenshot(scenario,"theme-"+theme+"-profile");
             evaluate(scenario,"document.querySelector('.app-info-footer').scrollIntoView({block:'center',behavior:'instant'})");
             waitTrue(scenario,"!document.getElementById('toast').classList.contains('show')");
-            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.8 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.9 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
                 paintedScreenshot(scenario,"theme-"+theme+"-copyright");
             evaluate(scenario,"document.querySelector('#app .profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 swipeRegion(scenario,".employment-progress",-1);

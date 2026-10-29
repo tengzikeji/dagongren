@@ -27,21 +27,9 @@ def bar_flickers(values,expected=245):
             or any(abs(x-expected)>12 for x in values[-5:]))
 
 
-def main():
-    assert detect_flash([26, 26, 37, 26, 26, 37])
-    assert detect_flash([26, 26, 27, 29, 32, 37]) is None
-    assert not bar_flickers([188]*5+[245]*15)
-    assert not bar_flickers([245]*20)
-    assert not bar_flickers([29]*20,expected=29)
-    assert bar_flickers([245]*5+[29]*3+[245]*12)
-    assert bar_flickers([188]*3+[245]*3+[188]*3+[245]*11)
-    if '--self-test' in sys.argv:
-        print('Flash detector self-test passed')
-        return
-    video = Path(sys.argv[1]) if len(sys.argv)>1 else next(Path('android/app/build/reports').rglob('startup-transition.mp4'), None)
-    ffmpeg = sys.argv[2] if len(sys.argv)>2 else shutil.which('ffmpeg')
-    if not video or not video.is_file() or not ffmpeg:
-        raise SystemExit('Startup video and ffmpeg are required for flash review')
+def review(video, ffmpeg, dark=False):
+    expected=23 if dark else 245
+    prefix='DARK_' if dark else ''
     # Include the launcher search field and dock: sampling only the middle of
     # the wallpaper can mistake a dark blue patch for our solid startup window.
     p = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '10.0', '-vf', 'fps=20,crop=iw*0.96:ih*0.87:iw*0.02:ih*0.045,scale=80:100,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
@@ -53,14 +41,14 @@ def main():
         variance=sum((x-mean)**2 for x in frame)/size
         stats.append((mean, variance**.5))
     # Allow the launcher to remain visible until the process presents its solid themed window.
-    anchor=next((i for i,(mean,sd) in enumerate(stats) if 235<=mean<=252 and sd<2.5),None)
+    anchor=next((i for i,(mean,sd) in enumerate(stats) if (15<=mean<=35 if dark else 235<=mean<=252) and sd<2.5),None)
     if anchor is None or len(stats)-anchor<10:
         raise SystemExit('Could not identify enough frames from the themed startup window')
     print('Solid startup window identified at',f'{anchor/20:.2f}s')
     values=[mean for mean,_ in stats[anchor:anchor+30]]
     flash=detect_flash(values)
     print('Startup window first 1.5s luminance:', ', '.join(f'{x:.1f}' for x in values))
-    if any(x<=5 for x in values) or any(mean<75 and sd<2.5 for mean,sd in stats[anchor:anchor+30]):
+    if any(x<=5 for x in values) or (not dark and any(mean<75 and sd<2.5 for mean,sd in stats[anchor:anchor+30])):
         raise SystemExit('A dark blank screen appeared after the light startup window')
     if flash:
         raise SystemExit(f'Launch brightness disappeared and returned around {(anchor+flash[0])/20:.2f}s (drops {flash[1]:.1f}, {flash[2]:.1f})')
@@ -70,16 +58,16 @@ def main():
     top = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '10.0', '-vf', 'fps=20,crop=iw*0.24:ih*0.012:iw*0.38:ih*0.004,scale=24:4,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True).stdout
     top_means=[sum(top[i:i+96])/96 for i in range(0,len(top),96) if len(top[i:i+96])==96][anchor:anchor+20]
     print('Startup status-bar first 1s luminance:', ', '.join(f'{x:.1f}' for x in top_means))
-    background_error=bar_flickers(top_means)
+    background_error=bar_flickers(top_means,expected=expected)
     # Inspect foreground occupancy too: a stable blue background cannot prove
     # that the clock and system icons have remained visible.
     raw = subprocess.run([ffmpeg, '-v', 'error', '-i', str(video), '-t', '30.0', '-vf', 'fps=20,crop=iw:ih*0.032:0:0,scale=360:20,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True).stdout
     from statistics import median
     import re
     progress=video.parent.parent/'device-progress.log'
-    done=re.search(r'COMPLETED_SECOND=([0-9.]+)',progress.read_text(errors='replace')) if progress.exists() else None
-    ready=re.search(r'FADE_READY_SECOND=([0-9.]+)',progress.read_text(errors='replace')) if progress.exists() else None
-    playing=re.search(r'PLAYING_SECOND=([0-9.]+)',progress.read_text(errors='replace')) if progress.exists() else None
+    done=re.search(r'(?<![A-Z_])'+prefix+r'COMPLETED_SECOND=([0-9.]+)',progress.read_text(errors='replace')) if progress.exists() else None
+    ready=re.search(r'(?<![A-Z_])'+prefix+r'FADE_READY_SECOND=([0-9.]+)',progress.read_text(errors='replace')) if progress.exists() else None
+    playing=re.search(r'(?<![A-Z_])'+prefix+r'PLAYING_SECOND=([0-9.]+)',progress.read_text(errors='replace')) if progress.exists() else None
     end=int((float(done.group(1))+.15)*20) if done else anchor+30
     icon_frames=[raw[i:i+7200] for i in range(0,len(raw),7200) if len(raw[i:i+7200])==7200][anchor+1:end]
     backgrounds=[median(frame[y*360+x] for y in range(4,16) for x in range(150,210)) for frame in icon_frames]
@@ -90,10 +78,10 @@ def main():
     else:
         fading=[(i+anchor+1,bg) for i,bg in enumerate(backgrounds) if (i+anchor+1)/20>=float(ready.group(1))]
         review['bar_handoff']=fading
-        first=next((i for i,bg in enumerate(backgrounds) if abs(bg-245)<=12),None)
+        first=next((i for i,bg in enumerate(backgrounds) if abs(bg-expected)<=12),None)
         if first is None or not playing or (first+anchor+1)/20>float(playing.group(1))+.1:
             failures.append('Home status-bar scheme was not ready before the live launch scene')
-        elif any(abs(bg-245)>12 for bg in backgrounds[first:]):
+        elif any(abs(bg-expected)>12 for bg in backgrounds[first:]):
             failures.append('Native status-bar scheme changed during the launch handoff')
     for name,start,end in [('clock',0,120),('system',240,360)]:
         counts=[sum(abs(frame[y*360+x]-bg)>55 for y in range(20) for x in range(start,end)) for frame,bg in zip(icon_frames,backgrounds)]
@@ -102,9 +90,38 @@ def main():
         print('Startup '+name+' icon pixels:', ', '.join(map(str,counts)))
         if baseline<3 or detect_flash(counts,threshold=max(3,baseline*.55)):
             failures.append('Status-bar '+name+' icons disappeared and returned during startup')
-    (video.parent/'startup-review.json').write_text(json.dumps(review,indent=2))
+    (video.parent/('startup-review-dark.json' if dark else 'startup-review.json')).write_text(json.dumps(review,indent=2))
     if background_error:failures.insert(0,'Status-bar background changed unexpectedly before launch content')
     if failures:raise SystemExit('; '.join(failures))
+
+
+def main():
+    assert detect_flash([26, 26, 37, 26, 26, 37])
+    assert detect_flash([26, 26, 27, 29, 32, 37]) is None
+    assert not bar_flickers([188]*5+[245]*15)
+    assert not bar_flickers([245]*20)
+    assert not bar_flickers([29]*20,expected=29)
+    assert bar_flickers([245]*5+[29]*3+[245]*12)
+    assert bar_flickers([188]*3+[245]*3+[188]*3+[245]*11)
+    if '--self-test' in sys.argv:
+        print('Flash detector self-test passed')
+        return
+    ffmpeg = sys.argv[2] if len(sys.argv)>2 else shutil.which('ffmpeg')
+    if not ffmpeg:
+        raise SystemExit('ffmpeg is required for flash review')
+    videos=[Path(sys.argv[1])] if len(sys.argv)>1 else sorted(Path('android/app/build/reports').rglob('startup-transition*.mp4'))
+    if not videos or (len(sys.argv)==1 and not {'startup-transition.mp4','startup-transition-dark.mp4'}.issubset({v.name for v in videos})):
+        raise SystemExit('Both light and dark cold-start videos are required')
+    failures=[]
+    for video in videos:
+        dark=video.stem.endswith('-dark')
+        print('Reviewing', 'dark' if dark else 'light', 'cold startup:',video)
+        try:
+            review(video,ffmpeg,dark)
+        except SystemExit as error:
+            failures.append(('dark' if dark else 'light')+': '+str(error))
+    if failures:
+        raise SystemExit('; '.join(failures))
 
 
 if __name__ == '__main__':

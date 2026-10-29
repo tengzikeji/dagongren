@@ -25,7 +25,7 @@ async function finishContent(f){f.fades[0].ready.resolve();await tick();f.fades[
 
 test('应用动效关闭仍播放冷启动，内容先淡出再释放底色',async()=>{
  const f=fixture({savedMotion:false});await opening(f);
- assert.doesNotMatch(f.page.innerHTML,/装机测试版|launch-edition/);assert.equal(f.page.dataset.phase,'content-fading');assert.equal(f.fades.length,1);assert.equal(f.fades[0].target,'content');assert.equal(f.fades[0].options.duration,420);assert.equal(f.nativeTransitions(),0);assert.equal(f.removed(),false);
+ assert.doesNotMatch(f.page.innerHTML,/装机测试版|launch-edition/);assert.equal(f.page.dataset.phase,'content-fading');assert.equal(f.fades.length,1);assert.equal(f.fades[0].target,'content');assert.equal(f.fades[0].options.duration,300);assert.equal(f.nativeTransitions(),0);assert.equal(f.removed(),false);
  await finishContent(f);assert.equal(f.page.dataset.phase,'fading');assert.equal(f.scene.style.opacity,'0');assert.equal(f.fades.length,2);assert.equal(f.fades[1].target,'background');assert.equal(f.fades[1].options.duration,650);
  f.fades[1].ready.resolve();await tick();assert.equal(f.nativeTransitions(),1);f.fades[1].finished.resolve();await tick();assert.equal(f.removed(),true);assert.equal(f.app.inert,false);
 });

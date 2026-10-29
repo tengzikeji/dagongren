@@ -281,7 +281,7 @@ function showCalendarSources(){
 }
 
 function appInfoFooter(){
-  const version=isAndroid?'安卓版 1.3.5-beta.8 测试版':'1.3.5-beta.8 网页预览';
+  const version=isAndroid?'安卓版 1.3.5-beta.9 测试版':'1.3.5-beta.9 网页预览';
   const storage=storageBlocked?'存储暂不可用，请及时导出账本。':isAndroid?'账本保存在本机，可自行配置坚果云同步。':'浏览器预览 · 数据保存在浏览器，坚果云同步为演示。';
   return `<footer class="app-info-footer" aria-label="应用信息"><div class="app-info-heading"><strong>打工人</strong><span>${version}</span></div><p class="app-info-storage">${icon('lock')}<span>${storage}</span></p><div class="app-info-divider" aria-hidden="true"></div><p class="app-info-owner">腾子科技·版权所有</p><p class="app-info-phone">联系电话：18937027607</p></footer>`;
 }

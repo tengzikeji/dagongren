@@ -25,7 +25,7 @@ export function prepareBrandIntro(){
  const open=()=>{if(opening||finished)return;opening=true;
   // Home paints behind a fully opaque launch canvas. Content leaves first.
   document.body.classList.add('intro-opening');page.dataset.phase='content-fading';
-  const scene=page.querySelector('.launch-scene'),contentDuration=420,duration=650;
+  const scene=page.querySelector('.launch-scene'),contentDuration=300,duration=650;
   try{performance.mark('dagongren.launch.content.fading',{detail:{duration:contentDuration,hold:2800,backgroundOpaque:true}});}catch{}
   const fadeBackground=()=>{if(finished)return;
    scene?.style?.setProperty('opacity','0','important');
@@ -40,7 +40,7 @@ export function prepareBrandIntro(){
  const start=()=>{
   if(started||finished||!nativePainted)return;
   started=true;clearTimeout(fallback);page.dataset.phase='playing';
-  try{performance.mark('dagongren.launch.playing',{detail:{at:Date.now(),surfaces:document.querySelectorAll('.launch-page').length,oldBrand:Boolean(document.querySelector('.brand-intro')),inert:app?.inert===true,animated:getComputedStyle(page.querySelector('.launch-emblem')).animationName==='launch-emblem-in',nativeFade,firstFrame:'launch-page',liveScene:Boolean(page.querySelector('.launch-emblem')),bitmapSurface:Boolean(page.querySelector('.launch-prelude,.launch-picture,.launch-card-sheen')),animationVersion:'1.3.5-beta.8',strokeRenderer:'transform-clips',appReleaseDelay:2100,strokeCompleteBy:1800,appReadyAtStart:appReady,prelude:false,animationNames:[...new Set(page.getAnimations({subtree:true}).map(a=>a.animationName).filter(Boolean))]}});}catch{}
+  try{performance.mark('dagongren.launch.playing',{detail:{at:Date.now(),surfaces:document.querySelectorAll('.launch-page').length,oldBrand:Boolean(document.querySelector('.brand-intro')),inert:app?.inert===true,animated:getComputedStyle(page.querySelector('.launch-emblem')).animationName==='launch-emblem-in',nativeFade,firstFrame:'launch-page',liveScene:Boolean(page.querySelector('.launch-emblem')),bitmapSurface:Boolean(page.querySelector('.launch-prelude,.launch-picture,.launch-card-sheen')),animationVersion:'1.3.5-beta.9',strokeRenderer:'transform-clips',appReleaseDelay:2100,strokeCompleteBy:1800,appReadyAtStart:appReady,prelude:false,animationNames:[...new Set(page.getAnimations({subtree:true}).map(a=>a.animationName).filter(Boolean))]}});}catch{}
   // Begin the visual movement before loading and calculating the ledger.
   loadTimer=setTimeout(releaseApp,2100);
   requestAnimationFrame(()=>requestAnimationFrame(()=>{if(!finished)timer=setTimeout(()=>{holdComplete=true;if(appReady)open();},2800);}));

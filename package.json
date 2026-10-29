@@ -1,6 +1,6 @@
 {
   "name": "dagongren",
-  "version": "1.3.5-beta.8",
+  "version": "1.3.5-beta.9",
   "private": true,
   "type": "module",
   "description": "打工人工资账本，支持用户配置坚果云与安卓版安装包",

@@ -51,8 +51,9 @@ public final class MainActivity extends Activity {
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
         NativeTheme.apply(this);
-        super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;
+        // Resolve the saved app theme before the first DecorView is created.
         refreshAppearance();
+        super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;
         // Match the starting theme before attaching content or changing insets.
         getWindow().setBackgroundDrawable(windowCanvas);
         if(Build.VERSION.SDK_INT>=29){getWindow().setStatusBarContrastEnforced(false);getWindow().setNavigationBarContrastEnforced(false);}
@@ -60,6 +61,10 @@ public final class MainActivity extends Activity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         FrameLayout root=new FrameLayout(this);root.setBackgroundColor(appearanceColor());
         if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(window->{
+            // The platform may restore theme attributes while attaching its splash.
+            // Reassert our selected scheme before the splash and live page exchange.
+            applyAppearance();
+            getWindow().setDecorFitsSystemWindows(false);
             // Keep the real system splash over the attached, hardware-rendered WebView.
             // Never hold pre-draw: WebView must be allowed to submit its first frame.
             if(launchNotified)window.remove();
@@ -133,6 +138,7 @@ public final class MainActivity extends Activity {
     private void refreshAppearance(){
         String mode=getSharedPreferences("appearance",MODE_PRIVATE).getString("mode","system");
         darkAppearance="dark".equals(mode)||("system".equals(mode)&&systemIsDark());
+        getTheme().applyStyle(darkAppearance?R.style.LaunchBarsDark:R.style.LaunchBarsLight,true);
     }
     private void applyAppearance(){
         paintAppearance(appearanceColor(),darkAppearance);
@@ -183,6 +189,7 @@ public final class MainActivity extends Activity {
     private void completeLaunchSurface(){
         if(launchNotified||!launchSurfacePrepared||isDestroyed())return;
         if(Build.VERSION.SDK_INT>=31&&systemSplashView!=null){((android.window.SplashScreenView)systemSplashView).remove();systemSplashView=null;}
+        applyAppearance();
         notifyLaunchSurface();
     }
     private void notifyLaunchSurface(){
