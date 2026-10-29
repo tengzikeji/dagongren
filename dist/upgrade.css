@@ -198,7 +198,7 @@
 .swipe-boundary-arrow svg{width:10px;height:17px;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .page-swipe-layer .swipe-boundary-arrow{animation:swipe-edge-nudge .65s ease-in-out infinite alternate!important}
 @keyframes swipe-edge-nudge{from{transform:translateX(0)}to{transform:translateX(var(--edge-nudge))}}
-body.motion-off .swipe-boundary-arrow{animation:none!important}
+@media(prefers-reduced-motion:reduce){:is(.page-swipe-layer,.page-swipe-preload) .swipe-boundary-arrow{animation:none!important}}
 /* Date paints depend only on their semantic state, never hover or touch press. */
 .calendar-day{--date-bg:#fff;--date-fg:#223a5c;--date-border:transparent;background:var(--date-bg)!important;color:var(--date-fg)!important;border-color:var(--date-border)!important;-webkit-tap-highlight-color:transparent}
 .calendar-day.weekend{--date-bg:#f8f9fc;--date-fg:#7e6b74}

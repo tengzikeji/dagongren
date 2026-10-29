@@ -402,7 +402,7 @@ public class AppSmokeTest {
             waitTrueLoading(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1),page=document.querySelector('.launch-page'),scene=document.querySelector('.launch-scene');if(!entry||!page||!scene)return false;window.__launchObserved=entry.detail;window.__launchObservedColors=[getComputedStyle(page).backgroundColor,getComputedStyle(scene).backgroundColor];if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='fading'){const rect=page.getBoundingClientRect(),style=getComputedStyle(page);window.__launchBlendSamples.push({opacity:Number(style.opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height,left:rect.left,top:rect.top,transform:style.transform,radius:style.borderRadius})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
             assertEquals("1",evaluateLoading(scenario,"window.__launchObserved.surfaces"));
             assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertFalse(activity.hasBitmapLaunchCover());assertTrue(activity.getWindow().getDecorView().isHardwareAccelerated());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
-            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.4'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface"));
+            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.5'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface"));
             assertEquals("false",evaluateLoading(scenario,"window.__launchObserved.oldBrand"));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObservedColors.length===2&&window.__launchObservedColors.every(color=>color==='rgb(243, 245, 249)')"));
             assertEquals("true",evaluateLoading(scenario,"!document.querySelector('.launch-edition')&&window.__launchObserved.animationNames.includes('launch-content-in')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false"));
@@ -651,22 +651,26 @@ public class AppSmokeTest {
     }
 
 
-    @Test public void fixedLaunchPaletteHandsOffToSavedDarkHome() throws Exception {
-        UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
-        device.executeShellCommand("settings put global animator_duration_scale 1");
-        try(ActivityScenario<MainActivity> prepared=ActivityScenario.launch(MainActivity.class)){
-            resetBook(prepared);
-            evaluate(prepared,"localStorage.setItem('dagongren.theme.v1','dark');AndroidFiles.themeStyle('dark')");
-            assertTrue(withActivity(activity->assertEquals("dark",activity.getSharedPreferences("appearance",android.content.Context.MODE_PRIVATE).getString("mode","system"))));
-        }
-        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
-            waitTrueLoading(scenario,"document.body.dataset.theme==='dark'&&document.querySelector('.launch-page')?.dataset.phase==='playing'");
-            assertEquals("true",evaluateLoading(scenario,"['.launch-page','.launch-scene'].every(s=>getComputedStyle(document.querySelector(s)).backgroundColor==='rgb(243, 245, 249)')&&document.querySelectorAll('.launch-ticks>i').length===48&&!document.querySelector('.launch-ledger,.launch-value,.launch-bars')"));
-            assertTrue(withActivity(activity->assertEquals(android.graphics.Color.rgb(243,245,249),((android.graphics.drawable.ColorDrawable)((android.view.View)activity.findViewById(R.id.web_view).getParent()).getBackground()).getColor())));
-            waitReady(scenario);
-            assertEquals("true",evaluate(scenario,"document.body.dataset.theme==='dark'&&localStorage.getItem('dagongren.theme.v1')==='dark'"));
-            assertTrue(withActivity(activity->assertEquals(android.graphics.Color.rgb(16,24,39),((android.graphics.drawable.ColorDrawable)((android.view.View)activity.findViewById(R.id.web_view).getParent()).getBackground()).getColor())));
-            paintedScreenshot(scenario,"fixed-launch-dark-home");
+    @Test public void themedLaunchKeepsAnimationsWhenAppMotionIsOff() throws Exception {
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).executeShellCommand("settings put global animator_duration_scale 1");
+        for(String theme:new String[]{"light","dark"}){
+            final int color="dark".equals(theme)?android.graphics.Color.rgb(16,24,39):android.graphics.Color.rgb(243,245,249);
+            String cssColor="dark".equals(theme)?"rgb(16, 24, 39)":"rgb(243, 245, 249)";
+            try(ActivityScenario<MainActivity> prepared=ActivityScenario.launch(MainActivity.class)){
+                resetBook(prepared);
+                evaluate(prepared,"localStorage.setItem('dagongren.theme.v1','"+theme+"');AndroidFiles.themeStyle('"+theme+"');const b=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));b.defaults.motion=false;localStorage.setItem('dagongren.paybook.v1',JSON.stringify(b));AndroidFiles.motionStyle(false)");
+                assertTrue(withActivity(activity->assertEquals(theme,activity.getSharedPreferences("appearance",android.content.Context.MODE_PRIVATE).getString("mode","system"))));
+            }
+            try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+                waitTrueLoading(scenario,"document.body.dataset.theme==='"+theme+"'&&document.querySelector('.launch-page')?.dataset.phase==='playing'");
+                assertEquals("true",evaluateLoading(scenario,"['.launch-page','.launch-scene'].every(s=>getComputedStyle(document.querySelector(s)).backgroundColor==='"+cssColor+"')&&document.querySelectorAll('.launch-folio').length===3&&!document.querySelector('.launch-ledger,.launch-value,.launch-bars')"));
+                assertTrue(withActivity(activity->assertEquals(color,((android.graphics.drawable.ColorDrawable)((android.view.View)activity.findViewById(R.id.web_view).getParent()).getBackground()).getColor())));
+                assertEquals("true",evaluateLoading(scenario,"document.body.classList.add('motion-off');['launch-emblem-in','launch-page-spread','launch-page-settle','launch-engrave','launch-seal','launch-ambient','launch-content-in'].every(name=>document.querySelector('.launch-page').getAnimations({subtree:true}).some(a=>a.animationName===name))&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false"));
+                waitReady(scenario);
+                assertEquals("true",evaluate(scenario,"document.body.dataset.theme==='"+theme+"'&&document.body.classList.contains('motion-off')&&localStorage.getItem('dagongren.theme.v1')==='"+theme+"'"));
+                assertTrue(withActivity(activity->assertEquals(color,((android.graphics.drawable.ColorDrawable)((android.view.View)activity.findViewById(R.id.web_view).getParent()).getBackground()).getColor())));
+                paintedScreenshot(scenario,"themed-launch-home-"+theme);
+            }
         }
     }
 
@@ -761,6 +765,7 @@ public class AppSmokeTest {
             assertEquals("true",evaluate(scenario,"Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.page-swipe-track')).transform).m41+innerWidth)<.6&&document.querySelectorAll('.page-swipe-track>.swipe-page').length===2"));
             evaluate(scenario,"window.__dragInput('pointerup',-innerWidth*1.2,100,2400)");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')&&document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'");
             evaluate(scenario,"document.querySelector('.bottom-nav [data-view=settings]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')");
+            evaluate(scenario,"document.querySelector('[data-action=toggle-motion]').click()");waitTrue(scenario,"document.body.classList.contains('motion-off')&&!document.querySelector('.page-swipe-layer')");
             evaluate(scenario,"window.__edgeToast=document.getElementById('toast').textContent;window.__dragInput('pointerdown',250,100,3000,'.topbar');window.__dragInput('pointermove',230,100,3100)");nextGestureFrames(scenario);
             assertEquals("true",evaluate(scenario,"Number(getComputedStyle(document.querySelector('.swipe-boundary-hint')).opacity)===0"));
             evaluate(scenario,"window.__dragInput('pointermove',70,100,4000)");nextGestureFrames(scenario);
@@ -824,7 +829,7 @@ public class AppSmokeTest {
                 paintedScreenshot(scenario,"theme-"+theme+"-profile");
             evaluate(scenario,"document.querySelector('.app-info-footer').scrollIntoView({block:'center',behavior:'instant'})");
             waitTrue(scenario,"!document.getElementById('toast').classList.contains('show')");
-            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.4 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.5 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
                 paintedScreenshot(scenario,"theme-"+theme+"-copyright");
             evaluate(scenario,"document.querySelector('#app .profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 swipeRegion(scenario,".employment-progress",-1);
