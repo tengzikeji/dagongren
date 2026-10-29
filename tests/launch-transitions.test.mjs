@@ -17,9 +17,9 @@ function fixture({savedMotion=true}={}){
  function advance(ms){time+=ms;for(const [id,t] of [...timers])if(t.at<=time){timers.delete(id);t.fn();}}
  return {intro:context.prepare(),page,app,ready,finished,frame,advance,removed:()=>removed,nativeTransitions:()=>nativeTransitions};
 }
-test('应用动效关闭仍播放完整冷启动，不显示装机测试版标记',async()=>{const f=fixture({savedMotion:false});f.frame();f.frame();assert.equal(f.page.dataset.phase,'playing');assert.doesNotMatch(f.page.innerHTML,/装机测试版|launch-edition/);f.frame();f.frame();f.advance(650);await f.intro.beforeApp;f.intro.play(false);f.frame();f.frame();f.advance(1050);assert.equal(f.page.dataset.phase,'fading');assert.equal(f.removed(),false);f.ready.resolve();await Promise.resolve();f.finished.resolve();await Promise.resolve();await Promise.resolve();assert.equal(f.removed(),true);});
+test('应用动效关闭仍播放完整冷启动，不显示装机测试版标记',async()=>{const f=fixture({savedMotion:false});f.frame();f.frame();assert.equal(f.page.dataset.phase,'playing');assert.doesNotMatch(f.page.innerHTML,/装机测试版|launch-edition/);f.frame();f.frame();f.advance(650);await f.intro.beforeApp;f.intro.play(false);f.frame();f.frame();f.advance(2150);assert.equal(f.page.dataset.phase,'fading');assert.equal(f.removed(),false);f.ready.resolve();await Promise.resolve();f.finished.resolve();await Promise.resolve();await Promise.resolve();assert.equal(f.removed(),true);});
 test('启动转场等待动画真正就绪和完成，繁忙渲染器下不会被固定倒计时截断',async()=>{
- const f=fixture();f.frame();f.frame();f.frame();f.frame();f.advance(650);await f.intro.beforeApp;f.intro.play(true);f.frame();f.frame();f.advance(1050);
+ const f=fixture();f.frame();f.frame();f.frame();f.frame();f.advance(650);await f.intro.beforeApp;f.intro.play(true);f.frame();f.frame();f.advance(2150);
  assert.equal(f.page.dataset.phase,'fading');assert.equal(f.app.inert,true);
  f.advance(1200);assert.equal(f.removed(),false);assert.equal(f.nativeTransitions(),0);
  f.ready.resolve();await Promise.resolve();await Promise.resolve();assert.equal(f.nativeTransitions(),1);
@@ -27,6 +27,6 @@ test('启动转场等待动画真正就绪和完成，繁忙渲染器下不会�
  f.finished.resolve();await Promise.resolve();await Promise.resolve();assert.equal(f.removed(),true);assert.equal(f.app.inert,false);
 });
 test('正常完成的启动转场立即释放首页，不等待故障兜底计时',async()=>{
- const f=fixture();f.frame();f.frame();f.frame();f.frame();f.advance(650);await f.intro.beforeApp;f.intro.play(true);f.frame();f.frame();f.advance(1050);
+ const f=fixture();f.frame();f.frame();f.frame();f.frame();f.advance(650);await f.intro.beforeApp;f.intro.play(true);f.frame();f.frame();f.advance(2150);
  f.ready.resolve();await Promise.resolve();f.finished.resolve();await Promise.resolve();await Promise.resolve();assert.equal(f.removed(),true);assert.equal(f.app.inert,false);
 });
