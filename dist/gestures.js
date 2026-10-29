@@ -198,7 +198,8 @@ export function bindPageSwipe(root,api){
  let cache=new Map(),idle=0,tapTarget=null,snapshot=null;
  const warm=()=>{const from=api.current();for(const to of [...[-1,1].map(d=>pageSwipeTarget(from,d)),tapTarget].filter(Boolean))if(!cache.has(to)){const node=contentFrom(api.preview?.(to),'.workspace .content');if(node)cache.set(to,stripIds(node));}if(!snapshot){const content=root.querySelector('.workspace .content');if(content)snapshot=stripIds(api.snapshot?.(content)||content.cloneNode(true));}};
  const controller=bindInput(root,{page:true,blocked:()=>api.blocked?.()||!VIEWS.includes(api.current()),width:()=>document.documentElement.clientWidth,
-  accept:(target,x)=>x>=0&&x<=document.documentElement.clientWidth&&!target.closest?.('.calendar-grid-viewport,.profile-name-viewport,.entry-filters,.record-year-trigger,input,textarea,select,.select-trigger,[role=dialog],.bottom-nav,.side-nav,.record-launcher')&&(api.current()==='calendar'||!target.closest?.('.month-control,.month-toolbar')),ownsClick:()=>true,warm,
+  // Picker buttons can start a page swipe; bindInput keeps taps and suppresses a completed drag's click.
+  accept:(target,x)=>x>=0&&x<=document.documentElement.clientWidth&&!target.closest?.('.calendar-grid-viewport,.profile-name-viewport,.entry-filters,input,textarea,select,.select-trigger,[role=dialog],.bottom-nav,.side-nav,.record-launcher'),ownsClick:()=>true,warm,
   prepare:()=>preparePageScene(root,api,cache,snapshot),
   scene:delta=>{const target=tapTarget;tapTarget=null;return pageScene(root,api,cache,delta,target);},
   settled:(completed,to)=>{cache.clear();snapshot=null;api.settled?.(completed,to);},commit:delta=>{const to=pageSwipeTarget(api.current(),delta);if(to)api.navigate(to);}
