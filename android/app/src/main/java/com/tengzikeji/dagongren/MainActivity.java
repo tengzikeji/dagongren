@@ -129,13 +129,13 @@ public final class MainActivity extends Activity {
     }
 
     private boolean systemIsDark(){android.app.UiModeManager manager=getSystemService(android.app.UiModeManager.class);if(manager!=null){int mode=manager.getNightMode();if(mode==android.app.UiModeManager.MODE_NIGHT_YES)return true;if(mode==android.app.UiModeManager.MODE_NIGHT_NO)return false;}return (android.content.res.Resources.getSystem().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES;}
-    private int appearanceColor(){return darkAppearance?Color.rgb(16,24,39):Color.rgb(243,245,249);}
+    private int appearanceColor(){return !launchIntro&&darkAppearance?Color.rgb(16,24,39):Color.rgb(243,245,249);}
     private void refreshAppearance(){
         String mode=getSharedPreferences("appearance",MODE_PRIVATE).getString("mode","system");
         darkAppearance="dark".equals(mode)||("system".equals(mode)&&systemIsDark());
     }
     private void applyAppearance(){
-        paintAppearance(appearanceColor(),darkAppearance);
+        paintAppearance(appearanceColor(),!launchIntro&&darkAppearance);
     }
     @SuppressWarnings("deprecation") private void paintAppearance(int color,boolean darkBars){
         if(paintedWindowColor==null||paintedWindowColor!=color){
@@ -155,8 +155,11 @@ public final class MainActivity extends Activity {
         if(webView!=null){if(!launchIntro)webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
     }
     private void fadeLaunchAppearance(int duration,int elapsed){
-        // Compatibility with the web fade protocol. Native bars already use
-        // the home scheme from the starting window, so no icon retint is needed.
+        if(!launchIntro||!darkAppearance||duration<=0)return;
+        // Web reports the actual eased fade progress, including renderer stalls.
+        float progress=Math.max(0f,Math.min(1f,(float)elapsed/duration));
+        int color=Color.rgb(Math.round(243+(16-243)*progress),Math.round(245+(24-245)*progress),Math.round(249+(39-249)*progress));
+        paintAppearance(color,progress>=.5f);
     }
     @Override public void onConfigurationChanged(Configuration config){
         super.onConfigurationChanged(config);refreshAppearance();applyAppearance();

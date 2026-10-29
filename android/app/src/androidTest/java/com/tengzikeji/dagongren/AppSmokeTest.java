@@ -402,7 +402,7 @@ public class AppSmokeTest {
             waitTrueLoading(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1),page=document.querySelector('.launch-page'),scene=document.querySelector('.launch-scene');if(!entry||!page||!scene)return false;window.__launchObserved=entry.detail;window.__launchObservedColors=[getComputedStyle(page).backgroundColor,getComputedStyle(scene).backgroundColor];if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='fading'){const rect=page.getBoundingClientRect(),style=getComputedStyle(page);window.__launchBlendSamples.push({opacity:Number(style.opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height,left:rect.left,top:rect.top,transform:style.transform,radius:style.borderRadius})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
             assertEquals("1",evaluateLoading(scenario,"window.__launchObserved.surfaces"));
             assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertFalse(activity.hasBitmapLaunchCover());assertTrue(activity.getWindow().getDecorView().isHardwareAccelerated());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
-            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.3'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface"));
+            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.4'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface"));
             assertEquals("false",evaluateLoading(scenario,"window.__launchObserved.oldBrand"));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObservedColors.length===2&&window.__launchObservedColors.every(color=>color==='rgb(243, 245, 249)')"));
             assertEquals("true",evaluateLoading(scenario,"!document.querySelector('.launch-edition')&&window.__launchObserved.animationNames.includes('launch-content-in')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false"));
@@ -412,7 +412,7 @@ public class AppSmokeTest {
             assertTrue(withActivity(activity->assertTrue("Repeated SystemUI icon writes",activity.getSystemBarIconUpdateCount()<=1)));
             assertTrue(withActivity(activity->{assertFalse(activity.getWindow().isStatusBarContrastEnforced());assertFalse(activity.getWindow().isNavigationBarContrastEnforced());}));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.inert"));
-            assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.animated&&['launch-soft-in','launch-line','launch-bar','launch-sheen','launch-orbit','launch-dot'].every(name=>window.__launchObserved.animationNames.includes(name))"));
+            assertEquals("true",evaluateLoading(scenario,"window.__launchObserved.animated&&['launch-soft-in','launch-line','launch-emblem-in','launch-engrave','launch-sheen','launch-orbit','launch-dot'].every(name=>window.__launchObserved.animationNames.includes(name))"));
             waitTrueLoading(scenario,"performance.getEntriesByName('dagongren.app.render').length>0");
             assertEquals("true",evaluateLoading(scenario,"(()=>{const created=performance.getEntriesByName('dagongren.launch.created')[0],painted=performance.getEntriesByName('dagongren.launch.painted')[0],render=performance.getEntriesByName('dagongren.app.render')[0],playing=performance.getEntriesByName('dagongren.launch.playing')[0];return !!created&&!!painted&&!!render&&created.startTime<=painted.startTime&&painted.startTime<=playing.startTime&&playing.startTime<render.startTime})()"));
             double playingSecond=(Double.parseDouble(evaluateLoading(scenario,"window.__launchObserved.at"))-recordingStarted)/1000.0;
@@ -651,7 +651,26 @@ public class AppSmokeTest {
     }
 
 
-    @Test public void fourTabsOfferTopShortcutAfterTwoScreens() throws Exception {
+    @Test public void fixedLaunchPaletteHandsOffToSavedDarkHome() throws Exception {
+        UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        device.executeShellCommand("settings put global animator_duration_scale 1");
+        try(ActivityScenario<MainActivity> prepared=ActivityScenario.launch(MainActivity.class)){
+            resetBook(prepared);
+            evaluate(prepared,"localStorage.setItem('dagongren.theme.v1','dark');AndroidFiles.themeStyle('dark')");
+            assertTrue(withActivity(activity->assertEquals("dark",activity.getSharedPreferences("appearance",android.content.Context.MODE_PRIVATE).getString("mode","system"))));
+        }
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            waitTrueLoading(scenario,"document.body.dataset.theme==='dark'&&document.querySelector('.launch-page')?.dataset.phase==='playing'");
+            assertEquals("true",evaluateLoading(scenario,"['.launch-page','.launch-scene'].every(s=>getComputedStyle(document.querySelector(s)).backgroundColor==='rgb(243, 245, 249)')&&document.querySelectorAll('.launch-ticks>i').length===48&&!document.querySelector('.launch-ledger,.launch-value,.launch-bars')"));
+            assertTrue(withActivity(activity->assertEquals(android.graphics.Color.rgb(243,245,249),((android.graphics.drawable.ColorDrawable)((android.view.View)activity.findViewById(R.id.web_view).getParent()).getBackground()).getColor())));
+            waitReady(scenario);
+            assertEquals("true",evaluate(scenario,"document.body.dataset.theme==='dark'&&localStorage.getItem('dagongren.theme.v1')==='dark'"));
+            assertTrue(withActivity(activity->assertEquals(android.graphics.Color.rgb(16,24,39),((android.graphics.drawable.ColorDrawable)((android.view.View)activity.findViewById(R.id.web_view).getParent()).getBackground()).getColor())));
+            paintedScreenshot(scenario,"fixed-launch-dark-home");
+        }
+    }
+
+    @Test public void fourTabsOfferTopShortcutAfterOneScreen() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
             evaluate(scenario,"document.querySelector('.bottom-nav [data-view=settings]').click();document.querySelector('[data-action=toggle-motion]').click();document.querySelector('.bottom-nav [data-view=home]').click()");
@@ -659,10 +678,10 @@ public class AppSmokeTest {
             for(String page:new String[]{"home","calendar","records","settings"}){
                 evaluate(scenario,"document.querySelector('.bottom-nav [data-view="+page+"]').click()");
                 waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
-                assertEquals("true",evaluate(scenario,"(()=>{const space=document.createElement('div');space.className='review-long-page';space.style.height=(innerHeight*6)+'px';document.body.appendChild(space);window.scrollTo({top:innerHeight*1.5,behavior:'instant'});return space.isConnected&&space.offsetHeight>=innerHeight*5})()"));
-                waitTrue(scenario,"scrollY>innerHeight");
+                assertEquals("true",evaluate(scenario,"(()=>{const space=document.createElement('div');space.className='review-long-page';space.style.height=(innerHeight*6)+'px';document.body.appendChild(space);window.scrollTo({top:innerHeight*.75,behavior:'instant'});return space.isConnected&&space.offsetHeight>=innerHeight*5})()"));
+                waitTrue(scenario,"scrollY>innerHeight*.5&&scrollY<innerHeight");
                 assertEquals("false",evaluate(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.top==='true'"));
-                evaluate(scenario,"window.scrollTo({top:innerHeight*2.5,behavior:'instant'})");
+                evaluate(scenario,"window.scrollTo({top:innerHeight,behavior:'instant'})");
                 waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.top==='true'&&getComputedStyle(document.querySelector('.bottom-nav [aria-current=page] .nav-top-glyph')).opacity==='1'");
                 assertEquals("true",evaluate(scenario,"(()=>{const button=document.querySelector('.bottom-nav [aria-current=page]'),s=getComputedStyle(button.querySelector('.nav-top-glyph'));return s.opacity==='1'&&s.animationName==='nav-top-ready'})()"));
                 paintedScreenshot(scenario,"nav-top-"+page);
@@ -805,7 +824,7 @@ public class AppSmokeTest {
                 paintedScreenshot(scenario,"theme-"+theme+"-profile");
             evaluate(scenario,"document.querySelector('.app-info-footer').scrollIntoView({block:'center',behavior:'instant'})");
             waitTrue(scenario,"!document.getElementById('toast').classList.contains('show')");
-            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.3 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.4 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
                 paintedScreenshot(scenario,"theme-"+theme+"-copyright");
             evaluate(scenario,"document.querySelector('#app .profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 swipeRegion(scenario,".employment-progress",-1);

@@ -56,7 +56,6 @@ body[data-theme=dark] .field input:focus,body[data-theme=dark] .field textarea:f
 body[data-theme=dark] .btn-primary{background:#426ed5;border-color:#668ff1;color:#fff;box-shadow:none}
 body[data-theme=dark] .error{color:#ffa2b1}
 body[data-theme=dark] :is(.empty-state,.cleanup-cloud-option,.theme-intro,.calendar-gesture-hint,.calendar-policy,.sync-step-number){color:var(--muted)}
-body[data-theme=dark] .launch-page{background:#101827;color:#e5edf9}body[data-theme=dark] .launch-grid{opacity:.15}body[data-theme=dark] .launch-copy h2,body[data-theme=dark] .launch-header strong{color:#e5edf9}body[data-theme=dark] .launch-chip{background:#223148;color:#c4d8ff;border-color:var(--line)}body[data-theme=dark] .launch-status{border-color:var(--line)}
 body.motion-off *:not(.launch-page,.launch-page *),body.motion-off *:not(.launch-page,.launch-page *):before,body.motion-off *:not(.launch-page,.launch-page *):after{animation:none!important;transition:none!important}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 

@@ -215,63 +215,11 @@ body[data-theme=dark] .calendar-day.has-entry{--date-border:#58759e}
 
 
 
-/* Restore the beta.1 launch composition and its independent animations. */
-.launch-page{position:fixed;inset:0;z-index:10000;overflow:hidden;background:#f3f5f9;color:#1c3454;isolation:isolate}
-.launch-scene{position:absolute;left:50%;top:50%;width:393px;height:777px;transform:translate(-50%,-50%) scale(var(--launch-scale,1));transform-origin:center;display:grid;grid-template-rows:auto minmax(150px,.9fr) minmax(230px,1fr) auto;gap:14px;padding:28px 24px 24px;background:#f3f6fb;color:#1c3454;overflow:hidden;isolation:isolate}
-.launch-grid{position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse at 75% 45%,#dce9fd99,transparent 65%),linear-gradient(#a9c4ea0d 1px,transparent 1px),linear-gradient(90deg,#a9c4ea0d 1px,transparent 1px);background-size:auto,32px 32px,32px 32px}
-.launch-header{display:flex;align-items:center;gap:12px;min-height:48px}.launch-app-icon{display:grid;place-items:center;width:44px;height:44px;background:linear-gradient(145deg,#3e83ff,#214fe2);border:1px solid #ffffff99;border-radius:14px;box-shadow:0 6px 16px #2f65e32b;flex-shrink:0}.launch-app-icon svg{width:25px;height:25px;stroke:#fff;stroke-width:1.5}.launch-header>div{display:flex;flex-direction:column;gap:4px}.launch-header strong{font-size:21px;line-height:1.2;font-weight:700;letter-spacing:.2px}.launch-header>div>span{font-size:9px;letter-spacing:.8px;color:#7f90a8}.launch-edition{font-size:9px;letter-spacing:.6px;padding:5px 8px;border:1px solid #dce5f2;color:#7c8fa8;border-radius:7px;margin-left:auto;white-space:nowrap}
-.launch-copy{align-self:end;position:relative;padding:10px 0 2px}.launch-eyebrow{display:flex;align-items:center;gap:6px;font-size:10px;color:#51749e;letter-spacing:1px;margin-bottom:14px}.launch-eyebrow i{width:5px;height:5px;background:#3276f5;border-radius:50%;box-shadow:0 0 0 4px #3276f50d}.launch-copy h2{font-size:clamp(28px,8.1vw,36px);line-height:1.42;font-weight:680;letter-spacing:-.7px;color:#1c3454}.launch-copy h2>span{color:#3276f5}.launch-copy p{font-size:11px;color:#8998ad;letter-spacing:.4px;margin-top:15px;line-height:1.8}
-.launch-art{position:relative;align-self:center;width:100%;height:260px;max-width:430px;justify-self:center}.launch-orbit{position:absolute;left:50%;top:51%;border:1px solid #b8d1f355;border-radius:50%;pointer-events:none}.launch-orbit>i{position:absolute;top:23%;right:5%;width:5px;height:5px;background:#73aeff;border:2px solid #e8f1ff;border-radius:50%;box-shadow:0 0 0 4px #73aeff0c}.orbit-one{width:113%;height:94%;transform:translate(-50%,-50%) rotate(-18deg)}.orbit-two{width:97%;height:110%;transform:translate(-50%,-50%) rotate(18deg);border-style:dashed;border-color:#b8d1f32b}.orbit-two>i{left:4%;top:73%;right:auto;background:#b6c9e7}
-.launch-ledger{position:absolute;left:0;top:25px;width:100%;height:210px;border-radius:24px;padding:24px;background:linear-gradient(135deg,#101e3d,#1b3973);border:1px solid #233e70;box-shadow:0 18px 34px #17397129;color:#fff;overflow:hidden;transform-origin:0 0}.launch-ledger-top{display:flex;align-items:center;justify-content:space-between}.launch-ledger-top>span{display:flex;align-items:center;gap:7px;color:#bacced;font-size:11px;letter-spacing:.7px}.launch-ledger-top>span>i{width:5px;height:5px;border-radius:50%;background:#7bbcff;box-shadow:0 0 0 4px #7bbcff12}.launch-ledger-top>svg{width:22px;height:22px;stroke:#85a9e1;stroke-width:1.3}
-.launch-value{display:flex;align-items:center;gap:14px;height:69px}.launch-value>span:first-child{font-size:36px;font-family:'Segoe UI',sans-serif;color:#d2e3ff;font-weight:450}.launch-value-line{position:relative;height:11px;width:53%;background:linear-gradient(90deg,#e3efff,#7caaf0);border-radius:5px;transform-origin:left}.launch-value-line:after{content:"";position:absolute;top:21px;left:0;height:4px;width:68%;border-radius:4px;background:#a3c3ef3d}.launch-value-dot{height:11px;width:11px;border-radius:4px;background:#88b7ff94}
-.launch-ledger-divider{height:1px;background:#a4c0eb24;margin:3px 0 15px}.launch-ledger-bottom{display:flex;justify-content:space-between;align-items:flex-end}.launch-ledger-bottom>div:first-child{display:flex;flex-direction:column;gap:5px}.launch-ledger-bottom span{font-size:9px;color:#90aad1;letter-spacing:.6px}.launch-ledger-bottom b{font-size:13px;font-weight:500;letter-spacing:1px;color:#d9e7ff}.launch-bars{display:flex;align-items:flex-end;gap:5px;height:38px}.launch-bars i{display:block;width:7px;border-radius:3px 3px 1px 1px;background:linear-gradient(#8bbaff,#457bd4);height:12px;transform-origin:bottom}.launch-bars i:nth-child(2){height:19px}.launch-bars i:nth-child(3){height:15px}.launch-bars i:nth-child(4){height:27px}.launch-bars i:nth-child(5){height:23px}.launch-bars i:nth-child(6){height:32px}.launch-bars i:nth-child(7){height:38px}
-.launch-chip{position:absolute;bottom:8px;right:-3px;display:flex;align-items:center;gap:7px;padding:12px 16px;background:#ffffffed;border:1px solid #e2eafa;border-radius:13px;box-shadow:0 8px 24px #274c8312;color:#526e93;font-size:10px;letter-spacing:.5px}.launch-chip svg{height:17px;width:17px;stroke:#4077d6;stroke-width:1.8}
-.launch-status{display:flex;align-items:center;gap:10px;min-height:42px;border-top:1px solid #dfe7f1;padding-top:17px}.launch-status-icon{display:grid;place-items:center;width:31px;height:31px;border-radius:10px;background:#eaf0fa}.launch-status svg{width:17px;height:17px;stroke:#7490b5;stroke-width:1.3}.launch-status>span:nth-child(2){font-size:10px;line-height:1.8;color:#637b9b;letter-spacing:.5px}.launch-status small{display:block;font-size:9px;color:#9aa8ba;letter-spacing:.6px}.launch-ready{display:flex;align-items:center;gap:4px;margin-left:auto}.launch-ready i{width:4px;height:4px;background:#5c8dde;border-radius:50%}
-.launch-page[data-phase] .launch-copy{animation:launch-rise .55s .08s cubic-bezier(.2,.7,.25,1) both}.launch-page[data-phase] .launch-ledger{animation:launch-card-in .7s .12s cubic-bezier(.18,.7,.25,1) both}.launch-page[data-phase] .launch-value-line{animation:launch-line .85s .3s cubic-bezier(.2,.8,.25,1) both}.launch-page[data-phase] .launch-bars i{animation:launch-bar .7s .35s cubic-bezier(.2,.8,.25,1) both}.launch-page[data-phase] .launch-bars i:nth-child(2n){animation-delay:.44s}.launch-page[data-phase] .launch-bars i:nth-child(3n){animation-delay:.55s}.launch-page[data-phase] .launch-chip{animation:launch-rise .55s .58s cubic-bezier(.2,.8,.25,1) both}.launch-page[data-phase] .launch-status{animation:launch-rise .5s .7s ease both}.launch-page[data-phase] .orbit-one{animation:launch-orbit 1.7s ease-out both}.launch-page[data-phase] .launch-ready i{animation:launch-dot .65s .6s ease-in-out 2 both}.launch-page[data-phase] .launch-ready i:nth-child(2){animation-delay:.75s}.launch-page[data-phase] .launch-ready i:nth-child(3){animation-delay:.9s}
-@keyframes launch-rise{from{opacity:.7;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes launch-card-in{from{opacity:.7;transform:translateY(28px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes launch-line{from{transform:scaleX(.15);opacity:.2}to{transform:scaleX(1);opacity:1}}@keyframes launch-bar{from{transform:scaleY(.15);opacity:.1}to{transform:scaleY(1);opacity:1}}@keyframes launch-sheen{to{transform:translateX(70%)}}@keyframes launch-orbit{from{transform:translate(-50%,-50%) rotate(-34deg);opacity:.1}to{transform:translate(-50%,-50%) rotate(-18deg);opacity:1}}@keyframes launch-dot{50%{opacity:.2;transform:translateY(-3px)}}
-.intro-playing #app{opacity:0;pointer-events:none}.intro-playing #app *,.intro-playing #app *:before,.intro-playing #app *:after{animation:none!important}.intro-opening #app{opacity:1}
-
-/* The native window and live launch surface share one blue canvas. */
-body.intro-playing .launch-page{background:#f3f5f9;color:#1c3454}
-body.intro-playing[data-theme=dark] .launch-page{background:#101827;color:#e5edf9}
-.launch-page .launch-grid{opacity:.22}
-body[data-theme=dark] .launch-page .launch-header strong,body[data-theme=dark] .launch-page .launch-copy h2{color:#e5edf9}
-body[data-theme=dark] .launch-page .launch-header>div>span,body[data-theme=dark] .launch-page .launch-copy p,body[data-theme=dark] .launch-page .launch-status small{color:#91a8cc}
-body[data-theme=dark] .launch-page .launch-eyebrow,body[data-theme=dark] .launch-page .launch-status>span:nth-child(2){color:#b1c8eb}
-body[data-theme=dark] .launch-page .launch-chip{background:#203452;color:#cbdfff;border-color:#42618a}
-body[data-theme=dark] .launch-page .launch-status{border-color:#365076}
-body[data-theme=dark] .launch-page .launch-status-icon{background:#1c3153}
-body[data-theme=dark] .launch-page .launch-ledger{border-color:#46628c;box-shadow:0 18px 34px #0002}
-.launch-page[data-phase] .launch-header{animation:launch-soft-in .28s ease-out both}
-.launch-page[data-phase] .launch-copy{animation:launch-soft-in .32s .04s ease-out both}
-.launch-page[data-phase] .launch-ledger{animation:launch-soft-in .38s .08s ease-out both}
-.launch-page[data-phase] .launch-chip{animation:launch-soft-in .32s .3s ease-out both}
-.launch-page[data-phase] .launch-status{animation:launch-soft-in .32s .3s ease-out both}
-@keyframes launch-soft-in{from{opacity:.35}to{opacity:1}}
-
-
-.launch-scene{background:#f3f5f9;color:#1c3454}body[data-theme=dark] .launch-scene{background:#101827;color:#e5edf9}.launch-copy h2{font-size:31.833px}
-.launch-page[data-phase=preparing] *{animation-play-state:paused!important}
-.launch-page[data-phase=fading]{transform:none;border-radius:0;box-shadow:none;will-change:opacity;pointer-events:none}
-.launch-page :is(.launch-ledger,.launch-value-line,.launch-bars i,.launch-ready i){will-change:transform,opacity}
-@media(prefers-reduced-motion:reduce){:is(.page-swipe-layer,.page-swipe-preload) .swipe-boundary-arrow,.launch-page *{animation:none!important}}
-
-/* Launch content fades in over a stable, opaque native-blue background. */
-
-
 /* Compact application information below the last settings card. */
 .app-info-footer{width:min(100%,380px);margin:0 auto;padding:10px 12px 4px;text-align:center;color:var(--muted,#7c90ad);font-size:11px;line-height:1.7;touch-action:pan-y pinch-zoom}
 .app-info-heading{display:flex;align-items:baseline;justify-content:center;gap:8px;flex-wrap:wrap}.app-info-heading strong{color:var(--ink,#1c3454);font-size:12px;font-weight:650}.app-info-heading span{font-size:11px}
 .app-info-storage{display:flex;justify-content:center;align-items:flex-start;gap:5px;margin:7px 0 0}.app-info-storage svg{width:12px;height:12px;margin-top:3px;flex-shrink:0}.app-info-storage span{max-width:100%;overflow-wrap:anywhere}
 .app-info-divider{height:1px;width:54px;margin:13px auto 10px;background:var(--line,#e2e8f0)}.app-info-owner,.app-info-phone{margin:0}.app-info-phone{margin-top:3px;font-variant-numeric:tabular-nums}
-
-/* Keep a restrained card highlight moving if the home data needs more time. */
-.launch-loading-sheen{position:absolute;inset:-40% -60%;background:linear-gradient(110deg,transparent 42%,#c3dcff09 49%,#c3dcff12 50%,transparent 58%);transform:translateX(-70%);pointer-events:none}
-.launch-page[data-phase] .launch-loading-sheen{animation:launch-sheen 1.35s .4s ease-in-out both}
-
-.launch-page[data-phase=preparing] .launch-scene{opacity:0}
-.launch-page:is([data-phase=playing],[data-phase=fading]) .launch-scene{animation:launch-content-in .42s ease-out both}
-@keyframes launch-content-in{from{opacity:0}to{opacity:1}}
 
 /* Navigation glyph replacement keeps the four button hit areas stable. */
 .bottom-nav .nav-symbol{display:block;position:relative;width:24px;height:24px;margin:0 auto}

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import {topIconVisible,topScrollDuration} from '../dist/navigation.js';
-test('置顶图标以两屏滚动距离为边界，包含临界点',()=>{for(const h of [480,660,900]){assert.equal(topIconVisible(h*2-1,h),false);assert.equal(topIconVisible(h*2,h),true);assert.equal(topIconVisible(h*2+1,h),true);}assert.equal(topIconVisible(100,0),false);assert.ok(topScrollDuration(20000,600)<=320);});
+test('置顶图标以一屏滚动距离为边界，包含临界点',()=>{for(const h of [480,660,900]){assert.equal(topIconVisible(h-1,h),false);assert.equal(topIconVisible(h,h),true);assert.equal(topIconVisible(h+1,h),true);}assert.equal(topIconVisible(100,0),false);assert.equal(topIconVisible(100,Infinity),false);assert.equal(topIconVisible(NaN,600),false);assert.ok(topScrollDuration(20000,600)<=320);});
 function fixture(reduced=false){
  const frames=new Map(),positions=[],events={},classes=new Set(),animations=[],marks=[],navigations=[];let id=0,current='home';
  const buttons=['home','calendar','records','settings'].map(view=>({dataset:{view},querySelector:()=>({textContent:view}),setAttribute(){}}));

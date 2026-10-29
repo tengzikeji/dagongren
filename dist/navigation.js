@@ -1,5 +1,5 @@
 const mainPages=['home','calendar','records','settings'];
-export function topIconVisible(scroll,viewport){return Number.isFinite(scroll)&&viewport>0&&scroll>=viewport*2;}
+export function topIconVisible(scroll,viewport){return Number.isFinite(scroll)&&Number.isFinite(viewport)&&viewport>0&&scroll>=viewport;}
 export function topScrollDuration(distance,viewport){return Math.min(320,180+Math.max(0,distance)/Math.max(1,viewport)*45);}
 export function navIconMarkup(original){return '<span class="nav-symbol"><span class="nav-original">'+original+'</span><svg class="nav-top-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5h12M12 19V9m-4 4 4-4 4 4"/></svg></span>';}
 export function bindBottomNavigation(root,api){
