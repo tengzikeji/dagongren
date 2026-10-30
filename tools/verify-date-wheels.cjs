@@ -1,6 +1,6 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const root=path.join(__dirname,'../dist'),out=process.env.WHEEL_SCREENSHOTS||path.join(__dirname,'../../outputs/beta12-browser');
+const root=path.join(__dirname,'../dist'),out=process.env.WHEEL_SCREENSHOTS||path.join(__dirname,'../../outputs/beta13-browser');
 fs.mkdirSync(out,{recursive:true});
 const errors=[],checks=[],colorFailures=[];
 async function main(){
@@ -22,7 +22,7 @@ async function main(){
   const failures=await page.evaluate(()=>{
    const rgb=value=>{const match=value.match(/[\d.]+/g);return match?match.slice(0,3).map(Number):[0,0,0];},alpha=value=>value.startsWith('rgba')?Number(value.match(/[\d.]+/g)[3]):1,lum=values=>values.map(value=>{value/=255;return value<=.04045?value/12.92:((value+.055)/1.055)**2.4;}).reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0);
    function background(node){let value=[255,255,255];const chain=[];for(let p=node;p;p=p.parentElement)chain.unshift(p);for(const p of chain){const color=getComputedStyle(p).backgroundColor,a=alpha(color),c=rgb(color);value=value.map((base,index)=>c[index]*a+base*(1-a));}return value;}
-   const selector='#modal-root button:not(:disabled),#modal-root .choice-card-copy small,#modal-root .select-trigger small,#modal-root .choice small,#modal-root .theme-option-copy>span,#view-content .record-filter-grid>button';
+   const selector='#modal-root button:not(:disabled),#modal-root .choice-card-copy small,#modal-root .select-trigger small,#modal-root .choice small,#modal-root .theme-option-copy>span,#view-content .record-filter-grid>button,#view-content .detail-tabs>button';
    return [...document.querySelectorAll(selector)].filter(node=>node.textContent.trim()&&node.getClientRects().length&&!node.closest('[aria-hidden=true]')&&getComputedStyle(node).visibility==='visible').flatMap(node=>{const fg=lum(rgb(getComputedStyle(node).color)),bg=lum(background(node)),ratio=(Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05);return ratio>=4.5?[]:[{text:node.textContent.trim().slice(0,35),classes:node.className,ratio:Number(ratio.toFixed(2)),color:getComputedStyle(node).color,background:getComputedStyle(node).backgroundColor}];});
   });if(failures.length){const config=await page.evaluate(()=>({theme:document.body.dataset.theme,width:innerWidth,dialog:document.querySelector('#modal-title')?.textContent||''}));for(const failure of failures){const item={...config,...failure};if(!colorFailures.some(prior=>JSON.stringify(prior)===JSON.stringify(item)))colorFailures.push(item);}fs.writeFileSync(path.join(out,'contrast-failures.json'),JSON.stringify(colorFailures,null,2));}
  }
@@ -49,7 +49,39 @@ async function main(){
   const steps=!vertical&&Math.abs(toX-x)<size.width/5?3:10,delay=steps===3?5:15;
   const session=await page.context().newCDPSession(page),afterScroll=!vertical&&selector.includes('record-date-filter'),started=await page.evaluate(afterScroll=>{if(afterScroll)window.dispatchEvent(new Event('scroll'));return performance.now();},afterScroll);await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});if(afterScroll)await page.waitForTimeout(100);const stamp=Date.now()/1000;for(let n=1;n<=steps;n++){await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+(toX-x)*n/steps,y:y+(toY-y)*n/steps}],...(steps===3?{timestamp:stamp+n*.005}:{})});await page.waitForTimeout(delay);}await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[],...(steps===3?{timestamp:stamp+(steps+1)*.005}:{})});await session.detach();await page.waitForTimeout(450);console.log(JSON.stringify({gesture:selector,afterScroll,from:{x,y},to:{x:toX,y:toY},steps,marks:await page.evaluate(started=>performance.getEntriesByType('mark').filter(entry=>entry.startTime>=started&&/dagongren\.(page|calendar)\.(down|slide|rebound)/.test(entry.name)).map(entry=>({name:entry.name,detail:entry.detail})),started)}));
  }
+ async function launcherPress(page,fraction){
+  const button=page.locator('#app .record-launcher');const before=await button.boundingBox(),x=before.x+before.width*fraction,y=before.y+before.height*.4;
+  const session=await page.context().newCDPSession(page);
+  await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+  try{await page.waitForTimeout(100);const during=await button.boundingBox();assert(Math.abs(during.x-before.x)<.6&&Math.abs(during.y-before.y)<.6,'Record launcher moves away from the thumb while pressed');}
+  finally{await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await session.detach();}
+  await page.waitForSelector('#modal-root .record-entry-menu');assert.equal(await page.locator('#modal-root [data-action=record-kind]').count(),6);await close(page);
+ }
+ async function deviceFeedbackReview(page,c){
+  const original=await page.evaluate(()=>localStorage.getItem('dagongren.paybook.v1'));
+  for(const view of ['home','calendar','records','settings']){await nav(page,view);await launcherPress(page,.12);assert.equal(await page.locator('#app .bottom-nav [aria-current=page]').getAttribute('data-view'),view);}
+  await launcherPress(page,.88);checks.push({c,case:'launcher-left-right-hit-target'});
+  for(const view of ['home','calendar','records']){
+   await nav(page,view);await page.locator('#view-content [data-action=metric][data-metric=earned]').first().tap();await page.waitForSelector('.metric-dialog');await animations(page);
+   await page.evaluate(()=>{window.__metricShell=document.querySelector('.metric-dialog');window.__metricHead=window.__metricShell.querySelector('.modal-header');window.__metricBody=window.__metricShell.querySelector('.modal-body');window.__metricBounds=window.__metricShell.getBoundingClientRect().toJSON();window.__metricScope={scope:window.__metricShell.dataset.metricScope,ref:window.__metricShell.dataset.metricRef};});
+   for(const metric of ['pending','received','earned']){
+    await page.locator('#modal-root .metric-switches [data-metric='+metric+']').tap();await page.waitForFunction(metric=>document.querySelector('.metric-dialog')?.dataset.metric===metric,metric);
+    const stable=await page.evaluate(()=>{const modal=document.querySelector('.metric-dialog'),r=modal.getBoundingClientRect();return modal===window.__metricShell&&modal.querySelector('.modal-header')===window.__metricHead&&modal.querySelector('.modal-body')===window.__metricBody&&modal.dataset.metricScope===window.__metricScope.scope&&modal.dataset.metricRef===window.__metricScope.ref&&Math.abs(r.y-window.__metricBounds.y)<.6&&Math.abs(r.height-window.__metricBounds.height)<.6&&document.querySelectorAll('#modal-root .modal').length===1&&!modal.textContent.includes('NaN');});
+    assert(stable,'Metric tabs must update within the existing dialog');await layout(page);assert.equal(await page.locator('.metric-switches [aria-pressed=true]').getAttribute('data-metric'),metric);
+   }
+   await capture(page,c,'metric-in-place-'+view);await page.locator('#modal-root [data-action=modal-back]').tap();await page.waitForFunction(()=>!document.querySelector('#modal-root .modal'));assert.equal(await page.locator('#app .bottom-nav [aria-current=page]').getAttribute('data-view'),view);
+  }
+  checks.push({c,case:'metric-tabs-in-place'});
+  await nav(page,'records');
+  const backgrounds=[];for(const tab of ['salary','entries']){await page.locator('#view-content .detail-tabs [data-tab='+tab+']').tap();await page.waitForTimeout(180);await contrast(page);backgrounds.push(await page.locator('#view-content .detail-tabs [data-tab='+tab+']').evaluate(node=>getComputedStyle(node).backgroundColor));}
+  assert.notEqual(backgrounds[0],backgrounds[1],'Salary periods and journal tabs must have distinct selected colors');await capture(page,c,'detail-tab-colors');
+  await page.locator('#view-content .detail-tabs [data-tab=salary]').tap();
+  for(const [view,label] of [['home','账目月份'],['calendar','日历月份']]){await nav(page,view);await page.locator('#view-content [data-action=month-picker]').tap();await page.waitForSelector('.date-wheel-sheet');assert.equal(await page.locator('.date-wheel-sheet h3').innerText(),label);await page.locator('.date-sheet-actions [data-date-action=cancel]').tap();await page.waitForFunction(()=>!document.querySelector('#modal-root .modal'));}
+  assert.equal(await page.evaluate(()=>localStorage.getItem('dagongren.paybook.v1')),original,'UI review must not change the ledger');checks.push({c,case:'detail-tab-colors-context-month-names'});await nav(page,'home');
+ }
+
  async function run(c){const {context,page}=await start(c);try{
+  await deviceFeedbackReview(page,c);
   const heroColor=await page.locator('#view-content .balance-primary>strong').evaluate(node=>getComputedStyle(node).color);
   await open(page,'subsidy');await page.locator('#subsidy-form [name=amount]').fill('120.99');await page.locator('#adjustment-category').evaluate(node=>{node.value='餐补';node.dispatchEvent(new Event('change',{bubbles:true}));});await page.locator('.modal-footer button[type=submit]').tap();await page.waitForFunction(()=>!document.querySelector('#subsidy-form'));
   if(c.motion)await page.waitForSelector('#view-content .balance-primary .number-roll-strip');

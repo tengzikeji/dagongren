@@ -330,7 +330,7 @@ function showCalendarSources(){
 }
 
 function appInfoFooter(){
-  const version=isAndroid?'安卓版 1.3.5-beta.12 测试版':'1.3.5-beta.12 网页预览';
+  const version=isAndroid?'安卓版 1.3.5-beta.13 测试版':'1.3.5-beta.13 网页预览';
   const storage=storageBlocked?'存储暂不可用，请及时导出账本。':isAndroid?'账本保存在本机，可自行配置坚果云同步。':'浏览器预览 · 数据保存在浏览器，坚果云同步为演示。';
   return `<footer class="app-info-footer" aria-label="应用信息"><div class="app-info-heading"><strong>打工人</strong><span>${version}</span></div><p class="app-info-storage">${icon('lock')}<span>${storage}</span></p><div class="app-info-divider" aria-hidden="true"></div><p class="app-info-owner">腾子科技·版权所有</p><p class="app-info-phone">联系电话：18937027607</p></footer>`;
 }
@@ -429,7 +429,7 @@ function showMonthPicker() {
 }
 function pickerYearGrid(kind){return '<p class="field-note">选择年份后继续选择月份；支持2020—2089年。</p><div class="picker-year-grid">'+Array.from({length:70},(_,index)=>2020+index).map(year=>'<button type="button" data-action="choose-picker-year" data-kind="'+kind+'" data-year="'+year+'" aria-pressed="'+(year===pickerYear)+'">'+year+'年</button>').join('')+'</div>';}
 function renderMonthPicker(){
- showStandaloneDateWheel('选择月份',{kind:'month',label:'记账月份',value:selectedMonth,min:'2020-01',max:'2089-12',today:today.slice(0,7),onConfirm:month=>{if(validMonth(month)){selectedMonth=month;render();}}});
+ showStandaloneDateWheel('选择月份',{kind:'month',label:view==='home'?'账目月份':view==='calendar'?'日历月份':'记账月份',value:selectedMonth,min:'2020-01',max:'2089-12',today:today.slice(0,7),onConfirm:month=>{if(validMonth(month)){selectedMonth=month;render();}}});
 }
 
 function showSalarySettings() {
@@ -826,9 +826,20 @@ function metricData(query={metric:'pending',scope:'all',ref:''}) {
   return {query,title:titles[metric]||'账目明细',total,unit,rows,scopeLabel,basis};
 }
 
-function showMetric(metric='pending',scope='all',ref='') {
+function showMetric(metric='pending',scope='all',ref='',inPlace=false) {
   const d=metricData({metric,scope,ref}),switches=['earned','pending','received'];
-  showModal(d.title,`<div class="metric-scope">${esc(d.scopeLabel)}<span>${d.basis} · 截至${today}</span></div><div class="metric-total number" data-total="${d.total}">${d.unit==='days'?'':'<small>¥</small>'}${d.unit==='days'?d.total:money(d.total)}${d.unit==='days'?'<small>天</small>':''}</div>${metric==='rate'?`<div class="notice gray">${metricRateInfo({scope,ref}).rates.map(rate=>rate.from+' 至 '+rate.to+'：固定工资 ¥'+money(rate.salaryCents)+' ÷ '+rate.divisor+'天 ＝ 日薪 ¥'+money(rate.dailyCents)).join('<br>')}<br>上方金额为${metricRateInfo({scope,ref}).referenceDate}所在账期的参考日薪。按完整工资周期累计舍入到分；同一工资标准、完整无请假周期恰好一份固定工资。</div>`:`<div class="metric-switches">${switches.map(key=>`<button class="${key===metric?'active':''}" ${metricAttrs(key,scope,ref)}>${{earned:'净计薪',pending:'待发',received:'实收'}[key]}</button>`).join('')}</div>`}${metric==='earned'?'<p class="metric-note">基本工资 − 请假扣薪 ＋ 加班 ＋ 补贴 − 其他扣款。负数日期会在原主体、原账期内抵扣。</p>':metric==='carry'?'<p class="metric-note">扣款超过该账期已计薪的部分仍保留。该账期后续计薪时继续抵扣，不跨主体或跨账期自动扣款。</p>':metric==='pending'?'<p class="metric-note">按所选计薪日期汇总，点击账期查看完整结算情况。</p>':metric.startsWith('applied')?'<p class="metric-note">下方显示本范围实际抵扣金额；点开可以核对原始收款。</p>':''}<div class="metric-rows">${d.rows.map(row=>`<button class="metric-row" data-action="${row.action}" ${row.periodId?`data-period="${esc(row.periodId)}"`:''} data-date="${row.date}" data-month="${row.ownerMonth||row.date.slice(0,7)}" data-kind="${row.kind||''}" data-id="${esc(row.id||'')}"><span><strong>${esc(row.label)}</strong><small>${esc(row.meta||'')}</small></span><b class="number ${row.amountCents<0?'negative':''}">${d.unit==='days'?row.amountCents+'天':'¥ '+money(row.amountCents)}</b>${icon('chevron')}</button>`).join('')||'<div class="empty-state">这个范围内暂无对应账目。<br>记录保存后，金额会自动更新。</div>'}</div><button class="btn btn-plain full" data-action="record-entry" data-month="${scope==='month'?ref:selectedMonth}">${icon('plus')}记一笔</button>`,true);
+  const body=`<div class="metric-scope">${esc(d.scopeLabel)}<span>${d.basis} · 截至${today}</span></div><div class="metric-total number" data-total="${d.total}">${d.unit==='days'?'':'<small>¥</small>'}${d.unit==='days'?d.total:money(d.total)}${d.unit==='days'?'<small>天</small>':''}</div>${metric==='rate'?`<div class="notice gray">${metricRateInfo({scope,ref}).rates.map(rate=>rate.from+' 至 '+rate.to+'：固定工资 ¥'+money(rate.salaryCents)+' ÷ '+rate.divisor+'天 ＝ 日薪 ¥'+money(rate.dailyCents)).join('<br>')}<br>上方金额为${metricRateInfo({scope,ref}).referenceDate}所在账期的参考日薪。按完整工资周期累计舍入到分；同一工资标准、完整无请假周期恰好一份固定工资。</div>`:`<div class="metric-switches">${switches.map(key=>`<button class="${key===metric?'active':''}" aria-pressed="${key===metric}" data-metric-switch="true" ${metricAttrs(key,scope,ref)}>${{earned:'净计薪',pending:'待发',received:'实收'}[key]}</button>`).join('')}</div>`}${metric==='earned'?'<p class="metric-note">基本工资 − 请假扣薪 ＋ 加班 ＋ 补贴 − 其他扣款。负数日期会在原主体、原账期内抵扣。</p>':metric==='carry'?'<p class="metric-note">扣款超过该账期已计薪的部分仍保留。该账期后续计薪时继续抵扣，不跨主体或跨账期自动扣款。</p>':metric==='pending'?'<p class="metric-note">按所选计薪日期汇总，点击账期查看完整结算情况。</p>':metric.startsWith('applied')?'<p class="metric-note">下方显示本范围实际抵扣金额；点开可以核对原始收款。</p>':''}<div class="metric-rows">${d.rows.map(row=>`<button class="metric-row" data-action="${row.action}" ${row.periodId?`data-period="${esc(row.periodId)}"`:''} data-date="${row.date}" data-month="${row.ownerMonth||row.date.slice(0,7)}" data-kind="${row.kind||''}" data-id="${esc(row.id||'')}"><span><strong>${esc(row.label)}</strong><small>${esc(row.meta||'')}</small></span><b class="number ${row.amountCents<0?'negative':''}">${d.unit==='days'?row.amountCents+'天':'¥ '+money(row.amountCents)}</b>${icon('chevron')}</button>`).join('')||'<div class="empty-state">这个范围内暂无对应账目。<br>记录保存后，金额会自动更新。</div>'}</div><button class="btn btn-plain full" data-action="record-entry" data-month="${scope==='month'?ref:selectedMonth}">${icon('plus')}记一笔</button>`;
+  const current=modalRoot.querySelector('.modal.metric-dialog');
+  if(inPlace&&current?.dataset.metricScope===scope&&current.dataset.metricRef===ref){
+    const content=current.querySelector('.modal-body');content.innerHTML=body;content.scrollTop=0;
+    current.querySelector('#modal-title').textContent=d.title;current.dataset.metric=metric;
+    const meta=modalPresentation(d.title);current.querySelector('.modal-icon').innerHTML=icon(meta.mark);current.querySelector('.modal-kicker').textContent=meta.label;current.querySelector('#modal-description').textContent=meta.description;
+    for(const name of [...current.classList])if(name.startsWith('tone-'))current.classList.remove(name);current.classList.add('tone-'+meta.kind);
+    activeModalContext=captureModalContext();syncModalViewport();
+    current.querySelector('.metric-switches [data-metric="'+metric+'"]').focus({preventScroll:true});return;
+  }
+  showModal(d.title,body,true);
+  const dialog=modalRoot.querySelector('.modal');if(dialog?.dataset){dialog.classList.add('metric-dialog');Object.assign(dialog.dataset,{metric,metricScope:scope,metricRef:ref});}
 }
 
 function showDayLedger(date) {
@@ -847,7 +858,7 @@ document.addEventListener('click',e=>{
   if(nativeSync?.handleClick(action))return;
   if(action==='nav'){if(button.closest('.bottom-nav')&&!button.dataset.tab&&bottomNavigation?.select(button.dataset.view))return;if(button.closest('.side-nav')&&!button.dataset.tab&&pageNavigator?.navigate(button.dataset.view))return;activateNav(button.dataset.view,button.dataset.tab);}
   else if(action==='month-entries'){selectedMonth=button.dataset.month;recordYear=selectedMonth.slice(0,4);detailTab='entries';entryFilter='all';resetRecordRange('entries');entryMonthScope=selectedMonth;navigateView('records');closeModal();render();window.scrollTo({top:0});}
-  else if(action==='metric')showMetric(button.dataset.metric,button.dataset.scope||'all',button.dataset.ref||'');
+  else if(action==='metric')showMetric(button.dataset.metric,button.dataset.scope||'all',button.dataset.ref||'',button.dataset.metricSwitch==='true');
   else if(action==='day-ledger')showDayLedger(button.dataset.date);
   else if(action==='calendar-rights')showModal('资料版权与使用条件','<div class="calendar-rights">'+calendarRights()+'</div>');
   else if(action==='calendar-sources')showCalendarSources();

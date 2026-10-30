@@ -30,3 +30,13 @@ body[data-theme] .record-filter-caption>button:not(:disabled),.record-range-year
 .modal.modal-v2 :is(button,[role=listbox],input,select,textarea):focus-visible,.record-filter-grid>button:focus-visible{outline:2px solid var(--control-selected-border);outline-offset:2px}
 .modal.modal-v2 button:disabled,.record-filter-caption>button:disabled{opacity:.48;box-shadow:none}
 .date-wheel-option[aria-disabled=true]{opacity:.32}
+/* Keep the center button's hit target fixed while only its icon responds to a press. */
+button.record-launcher:active:not(:disabled){transform:translateX(-50%)}
+button.record-launcher:active:not(:disabled) .record-plus{transform:scale(.96)}
+body{--salary-tab:#285dc6;--salary-tab-soft:#edf3ff;--salary-tab-ink:#214785;--entry-tab:#0e6b64;--entry-tab-soft:#eaf7f3;--entry-tab-ink:#175e57}
+body[data-theme=dark]{--salary-tab:#396acb;--salary-tab-soft:#25354f;--salary-tab-ink:#bfd5ff;--entry-tab:#147367;--entry-tab-soft:#1e3837;--entry-tab-ink:#a9e4da}
+body[data-theme] .detail-tabs>button[data-tab=salary]{background:var(--salary-tab-soft);color:var(--salary-tab-ink);border:1px solid var(--control-border);box-shadow:none}
+body[data-theme] .detail-tabs>button[data-tab=entries]{background:var(--entry-tab-soft);color:var(--entry-tab-ink);border:1px solid var(--control-border);box-shadow:none}
+body[data-theme] .detail-tabs>button[data-tab=salary][aria-pressed=true]{background:var(--salary-tab);border-color:var(--salary-tab);color:#fff;font-weight:700}
+body[data-theme] .detail-tabs>button[data-tab=entries][aria-pressed=true]{background:var(--entry-tab);border-color:var(--entry-tab);color:#fff;font-weight:700}
+.modal.metric-dialog{height:min(720px,calc(var(--visible-height,100dvh) - 32px))}

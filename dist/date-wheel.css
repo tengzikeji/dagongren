@@ -1,5 +1,6 @@
 .modal.record-date-choosing{min-height:min(616px,calc(var(--visible-height,100dvh) - 32px))}
-.date-wheel-sheet{--wheel-row:clamp(28px,calc((var(--visible-height,100dvh) - 444px)/5),44px);--wheel-label:24px}
+.date-wheel-sheet{--wheel-row:clamp(28px,calc((var(--visible-height,100dvh) - 444px)/5),44px);--wheel-label:24px;animation:date-wheel-enter .12s ease-out both}
+@keyframes date-wheel-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .date-wheel-body{display:flex;flex-direction:column;justify-content:center;gap:14px;overflow-y:auto;padding:16px 20px}
 .date-wheel-body .date-selection{margin:0;padding:11px 15px;text-align:center;flex-shrink:0}
 .date-wheel-body .date-selection>strong{font-size:24px;letter-spacing:.2px;line-height:1.4}

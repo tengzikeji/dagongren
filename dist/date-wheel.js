@@ -7,7 +7,7 @@ export function createDateWheelModel({kind='date',value='',min,max,allowed=()=>t
  min=String(min??(kind==='day'?1:kind==='year'?'2020':kind==='month'?'2020-01':'2020-01-01'));
  max=String(max??(kind==='day'?31:kind==='year'?'2089':kind==='month'?'2089-12':'2089-12-31'));
  const parts=kind==='date'?['year','month','day']:kind==='month'?['year','month']:kind==='year'?['year']:['day'];
- const cache=new Map(),monthCache=new Map();let state={year:2020,month:1,day:1},yearCache=null;
+ const cache=new Map(),monthCache=new Map(),dateAvailability=new Map();let state={year:2020,month:1,day:1},yearCache=null;
  function accepts(candidate){
   const valid=kind==='date'?validDate(candidate):kind==='month'?validMonth(candidate):kind==='year'?/^\d{4}$/.test(candidate)&&validMonth(candidate+'-01'):/^\d{1,2}$/.test(candidate)&&Number(candidate)>=1&&Number(candidate)<=31;
   return valid&&(kind==='day'?Number(candidate)>=Number(min)&&Number(candidate)<=Number(max):candidate>=min&&candidate<=max)&&allowed(candidate);
@@ -17,8 +17,15 @@ export function createDateWheelModel({kind='date',value='',min,max,allowed=()=>t
   const values=Array.from({length:daysInMonth(key)},(_,i)=>i+1).filter(day=>accepts(key+'-'+wheelPad(day)));
   cache.set(key,values);return values;
  }
- function months(year){if(!monthCache.has(year))monthCache.set(year,Array.from({length:12},(_,i)=>i+1).filter(month=>kind==='date'?dates(year,month).length:accepts(year+'-'+wheelPad(month))));return monthCache.get(year);}
- function years(){return yearCache??=Array.from({length:70},(_,i)=>2020+i).filter(year=>kind==='year'?accepts(String(year)):String(year)>=min.slice(0,4)&&String(year)<=max.slice(0,4)&&months(year).length);}
+ function hasDate(year,month){
+  const key=year+'-'+wheelPad(month);if(dateAvailability.has(key))return dateAvailability.get(key);
+  for(let day=1;day<=daysInMonth(key);day++){const candidate=key+'-'+wheelPad(day);if(candidate>=min&&candidate<=max&&accepts(candidate)){dateAvailability.set(key,true);return true;}}
+  dateAvailability.set(key,false);return false;
+ }
+ function monthAllowed(year,month){return kind==='date'?hasDate(year,month):accepts(year+'-'+wheelPad(month));}
+ function months(year){if(!monthCache.has(year))monthCache.set(year,Array.from({length:12},(_,i)=>i+1).filter(month=>monthAllowed(year,month)));return monthCache.get(year);}
+ // Establish availability with one valid date; build complete days only for the displayed month.
+ function years(){return yearCache??=Array.from({length:70},(_,i)=>2020+i).filter(year=>kind==='year'?accepts(String(year)):String(year)>=min.slice(0,4)&&String(year)<=max.slice(0,4)&&Array.from({length:12},(_,i)=>i+1).some(month=>monthAllowed(year,month)));}
  function normalize(candidate){
   if(kind==='day'){
    const values=Array.from({length:31},(_,i)=>i+1).filter(day=>accepts(String(day)));if(!values.length)throw new Error('当前范围内暂无可选日期。');

@@ -50,3 +50,20 @@ test('快速滚动反馈限频，保存失败保留旧偏好，损坏配置安�
  f.storage.setItem=()=>{throw Error('quota')};assert.throws(()=>f.feedback.set('sound',false));assert.deepEqual(f.feedback.read(),{sound:true,haptic:true});
  assert.deepEqual(createWheelFeedback({storage:{getItem:()=>'{'}}).read(),{sound:true,haptic:true});assert.throws(()=>f.feedback.set('unknown',true));
 });
+test('日期滚轮初始化按可用性短路，不遍历完整七十年日期',()=>{
+ let checks=0;const wheel=createDateWheelModel({value:'2026-10-30',min:'2024-01-01',allowed:()=>{checks++;return true;}});
+ for(const part of wheel.parts)wheel.options(part);
+ assert.equal(wheel.value(),'2026-10-30');assert.equal(wheel.options('year').length,70);
+ assert(checks<300,'Opening a normal date wheel should not enumerate every day: '+checks);
+ const sparse=createDateWheelModel({value:'2025-01-01',min:'2024-01-01',max:'2026-12-31',allowed:date=>date==='2024-02-29'||date==='2026-06-20'});
+ assert.equal(sparse.value(),'2024-02-29');assert(sparse.options('year').find(row=>row.value==='2025').disabled);
+ sparse.select('year','2026');assert.equal(sparse.value(),'2026-06-20');assert(sparse.options('month').find(row=>row.value==='5').disabled);
+});
+test('快速滚动时触感逐帧跟随，音效独立限频，程序定位不产生排队反馈',()=>{
+ let time=100;const calls=[],feedback=createWheelFeedback({storage:{getItem:()=>null},bridge:{dateWheelFeedback:(sound,haptic)=>calls.push({time,sound,haptic})},now:()=>time});
+ for(let frame=0;frame<5;frame++){time=100+frame*16;assert(feedback.tick({userInitiated:true}));}
+ assert.deepEqual(calls.map(call=>call.haptic),[true,true,true,true,true]);
+ assert.deepEqual(calls.map(call=>call.sound),[true,false,true,false,true]);
+ time=165;assert.equal(feedback.tick({userInitiated:true}),false);
+ time=500;assert.equal(feedback.tick(),false);assert.equal(calls.length,5);
+});

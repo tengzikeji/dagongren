@@ -51,7 +51,8 @@ public final class MainActivity extends Activity {
     private boolean firstLaunchFramePresented;
     private int systemBarIconUpdates;
     private Integer paintedWindowColor;
-    private long lastDateWheelFeedback;
+    private long lastDateWheelSound,lastDateWheelHaptic;
+    private boolean dateWheelFeedbackScheduled,pendingDateWheelSound,pendingDateWheelHaptic;
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
@@ -237,16 +238,24 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void dateWheelFeedback(boolean sound,boolean haptic){
             runOnUiThread(()->{
                 if(isDestroyed()||isFinishing()||webView==null||!webView.hasWindowFocus())return;
-                long now=SystemClock.uptimeMillis();if(now-lastDateWheelFeedback<55)return;lastDateWheelFeedback=now;
-                if(haptic){
-                    boolean performed=false;
-                    if(Build.VERSION.SDK_INT>=34)performed=webView.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK);
-                    if(!performed)webView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
-                }
-                if(sound){
-                    AudioManager audio=(AudioManager)getSystemService(AUDIO_SERVICE);
-                    if(audio!=null&&audio.getRingerMode()==AudioManager.RINGER_MODE_NORMAL&&Settings.System.getInt(getContentResolver(),Settings.System.SOUND_EFFECTS_ENABLED,1)!=0&&audio.getStreamVolume(AudioManager.STREAM_SYSTEM)>0)audio.playSoundEffect(AudioManager.FX_KEY_CLICK,.16f);
-                }
+                pendingDateWheelSound|=sound;pendingDateWheelHaptic|=haptic;
+                if(dateWheelFeedbackScheduled)return;dateWheelFeedbackScheduled=true;
+                webView.postOnAnimation(()->{
+                    dateWheelFeedbackScheduled=false;
+                    boolean withSound=pendingDateWheelSound,withHaptic=pendingDateWheelHaptic;
+                    pendingDateWheelSound=false;pendingDateWheelHaptic=false;
+                    if(isDestroyed()||isFinishing()||webView==null||!webView.hasWindowFocus())return;
+                    long now=SystemClock.uptimeMillis();
+                    if(withHaptic&&now-lastDateWheelHaptic>=8){
+                        lastDateWheelHaptic=now;boolean performed=false;
+                        if(Build.VERSION.SDK_INT>=34)performed=webView.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK);
+                        if(!performed)webView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+                    }
+                    if(withSound&&now-lastDateWheelSound>=24){
+                        lastDateWheelSound=now;AudioManager audio=(AudioManager)getSystemService(AUDIO_SERVICE);
+                        if(audio!=null&&audio.getRingerMode()==AudioManager.RINGER_MODE_NORMAL&&Settings.System.getInt(getContentResolver(),Settings.System.SOUND_EFFECTS_ENABLED,1)!=0&&audio.getStreamVolume(AudioManager.STREAM_SYSTEM)>0)audio.playSoundEffect(AudioManager.FX_KEY_CLICK,.65f);
+                    }
+                });
             });
         }
         @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
