@@ -3,11 +3,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const output = path.resolve(root, './preview/dagongren-preview.html');
-const names=['index.html','style.css','design-v1.css','upgrade.css','themes.css','refresh.css','launch.css','themes.js','calendar-rights.js','calendar-data.js','calendar.js','payroll.js','charts.js','data-tools.js','sync-tools.js','sync-merge.js','cloud-cleanup.js','native-sync.js','refresh.js','navigation.js','gestures.js','interaction.js','launch.js','holiday-updates.js','app.js','icon.svg'];
+const names=['index.html','style.css','design-v1.css','upgrade.css','themes.css','refresh.css','launch.css','entry-forms.css','themes.js','calendar-rights.js','calendar-data.js','calendar.js','payroll.js','entry-dates.js','record-filters.js','charts.js','data-tools.js','sync-tools.js','sync-merge.js','cloud-cleanup.js','native-sync.js','refresh.js','navigation.js','gestures.js','interaction.js','record-date-picker.js','launch.js','holiday-updates.js','app.js','icon.svg'];
 const values=await Promise.all(names.map(file=>fs.readFile(path.join(root,'dist',file),'utf8')));
 const files=Object.fromEntries(names.map((name,i)=>[name,values[i]]));
-const shell=files['index.html'],css=files['style.css']+'\n'+files['design-v1.css']+'\n'+files['upgrade.css']+'\n'+files['themes.css']+'\n'+files['refresh.css']+'\n'+files['launch.css'],icon=files['icon.svg'];
-const logic=['themes.js','calendar-rights.js','calendar-data.js','calendar.js','payroll.js','charts.js','data-tools.js','sync-tools.js','sync-merge.js','cloud-cleanup.js','native-sync.js','refresh.js','navigation.js','gestures.js','interaction.js','launch.js','holiday-updates.js','app.js'].map(name=>files[name].replace(/^import[^\n]+\n/gm,'').replace(/^export \{[^\n]+\n/gm,'').replaceAll('export function ','function ')).join('\n');
+const shell=files['index.html'],css=files['style.css']+'\n'+files['design-v1.css']+'\n'+files['upgrade.css']+'\n'+files['themes.css']+'\n'+files['refresh.css']+'\n'+files['launch.css']+'\n'+files['entry-forms.css'],icon=files['icon.svg'];
+const logic=['themes.js','calendar-rights.js','calendar-data.js','calendar.js','payroll.js','entry-dates.js','record-filters.js','charts.js','data-tools.js','sync-tools.js','sync-merge.js','cloud-cleanup.js','native-sync.js','refresh.js','navigation.js','gestures.js','interaction.js','record-date-picker.js','launch.js','holiday-updates.js','app.js'].map(name=>files[name].replace(/^import[^\n]+\n/gm,'').replace(/^export \{[^\n]+\n/gm,'').replaceAll('export function ','function ')).join('\n');
 const embedded = shell
   .replace('<link rel="modulepreload" href="./app.js">','')
   .replace('<link rel="stylesheet" href="./design-v1.css">','')
@@ -15,6 +15,7 @@ const embedded = shell
   .replace('<link rel="stylesheet" href="./themes.css">','')
   .replace('<link rel="stylesheet" href="./refresh.css">','')
   .replace('<link rel="stylesheet" href="./launch.css">','')
+  .replace('<link rel="stylesheet" href="./entry-forms.css">','')
   .replace('<link rel="icon" href="./icon.svg" type="image/svg+xml">', '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,'+encodeURIComponent(icon)+'">')
   .replace('<link rel="stylesheet" href="./style.css">', '<style>'+css+'</style>')
   .replace('<script type="module" src="./bootstrap.js"></script>', '<script>\n(()=>{\n'+('globalThis.dagongrenIntro=prepareBrandIntro();\n'+logic).replace(/<\/script/gi,'<\\/script')+'\n})();\n</script>');

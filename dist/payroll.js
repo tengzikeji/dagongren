@@ -5,7 +5,7 @@ export function daysInMonth(month) {
 }
 
 export function validMonth(month) {
-  return /^\d{4}-(0[1-9]|1[0-2])$/.test(month) && Number(month.slice(0, 4)) >= 2020 && Number(month.slice(0, 4)) <= 2040;
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(month) && Number(month.slice(0, 4)) >= 2020 && Number(month.slice(0, 4)) <= 2089;
 }
 
 export function validDate(date) {

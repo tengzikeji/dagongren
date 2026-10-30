@@ -6,8 +6,8 @@ export function canonicalJSON(value) {
 export function makeCleanupPlan(local,cloud,options) {
   const {scope,target,month,year} = options;
   if(!['month','year','all'].includes(scope)||!['local','cloud','both'].includes(target))throw new Error('请选择有效的清理范围与位置。');
-  if(scope==='month'&&!/^(20[2-3]\d|2040)-(0[1-9]|1[0-2])$/.test(month||''))throw new Error('请选择有效月份。');
-  if(scope==='year'&&(!/^\d{4}$/.test(year||'')||+year<2020||+year>2040))throw new Error('请选择2020至2040年之间的年份。');
+  if(scope==='month'&&!/^(20[2-8]\d)-(0[1-9]|1[0-2])$/.test(month||''))throw new Error('请选择有效月份。');
+  if(scope==='year'&&(!/^\d{4}$/.test(year||'')||+year<2020||+year>2089))throw new Error('请选择2020至2089年之间的年份。');
   const matching=data=>Object.keys(data||{}).filter(key=>scope==='all'||(scope==='year'?key.startsWith(year+'-'):key===month)).sort();
   const localKeys=target==='cloud'?[]:matching(local),cloudKeys=target==='local'?[]:matching(cloud);
   const subset=(data,keys)=>Object.fromEntries(keys.map(key=>[key,data[key]]));

@@ -119,6 +119,101 @@ public class AppSmokeTest {
     private void selectCalendarMonth(ActivityScenario<MainActivity> scenario,String month) throws Exception {
         evaluate(scenario,"document.querySelector('[data-action=month-picker]').click();var targetYear=Number('"+month+"'.slice(0,4));for(let n=0;n<25;n++){const current=parseInt(document.querySelector('.month-year span').textContent);if(current===targetYear)break;document.querySelector('[data-action=picker-year][data-delta=\"'+(current>targetYear?'-1':'1')+'\"]').click();}document.querySelector('[data-action=choose-month][data-month=\""+month+"\"]').click()");
     }
+    private void pickRecordDate(ActivityScenario<MainActivity> scenario,String id,String date) throws Exception {
+        tapControl(scenario,"[data-date-for=\""+id+"\"]");
+        waitTrue(scenario,"Boolean(document.querySelector('.record-date-sheet'))");
+        tapControl(scenario,".record-date-sheet [data-date-action=years]");
+        assertEquals("70",evaluate(scenario,"document.querySelectorAll('.date-years button').length"));
+        tapControl(scenario,"[data-date-year-value=\""+date.substring(0,4)+"\"]");
+        tapControl(scenario,"[data-date-month-value=\""+date.substring(0,7)+"\"]");
+        tapControl(scenario,".date-days [data-date-value=\""+date+"\"]");
+        tapControl(scenario,".date-sheet-actions [data-date-action=confirm]");
+        waitTrue(scenario,"!document.querySelector('.record-date-sheet')");
+        assertEquals("\""+date+"\"",evaluate(scenario,"document.getElementById('"+id+"').value"));
+    }
+    private void seedEntryDateReview(ActivityScenario<MainActivity> scenario) throws Exception {
+        resetBook(scenario);
+        evaluate(scenario,"const defaults={salaryCents:600000,company:'日期筛选验收',joinDate:'2024-01-01',periodMode:'calendar',periodStartDay:1,payday:15,motion:true};const r=()=>({...defaults,leaves:[],overtime:[],subsidies:[],deductions:[],advances:[],payments:[]});const jan=r(),feb=r();jan.subsidies=[{id:'jan-s',date:'2024-01-10',category:'一月餐补',amountCents:1200}];feb.subsidies=[{id:'feb-s',date:'2024-02-10',category:'二月餐补',amountCents:2300}];localStorage.setItem('dagongren.paybook.v1',JSON.stringify({version:2,defaults,months:{'2024-01':jan,'2024-02':feb},excludedMonths:[],sync:{auto:false,nativeVersion:1,pending:0,logs:[]}}))");
+        scenario.recreate();waitReady(scenario);
+    }
+    @Test public void redesignedEntryDatesCrossMonthsAndReach2089() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            seedEntryDateReview(scenario);
+            evaluate(scenario,"document.querySelector('#app [data-action=record-entry]').click()");
+            assertEquals("false",evaluate(scenario,"Boolean(document.getElementById('entry-month'))"));
+            evaluate(scenario,"document.querySelector('[data-kind=leave]').click();document.getElementById('leave-note').value='跨月保留备注'");
+            assertEquals("false",evaluate(scenario,"document.querySelector('#modal-root').textContent.includes('切换记录')"));
+            pickRecordDate(scenario,"leave-start","2089-11-30");
+            pickRecordDate(scenario,"leave-end","2089-12-02");
+            assertEquals("\"跨月保留备注\"",evaluate(scenario,"document.getElementById('leave-note').value"));
+            paintedScreenshot(scenario,"entry-leave-2089-range");
+            tapControl(scenario,".modal-footer button[type=submit]");
+            waitTrue(scenario,"!document.querySelector('#leave-form')");
+            assertEquals("true",evaluate(scenario,"(()=>{const b=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));return b.months['2089-11'].leaves.length===1&&b.months['2089-12'].leaves.length===2&&b.months['2089-12'].leaves.every(x=>x.note==='跨月保留备注')})()"));
+            for(String kind:new String[]{"overtime","subsidy","deduction"}){
+                evaluate(scenario,"document.querySelector('#app [data-action=record-entry]').click();document.querySelector('[data-kind="+kind+"]').click()");
+                assertEquals("\"记录日期\"",evaluate(scenario,"document.querySelector('#"+kind+"-form .field label').textContent"));
+                assertEquals("false",evaluate(scenario,"document.querySelector('#modal-root').textContent.includes('切换记录')"));
+                String dateId="overtime".equals(kind)?"overtime-date":"adjustment-date";
+                pickRecordDate(scenario,dateId,"2089-12-31");
+                assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth"));
+                evaluate(scenario,"document.querySelector('.modal-close').click()");
+            }
+        }
+    }
+    @Test public void cashDatePickersKeepAmountsNotesAndOriginalSettlement() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            seedEntryDateReview(scenario);
+            for(String kind:new String[]{"advance","payment"}){
+                evaluate(scenario,"document.querySelector('#app [data-action=record-entry]').click();document.querySelector('[data-kind="+kind+"]').click();document.getElementById('cash-amount').value='123.45';document.getElementById('cash-amount').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('cash-note').value='收款草稿保留';window.__cashInterval={start:document.getElementById('cash-period').selectedOptions[0].dataset.start,end:document.getElementById('cash-period').selectedOptions[0].dataset.end};window.__cashBook=localStorage.getItem('dagongren.paybook.v1')");
+                tapControl(scenario,"[data-date-for=cash-date]");
+                tapControl(scenario,"[data-date-action=years]");
+                assertEquals("true",evaluate(scenario,"document.querySelector('[data-date-year-value=\"2089\"]').disabled&&!document.querySelector('[data-date-year-value=\"2020\"]').disabled"));
+                pressAppBack(scenario);
+                assertEquals("true",evaluate(scenario,"Boolean(document.getElementById('"+kind+"-form'))&&!document.querySelector('.record-date-sheet')&&window.__cashBook===localStorage.getItem('dagongren.paybook.v1')"));
+                pickRecordDate(scenario,"cash-date","2024-02-29");
+                assertEquals("true",evaluate(scenario,"document.getElementById('cash-amount').value==='123.45'&&document.getElementById('cash-note').value==='收款草稿保留'"));
+                paintedScreenshot(scenario,"entry-"+kind+"-receipt-date");
+                tapControl(scenario,".modal-footer button[type=submit]");
+                waitTrue(scenario,"!document.getElementById('"+kind+"-form')");
+                String key="advance".equals(kind)?"advances":"payments";
+                assertEquals("true",evaluate(scenario,"Object.values(JSON.parse(localStorage.getItem('dagongren.paybook.v1')).months).flatMap(r=>r."+key+"||[]).some(x=>x.date==='2024-02-29'&&x.amountCents===12345&&x.note==='收款草稿保留'&&x.periodStart===window.__cashInterval.start&&x.periodEnd===window.__cashInterval.end)"));
+            }
+        }
+    }
+    @Test public void recordDateFiltersResetIndependentlyAndKeepLedger() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            seedEntryDateReview(scenario);
+            evaluate(scenario,"document.querySelector('[data-view=records]').click();document.querySelector('[data-action=record-year-picker]').click();document.querySelector('[data-action=choose-record-year][data-year=\"2024\"]').click();window.__filterBook=localStorage.getItem('dagongren.paybook.v1')");
+            assertEquals("\"已发\"",evaluate(scenario,"document.querySelector('[data-action=filter][data-filter=paid]').textContent"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('.salary-filters').lastElementChild.dataset.action==='record-date-filter'&&document.querySelector('[data-action=reset-record-date-filter]').disabled"));
+            tapControl(scenario,"[data-action=record-date-filter]");
+            assertEquals("\"2024-01-01\"",evaluate(scenario,"document.getElementById('record-range-start').value"));
+            pickRecordDate(scenario,"record-range-end","2024-01-31");
+            tapControl(scenario,".modal-footer button[type=submit]");
+            waitTrue(scenario,"document.querySelectorAll('.salary-record-list .month-pay-card').length===1");
+            tapControl(scenario,"[data-action=detail-tab][data-tab=entries]");
+            assertEquals("8",evaluate(scenario,"document.querySelector('.journal-filters').children.length"));
+            assertEquals("2",evaluate(scenario,"document.querySelectorAll('.ledger-group .ledger-entry').length"));
+            tapControl(scenario,"[data-action=entry-filter][data-filter=subsidy]");
+            tapControl(scenario,"[data-action=record-date-filter]");
+            assertEquals("\"2024-12-31\"",evaluate(scenario,"document.getElementById('record-range-end').value"));
+            pickRecordDate(scenario,"record-range-start","2024-02-01");
+            pickRecordDate(scenario,"record-range-end","2024-02-29");
+            tapControl(scenario,".modal-footer button[type=submit]");
+            waitTrue(scenario,"document.querySelectorAll('.ledger-group .ledger-entry').length===1");
+            assertEquals("true",evaluate(scenario,"document.querySelector('.ledger-group').textContent.includes('二月餐补')&&!document.querySelector('.ledger-group').textContent.includes('一月餐补')"));
+            paintedScreenshot(scenario,"entry-filter-range");
+            tapControl(scenario,"[data-action=reset-record-date-filter]");
+            waitTrue(scenario,"document.querySelectorAll('.ledger-group .ledger-entry').length===2");
+            assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=entry-filter][data-filter=subsidy]').getAttribute('aria-pressed')==='true'"));
+            tapControl(scenario,"[data-action=detail-tab][data-tab=salary]");
+            assertEquals("1",evaluate(scenario,"document.querySelectorAll('.salary-record-list .month-pay-card').length"));
+            tapControl(scenario,"[data-action=reset-record-date-filter]");
+            assertEquals("true",evaluate(scenario,"document.querySelectorAll('.salary-record-list .month-pay-card').length>1&&window.__filterBook===localStorage.getItem('dagongren.paybook.v1')&&document.documentElement.scrollWidth<=innerWidth"));
+        }
+    }
+
     @Test public void cycleWagesChartsAndAdaptiveCalendarMatchLedger() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
@@ -422,7 +517,7 @@ public class AppSmokeTest {
             waitTrueLoading(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1),page=document.querySelector('.launch-page'),scene=document.querySelector('.launch-scene');if(!entry||!page||!scene)return false;window.__launchObserved=entry.detail;window.__launchObservedColors=[getComputedStyle(page).backgroundColor,getComputedStyle(scene).backgroundColor];if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];window.__launchContentSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='content-fading'){window.__launchContentSamples.push({opacity:Number(getComputedStyle(page).opacity),contentOpacity:Number(getComputedStyle(page.querySelector('.launch-scene')).opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity)})}if(page.dataset.phase==='fading'){const rect=page.getBoundingClientRect(),style=getComputedStyle(page);window.__launchBlendSamples.push({opacity:Number(style.opacity),contentOpacity:Number(getComputedStyle(page.querySelector('.launch-scene')).opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height,left:rect.left,top:rect.top,transform:style.transform,radius:style.borderRadius})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
             assertEquals("1",evaluateLoading(scenario,"window.__launchObserved.surfaces"));
             assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertFalse(activity.hasBitmapLaunchCover());assertTrue(activity.getWindow().getDecorView().isHardwareAccelerated());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
-            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.10'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface&&window.__launchObserved.strokeRenderer==='transform-clips'&&window.__launchObserved.appReleaseDelay===2100"));
+            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.11'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface&&window.__launchObserved.strokeRenderer==='transform-clips'&&window.__launchObserved.appReleaseDelay===2100"));
             assertEquals("false",evaluateLoading(scenario,"window.__launchObserved.oldBrand"));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObservedColors.length===2&&window.__launchObservedColors.every(color=>color==='"+(dark?"rgb(16, 24, 39)":"rgb(243, 245, 249)")+"')"));
             assertEquals("true",evaluateLoading(scenario,"!document.querySelector('.launch-edition')&&window.__launchObserved.animationNames.includes('launch-content-in')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false"));
@@ -928,7 +1023,7 @@ public class AppSmokeTest {
                 paintedScreenshot(scenario,"theme-"+theme+"-profile");
             evaluate(scenario,"document.querySelector('.app-info-footer').scrollIntoView({block:'center',behavior:'instant'})");
             waitTrue(scenario,"!document.getElementById('toast').classList.contains('show')");
-            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.10 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.11 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
                 paintedScreenshot(scenario,"theme-"+theme+"-copyright");
             evaluate(scenario,"document.querySelector('#app .profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 swipeRegion(scenario,".employment-progress",-1);

@@ -18,7 +18,7 @@ final class HolidayClient {
  private final OkHttpClient client;
  HolidayClient(){client=new OkHttpClient.Builder().connectTimeout(8,TimeUnit.SECONDS).readTimeout(12,TimeUnit.SECONDS).callTimeout(20,TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build();}
  JSONObject readYear(int year) throws Exception {
-  if(year<2020||year>2040)throw new IllegalArgumentException("日历年份超出支持范围。");
+  if(year<2020||year>2089)throw new IllegalArgumentException("日历年份超出支持范围。");
   String[] urls={"https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/"+year+".json","https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/"+year+".json"};Exception last=null;
   for(String url:urls){
    try(Response response=client.newCall(new Request.Builder().url(url).header("User-Agent","Dagongren/1.1.0").header("Cache-Control","no-cache").build()).execute()){

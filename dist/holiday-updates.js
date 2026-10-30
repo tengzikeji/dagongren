@@ -1,6 +1,6 @@
 import {applyOfficialSchedule} from './calendar.js';
 export function validateHolidayPayload(value,year){
- if(!value||value.year!==year||!Number.isInteger(year)||year<2020||year>2040||!Array.isArray(value.papers)||!value.papers.length||value.papers.length>20||!Array.isArray(value.days)||!value.days.length||value.days.length>120)throw new Error('日历资料不完整。');
+ if(!value||value.year!==year||!Number.isInteger(year)||year<2020||year>2089||!Array.isArray(value.papers)||!value.papers.length||value.papers.length>20||!Array.isArray(value.days)||!value.days.length||value.days.length>120)throw new Error('日历资料不完整。');
  for(const paper of value.papers){let parsed;try{parsed=new URL(paper);}catch{throw new Error('日历资料来源无效。');}if(typeof paper!=='string'||paper.length>2048||parsed.protocol!=='https:'||!(parsed.hostname==='gov.cn'||parsed.hostname.endsWith('.gov.cn')))throw new Error('日历资料缺少政府通知来源。');}
  const seen=new Set(),days=[];
  for(const row of value.days){
@@ -13,7 +13,7 @@ export function createCalendarUpdater({fetchYear,onChange=()=>{},storage=globalT
  try{const saved=JSON.parse(storage?.getItem(key)||'{}');for(const [year,entry] of Object.entries(saved)){try{const payload=validateHolidayPayload(entry.payload,Number(year));cached[year]={payload,updatedAt:Number(entry.updatedAt)||0};applyOfficialSchedule(payload);}catch{}}}catch{}
  function save(){try{storage?.setItem(key,JSON.stringify(cached));}catch{}}
  async function one(year,force){
-  if(!Number.isInteger(year)||year<2020||year>2040||!fetchYear)return;if(inflight.has(year))return inflight.get(year);
+  if(!Number.isInteger(year)||year<2020||year>2089||!fetchYear)return;if(inflight.has(year))return inflight.get(year);
   if(!force&&attempts.has(year)&&now()-attempts.get(year)<1800000)return;attempts.set(year,now());
   const operation=(async()=>{try{
    const result=await fetchYear(year);if(!result?.available)return;

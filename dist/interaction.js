@@ -110,8 +110,14 @@ function snapshotFinalNumbers(source){
  return clone;
 }
 export function closeChoicePicker(){
- if(!uiActiveChoice)return false;const {panel,children,trigger,modal}=uiActiveChoice;uiActiveChoice=null;panel.remove();modal.classList.remove('choosing');
+ if(!uiActiveChoice)return false;const {panel,children,trigger,modal}=uiActiveChoice;uiActiveChoice=null;panel.remove();modal.classList.remove('choosing','record-date-choosing');
  for(const child of children){child.inert=false;child.removeAttribute('aria-hidden');}trigger?.focus({preventScroll:true});return true;
+}
+export function openChoicePanel(root,trigger,panel){
+ closeChoicePicker();const modal=root.querySelector('.modal');if(!modal)return false;
+ const children=[...modal.children];for(const child of children){child.inert=true;child.setAttribute('aria-hidden','true');}
+ modal.classList.add('choosing');if(panel.classList.contains('record-date-sheet'))modal.classList.add('record-date-choosing');
+ modal.appendChild(panel);uiActiveChoice={panel,children,trigger,modal};return true;
 }
 export function enhanceModalChoices(root){
  if(!root.querySelectorAll)return;

@@ -65,7 +65,7 @@ for(const target of ['local','cloud','both']){
  const sub=ui.data().months['2026-10'].subsidies[0],ded=ui.data().months['2026-10'].deductions[0];ui.click('metric',{metric:'subsidy',scope:'month',ref:'2026-10'});assert.match(ui.el('modal-root').innerHTML,/data-total="20000"/);assert.match(ui.el('modal-root').innerHTML,/当月餐补/);ui.click('metric',{metric:'deduction',scope:'month',ref:'2026-10'});assert.match(ui.el('modal-root').innerHTML,/data-total="5000"/);assert.match(ui.el('modal-root').innerHTML,/工作服费用/);
  ui.click('edit-entry',{kind:'subsidy',month:'2026-10',id:sub.id});ui.submit('subsidy-form',{category:'__custom__',customCategory:'项目奖励',date:'2026-10-22',amount:'300',note:'修改'});assert.equal(ui.book().expectedCents,663710);assert.equal(ui.data().months['2026-10'].subsidies.length,1);ui.click('record-kind',{kind:'subsidy'});assert.match(ui.el('modal-root').innerHTML,/项目奖励 · 自定义/);
  ui.click('edit-entry',{kind:'deduction',month:'2026-10',id:ded.id});assert.match(ui.el('modal-root').innerHTML,/工作服费用/);ui.click('confirm-delete-entry',{kind:'deduction',month:'2026-10',id:ded.id});assert.match(ui.el('modal-root').innerHTML,/删除这笔扣款/);ui.click('delete-entry',{kind:'deduction',month:'2026-10',id:ded.id});assert.equal(ui.book().expectedCents,668710);
- ui.click('record-kind',{kind:'subsidy'});ui.submit('subsidy-form',{category:'__custom__',customCategory:' ',date:'2026-10-22',amount:'100',note:''});assert.match(ui.el('form-error').textContent,/项目名称/);ui.submit('subsidy-form',{category:'餐补',date:'2026-10-22',amount:'-1',note:''});assert.match(ui.el('form-error').textContent,/金额/);ui.submit('subsidy-form',{category:'餐补',date:'2026-09-20',amount:'100',note:''});assert.match(ui.el('form-error').textContent,/自然月/);
+ ui.click('record-kind',{kind:'subsidy'});ui.submit('subsidy-form',{category:'__custom__',customCategory:' ',date:'2026-10-22',amount:'100',note:''});assert.match(ui.el('form-error').textContent,/项目名称/);ui.submit('subsidy-form',{category:'餐补',date:'2026-10-22',amount:'-1',note:''});assert.match(ui.el('form-error').textContent,/金额/);ui.submit('subsidy-form',{category:'餐补',date:'2026-09-20',amount:'100',note:''});assert.match(ui.el('form-error').textContent,/入职日期/);
 }
 {
  const ui=boot(fixture);ui.click('record-kind',{kind:'subsidy'});ui.submit('subsidy-form',{category:'高温补贴',date:'2026-10-23',amount:'100',note:'明日生效'});ui.click('record-kind',{kind:'deduction'});ui.submit('deduction-form',{category:'住宿费',date:'2026-10-23',amount:'30',note:'明日生效'});assert.equal(ui.book().expectedCents,638710);ui.click('metric',{metric:'subsidy',scope:'month',ref:'2026-10'});assert.match(ui.el('modal-root').innerHTML,/data-total="0"/);ui.advance('2026-10-23T04:00:00Z');assert.equal(ui.book().expectedCents,665065);ui.click('metric',{metric:'subsidy',scope:'month',ref:'2026-10'});assert.match(ui.el('modal-root').innerHTML,/data-total="10000"/);assert.equal(boot(ui.data()).data().months['2026-10'].subsidies[0].category,'高温补贴');
@@ -148,3 +148,43 @@ console.log('Passed 1.3.1: system/light/dark appearance, device-only persistence
 console.log('Passed beta: return-to-current-month works for calendar and custom wage periods without rewriting the ledger.');
 
 {const ui=boot(fixture),before=ui.timerCount(60000);for(let i=0;i<4;i++)ui.evaluate('(__check.refreshAccrualDay(false),true)');assert.equal(ui.timerCount(60000),before);assert.equal(before,1);console.log('Passed 1.3.4: repeated manual refresh keeps one daily accrual timer.');}
+
+{
+ const ui=boot(fixture);ui.click('record-entry');assert.doesNotMatch(ui.el('modal-root').innerHTML,/entry-month|工资记录所属自然月/);
+ ui.click('record-kind',{kind:'leave',month:'2026-09'});assert.doesNotMatch(ui.el('modal-root').innerHTML,/切换记录/);
+ ui.submit('leave-form',{start:'2026-09-30',end:'2026-10-02',days:'1',deductMode:'yes',note:'跨月请假'});
+ assert.equal(ui.data().months['2026-09'].leaves.length,1);assert.equal(ui.data().months['2026-10'].leaves.length,2);
+ const before=JSON.stringify(ui.data());ui.click('record-kind',{kind:'leave',month:'2026-09'});ui.submit('leave-form',{start:'2026-09-30',end:'2026-10-02',days:'1',deductMode:'no',note:'重复'});assert.match(ui.el('form-error').textContent,/已有记录/);assert.equal(JSON.stringify(ui.data()),before);
+ for(const kind of ['overtime','subsidy','deduction']){
+  ui.click('record-kind',{kind,month:'2026-10'});const html=ui.el('modal-root').innerHTML;assert.doesNotMatch(html,/切换记录/);assert.match(html,/记录日期/);
+  const dateId=kind==='overtime'?'overtime-date':'adjustment-date';assert.ok(html.indexOf('id="'+dateId+'"')<html.indexOf(kind==='overtime'?'id="overtime-mode"':'id="adjustment-category"'));
+  ui.submit(kind+'-form',kind==='overtime'?{mode:'custom',date:'2026-09-29',amount:'50',note:'跨月加班'}:{category:kind==='subsidy'?'餐补':'住宿费',date:'2026-09-29',amount:'50',note:'跨月调整'});
+  const key={overtime:'overtime',subsidy:'subsidies',deduction:'deductions'}[kind],item=ui.data().months['2026-09'][key][0];assert.equal(item.date,'2026-09-29');assert.equal(item.amountCents,5000);
+  ui.click('edit-entry',{kind,month:'2026-09',id:item.id});ui.submit(kind+'-form',kind==='overtime'?{mode:'custom',date:'2026-10-03',amount:'66',note:'改日期'}:{category:item.category,date:'2026-10-03',amount:'66',note:'改日期'});
+  assert.equal(ui.data().months['2026-09'][key].length,0);assert.equal(ui.data().months['2026-10'][key][0].id,item.id);assert.equal(ui.data().months['2026-10'][key][0].amountCents,6600);
+ }
+}
+console.log('Passed entry redesign: removed month and switch controls, cross-month leave, date-first forms, per-date monthly routing and cross-month edits without receipt changes.');
+
+{
+ const data=clone(fixture);data.months['2026-09'].subsidies=[{id:'s9',date:'2026-09-30',amountCents:1200,category:'九月餐补'}];data.months['2026-10'].subsidies=[{id:'s10',date:'2026-10-02',amountCents:2300,category:'十月餐补'}];
+ const ui=boot(data);ui.click('nav',{view:'records'});const original=JSON.stringify(ui.data());
+ assert.match(ui.el('app').innerHTML,/data-filter="paid"[^>]*>已发</);assert.match(ui.el('app').innerHTML,/全年 · 默认/);
+ ui.click('record-date-filter',{kind:'salary'});let modal=ui.el('modal-root').innerHTML;
+ assert.match(modal,/id="record-range-start"[^>]*value="2026-01-01"/);assert.match(modal,/id="record-range-end"[^>]*value="2026-12-31"/);
+ ui.submit('record-date-filter-form',{kind:'salary',start:'2026-09-21',end:'2026-09-21'});
+ assert.equal((ui.el('app').innerHTML.match(/class="month-pay-card"/g)||[]).length,1);
+ ui.click('detail-tab',{tab:'entries'});assert.match(ui.el('app').innerHTML,/全年 · 默认/);assert.match(ui.el('app').innerHTML,/九月餐补/);assert.match(ui.el('app').innerHTML,/十月餐补/);
+ ui.click('entry-filter',{filter:'subsidy'});ui.click('record-date-filter',{kind:'entries'});
+ ui.submit('record-date-filter-form',{kind:'entries',start:'2026-09-30',end:'2026-10-01'});
+ assert.match(ui.el('app').innerHTML,/九月餐补/);assert.doesNotMatch(ui.el('app').innerHTML,/十月餐补/);
+ const filtered=ui.el('app').innerHTML;ui.click('record-date-filter',{kind:'entries'});ui.submit('record-date-filter-form',{kind:'entries',start:'2026-10-01',end:'2026-09-30'});assert.match(ui.el('form-error').textContent,/不能晚于/);ui.click('modal-back');assert.equal(ui.el('app').innerHTML,filtered);
+ ui.click('reset-record-date-filter',{kind:'entries'});assert.match(ui.el('app').innerHTML,/十月餐补/);assert.match(ui.el('app').innerHTML,/data-filter="subsidy" aria-pressed="true"/);
+ ui.click('detail-tab',{tab:'salary'});assert.equal((ui.el('app').innerHTML.match(/class="month-pay-card"/g)||[]).length,1);
+ ui.click('reset-record-date-filter',{kind:'salary'});assert.equal((ui.el('app').innerHTML.match(/class="month-pay-card"/g)||[]).length,2);
+ ui.click('month-entries',{month:'2026-09'});assert.match(ui.el('app').innerHTML,/9月/);assert.doesNotMatch(ui.el('app').innerHTML,/十月餐补/);ui.click('clear-entry-month');assert.match(ui.el('app').innerHTML,/十月餐补/);
+ for(const kind of ['advance','payment']){ui.click('record-kind',{kind,month:'2026-10'});modal=ui.el('modal-root').innerHTML;assert.match(modal,/<input type="hidden" id="cash-date"/);assert.match(modal,/data-date-policy="cash"/);assert.doesNotMatch(modal,/<input id="cash-date"[^>]*type="date"/);}
+ assert.equal(JSON.stringify(ui.data()),original);
+ ui.click('nav',{view:'calendar'});ui.click('month-picker');ui.click('picker-year-grid',{kind:'month'});assert.match(ui.el('modal-root').innerHTML,/data-year="2089"/);ui.click('choose-picker-year',{kind:'month',year:'2089'});ui.click('choose-month',{month:'2089-12'});assert.match(ui.el('app').innerHTML,/data-calendar-month="2089-12"/);assert.doesNotMatch(ui.el('app').innerHTML,/undefined|NaN/);ui.click('shift-month',{delta:'1'});assert.equal(ui.evaluate('__check.pageContext().selectedMonth'),'2089-12');
+}
+console.log('Passed date filter integration: inclusive ranges, independent defaults/reset, type intersections, invalid-range cancellation, month drilldowns, styled cash dates, unchanged ledger, and 2089 calendar bounds.');
