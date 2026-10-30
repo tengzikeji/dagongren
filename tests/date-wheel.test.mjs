@@ -45,8 +45,8 @@ test('滚动音效和触感默认开启，分别持久化，程序同步无反�
  const reload=createWheelFeedback({storage:f.storage});assert.deepEqual(reload.read(),{sound:false,haptic:false});
  assert.deepEqual(Object.keys(JSON.parse(f.raw())).sort(),['haptic','sound']);
 });
-test('快速滚动反馈限频，保存失败保留旧偏好，损坏配置安全恢复',()=>{
- const f=feedbackFixture();f.feedback.tick({userInitiated:true});assert.equal(f.feedback.tick({userInitiated:true}),false);assert.equal(f.calls.length,1);f.step();f.feedback.tick({userInitiated:true});assert.equal(f.calls.length,2);
+test('快速数字变化不丢音效，触感独立限频，保存失败保留旧偏好',()=>{
+ const f=feedbackFixture();f.feedback.tick({userInitiated:true});assert.equal(f.feedback.tick({userInitiated:true}),true);assert.deepEqual(f.calls,[[true,true],[true,false]]);f.step();f.feedback.tick({userInitiated:true});assert.equal(f.calls.length,3);
  f.storage.setItem=()=>{throw Error('quota')};assert.throws(()=>f.feedback.set('sound',false));assert.deepEqual(f.feedback.read(),{sound:true,haptic:true});
  assert.deepEqual(createWheelFeedback({storage:{getItem:()=>'{'}}).read(),{sound:true,haptic:true});assert.throws(()=>f.feedback.set('unknown',true));
 });
@@ -59,11 +59,14 @@ test('日期滚轮初始化按可用性短路，不遍历完整七十年日期',
  assert.equal(sparse.value(),'2024-02-29');assert(sparse.options('year').find(row=>row.value==='2025').disabled);
  sparse.select('year','2026');assert.equal(sparse.value(),'2026-06-20');assert(sparse.options('month').find(row=>row.value==='5').disabled);
 });
-test('快速滚动时触感逐帧跟随，音效独立限频，程序定位不产生排队反馈',()=>{
- let time=100;const calls=[],feedback=createWheelFeedback({storage:{getItem:()=>null},bridge:{dateWheelFeedback:(sound,haptic)=>calls.push({time,sound,haptic})},now:()=>time});
+test('滚动音效与每次数字变化一一对应，快速或变速滚动不丢拍，程序定位静音',()=>{
+ let time=100;const calls=[],feedback=createWheelFeedback({storage:{getItem:()=>null,setItem(){}},bridge:{dateWheelFeedback:(sound,haptic)=>calls.push({time,sound,haptic})},now:()=>time});
  for(let frame=0;frame<9;frame++){time=100+frame*8;assert(feedback.tick({userInitiated:true}));}
  assert.deepEqual(calls.map(call=>call.haptic),Array(9).fill(true));
- assert.deepEqual(calls.map(call=>call.sound),[true,false,false,false,true,false,false,false,true]);
- time=165;assert.equal(feedback.tick({userInitiated:true}),false);
- time=500;assert.equal(feedback.tick(),false);assert.equal(calls.length,9);
+ assert.deepEqual(calls.map(call=>call.sound),Array(9).fill(true));
+ time=165;assert.equal(feedback.tick({userInitiated:true}),true);assert.deepEqual(calls.at(-1),{time:165,sound:true,haptic:false});
+ for(const interval of [1,6,15,32,80,120,16,8]){time+=interval;feedback.tick({userInitiated:true});}
+ assert.equal(calls.length,18);assert(calls.every(call=>call.sound));
+ time=500;assert.equal(feedback.tick(),false);assert.equal(calls.length,18);
+ feedback.set('sound',false);time=501;feedback.tick({userInitiated:true});assert.equal(calls.at(-1).sound,false);
 });

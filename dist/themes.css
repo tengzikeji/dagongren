@@ -56,7 +56,7 @@ body[data-theme=dark] .field input:focus,body[data-theme=dark] .field textarea:f
 body[data-theme=dark] .btn-primary{background:#426ed5;border-color:#668ff1;color:#fff;box-shadow:none}
 body[data-theme=dark] .error{color:#ffa2b1}
 body[data-theme=dark] :is(.empty-state,.cleanup-cloud-option,.theme-intro,.calendar-gesture-hint,.calendar-policy,.sync-step-number){color:var(--muted)}
-body.motion-off *:not(.launch-page,.launch-page *,.swipe-boundary-arrow,.swipe-boundary-arrow *),body.motion-off *:not(.launch-page,.launch-page *,.swipe-boundary-arrow,.swipe-boundary-arrow *):before,body.motion-off *:not(.launch-page,.launch-page *,.swipe-boundary-arrow,.swipe-boundary-arrow *):after{animation:none!important;transition:none!important}
+body.motion-off *:not(.launch-page,.launch-page *,.swipe-boundary-arrow,.swipe-boundary-arrow *,.pull-refresh,.pull-refresh *),body.motion-off *:not(.launch-page,.launch-page *,.swipe-boundary-arrow,.swipe-boundary-arrow *,.pull-refresh,.pull-refresh *):before,body.motion-off *:not(.launch-page,.launch-page *,.swipe-boundary-arrow,.swipe-boundary-arrow *,.pull-refresh,.pull-refresh *):after{animation:none!important;transition:none!important}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 
 .calendar-day .day-wage{font-family:"Segoe UI",Arial,sans-serif;font-variant-numeric:tabular-nums}

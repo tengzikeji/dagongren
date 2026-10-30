@@ -276,6 +276,14 @@ public class AppSmokeTest {
             evaluate(scenario,"window.__wheelBudget=null;import(new URL('date-wheel.js',document.baseURI).href).then(({createDateWheelModel})=>{let count=0;const started=performance.now(),wheel=createDateWheelModel({value:'2026-10-30',min:'2024-01-01',allowed:()=>{count++;return true}});for(const part of wheel.parts)wheel.options(part);window.__wheelBudget={count,ms:performance.now()-started,value:wheel.value()}}).catch(error=>{window.__wheelBudget={error:String(error)}})");
             waitTrue(scenario,"window.__wheelBudget!==null");assertEquals("true",evaluate(scenario,"window.__wheelBudget.count<300&&window.__wheelBudget.value==='2026-10-30'"));
             android.util.Log.i("DagongrenMotion","WHEEL_INITIALIZATION="+evaluate(scenario,"JSON.stringify(window.__wheelBudget)"));
+            for(String theme:new String[]{"light","dark"}){
+                evaluate(scenario,"document.body.dataset.theme='"+theme+"';document.querySelector('#app .bottom-nav [data-view=records]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+                for(String tab:new String[]{"salary","entries"}){
+                    tapControl(scenario,"#view-content .detail-tabs [data-tab="+tab+"]");
+                    assertEquals("true",evaluate(scenario,"[...document.querySelectorAll('#view-content .detail-tabs>button')].every(button=>{const s=getComputedStyle(button),active=button.getAttribute('aria-pressed')==='true';return s.backgroundColor===(active?'rgb(40, 93, 198)':'rgb(255, 255, 255)')&&s.color===(active?'rgb(255, 255, 255)':'rgb(0, 0, 0)')})"));
+                }
+                paintedScreenshot(scenario,"detail-tab-colors-"+theme);
+            }
         }
     }
 
@@ -1373,9 +1381,10 @@ public class AppSmokeTest {
                 waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='"+page+"'&&!document.getElementById('app').classList.contains('swipe-busy')");
                 evaluate(scenario,"window.__reviewHoldReads=true");nativePull(scenario);
                 waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='syncing'");
-                assertEquals("true",evaluate(scenario,"(()=>{const badge=document.querySelector('.cloud-sync-badge'),pull=document.querySelector('.pull-refresh');return document.body.classList.contains('motion-off')&&badge.dataset.source==='pull'&&getComputedStyle(badge.querySelector('svg')).animationName==='sync-spin'&&pull.dataset.state==='syncing'&&getComputedStyle(pull.querySelector('svg')).animationName==='sync-spin'})()"));
+                assertEquals("true",evaluate(scenario,"(()=>{const badge=document.querySelector('.cloud-sync-badge'),pull=document.querySelector('.pull-refresh');return document.body.classList.contains('motion-off')&&badge.dataset.source==='pull'&&getComputedStyle(badge.querySelector('svg')).animationName==='sync-spin'&&pull.dataset.state==='syncing'&&getComputedStyle(pull.querySelector('svg')).animationName==='sync-spin'&&getComputedStyle(pull).animationName==='pull-status-in'&&getComputedStyle(pull).transitionDuration.split(',').some(value=>parseFloat(value)>0)})()"));
                 evaluate(scenario,"window.__releaseReviewReads()");
                 waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='success'&&document.querySelector('.pull-refresh').dataset.state==='success'");
+                assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('.pull-refresh')).animationName==='pull-result-in'&&getComputedStyle(document.querySelector('.pull-refresh .sync-result-stroke')).animationName==='sync-draw'"));
                 assertEquals("true",evaluate(scenario,"(()=>{const b=document.querySelector('.sync-cloud-button'),r=b.getBoundingClientRect(),data=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));return r.width>=40&&r.height>=34&&r.right<=innerWidth&&getComputedStyle(b.querySelector('.cloud-sync-badge')).color==='rgb(22, 134, 82)'&&!data.defaults.motion&&!data.sync.auto&&window.__reviewWrites===0})()"));
                 assertEquals("true",evaluate(scenario,"(()=>{const b=document.querySelector('.sync-cloud-button'),cloud=b.querySelector('.cloud-icon>svg').getBoundingClientRect(),badge=b.querySelector('.cloud-sync-badge').getBoundingClientRect(),content=document.querySelector('#app .workspace .content');return window.__pullPaints.some(f=>f.y>15)&&getComputedStyle(content).transform==='none'&&badge.left>=cloud.left&&badge.right<=cloud.right&&badge.top>=cloud.top&&badge.bottom<=cloud.bottom&&document.getElementById('toast').textContent===window.__pullToastBefore})()"));
                 paintedScreenshot(scenario,"pull-sync-"+page);

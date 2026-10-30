@@ -73,15 +73,47 @@ async function main(){
   }
   checks.push({c,case:'metric-tabs-in-place'});
   await nav(page,'records');
-  const backgrounds=[];for(const tab of ['salary','entries']){await page.locator('#view-content .detail-tabs [data-tab='+tab+']').tap();await page.waitForTimeout(180);await contrast(page);backgrounds.push(await page.locator('#view-content .detail-tabs [data-tab='+tab+']').evaluate(node=>getComputedStyle(node).backgroundColor));}
-  assert.notEqual(backgrounds[0],backgrounds[1],'Salary periods and journal tabs must have distinct selected colors');await capture(page,c,'detail-tab-colors');
+  for(const tab of ['salary','entries']){
+   await page.locator('#view-content .detail-tabs [data-tab='+tab+']').tap();await page.waitForTimeout(180);await contrast(page);
+   const colors=await page.locator('#view-content .detail-tabs>button').evaluateAll(nodes=>nodes.map(node=>({selected:node.getAttribute('aria-pressed')==='true',background:getComputedStyle(node).backgroundColor,color:getComputedStyle(node).color})));
+   for(const color of colors)assert.deepEqual(color,color.selected?{selected:true,background:'rgb(40, 93, 198)',color:'rgb(255, 255, 255)'}:{selected:false,background:'rgb(255, 255, 255)',color:'rgb(0, 0, 0)'});
+  }
+  await capture(page,c,'detail-tab-colors');
   await page.locator('#view-content .detail-tabs [data-tab=salary]').tap();
   for(const [view,label] of [['home','账目月份'],['calendar','日历月份']]){await nav(page,view);await page.locator('#view-content [data-action=month-picker]').tap();await page.waitForSelector('.date-wheel-sheet');assert.equal(await page.locator('.date-wheel-sheet h3').innerText(),label);await page.locator('.date-sheet-actions [data-date-action=cancel]').tap();await page.waitForFunction(()=>!document.querySelector('#modal-root .modal'));}
   assert.equal(await page.evaluate(()=>localStorage.getItem('dagongren.paybook.v1')),original,'UI review must not change the ledger');checks.push({c,case:'detail-tab-colors-context-month-names'});await nav(page,'home');
  }
 
+ async function feedbackAndPullReview(page,c){
+  const beforeBook=await page.evaluate(()=>localStorage.getItem('dagongren.paybook.v1'));
+  for(const reduced of ['no-preference','reduce']){
+   await page.emulateMedia({reducedMotion:reduced});
+   const states=await page.evaluate(()=>{
+    const node=document.querySelector('.pull-refresh'),saved={hidden:node.hidden,state:node.dataset.state};node.hidden=false;
+    const values=[];for(const state of ['syncing','success','error','attention','hidden','pulling']){node.dataset.state=state;const style=getComputedStyle(node);values.push({state,animation:style.animationName,transition:style.transitionDuration,spinner:node.querySelector('.sync-spinner')?getComputedStyle(node.querySelector('.sync-spinner')).animationName:null});}
+    node.dataset.state=saved.state;node.hidden=saved.hidden;return values;
+   });
+   for(const state of states){
+    const animation=state.state==='syncing'?'pull-status-in':['success','error','attention'].includes(state.state)?'pull-result-in':'none';
+    assert.equal(state.animation,reduced==='reduce'?'none':animation,'Pull popup animation must be independent from app motion: '+JSON.stringify({c,reduced,state}));
+    assert(reduced==='reduce'?state.transition.split(',').every(value=>parseFloat(value)===0):state.transition.split(',').some(value=>parseFloat(value)>0));
+   }
+  }
+  await page.emulateMedia({reducedMotion:'no-preference'});checks.push({c,case:'pull-popup-independent-motion-and-system-reduction'});
+  await nav(page,'settings');await page.locator('#view-content .setting-row[data-action=salary-settings]').filter({hasText:'固定月薪'}).tap();await page.locator('[data-date-for=payday]').tap();await animations(page);await part(page,'day','1');
+  const before=await page.evaluate(()=>window.__feedback.length),delays=[90,60,20,16,8,8,16,40,80];
+  for(let i=0;i<delays.length;i++){
+   await page.locator('.date-wheel-scroll').evaluate((node,index)=>{node.dispatchEvent(new Event('wheel'));node.scrollTo({top:index*node.firstElementChild.getBoundingClientRect().height,behavior:'instant'});node.dispatchEvent(new Event('scroll'));},i+1);
+   await page.waitForFunction(day=>document.querySelector('.date-wheel-sheet').dataset.selectedDay===String(day),i+2);await page.waitForTimeout(delays[i]);
+  }
+  await page.waitForTimeout(220);const feedback=await page.evaluate(before=>window.__feedback.slice(before),before);assert.equal(feedback.length,delays.length);assert(feedback.every(event=>event.sound),'Every centered date value must get one sound at both slow and fast speeds');
+  const stopped=await page.evaluate(()=>window.__feedback.length);await page.waitForTimeout(240);assert.equal(await page.evaluate(()=>window.__feedback.length),stopped,'Sounds must stop with the wheel');await part(page,'day','20');assert.equal(await page.evaluate(()=>window.__feedback.length),stopped,'Programmatic repositioning stays silent');
+  await page.locator('.date-sheet-actions [data-date-action=cancel]').tap();await close(page);assert.equal(await page.evaluate(()=>localStorage.getItem('dagongren.paybook.v1')),beforeBook);checks.push({c,case:'one-sound-per-wheel-value-at-changing-speeds'});await nav(page,'home');
+ }
+
  async function run(c){const {context,page}=await start(c);try{
   await deviceFeedbackReview(page,c);
+  await feedbackAndPullReview(page,c);
   const heroColor=await page.locator('#view-content .balance-primary>strong').evaluate(node=>getComputedStyle(node).color);
   await open(page,'subsidy');await page.locator('#subsidy-form [name=amount]').fill('120.99');await page.locator('#adjustment-category').evaluate(node=>{node.value='餐补';node.dispatchEvent(new Event('change',{bubbles:true}));});await page.locator('.modal-footer button[type=submit]').tap();await page.waitForFunction(()=>!document.querySelector('#subsidy-form'));
   if(c.motion)await page.waitForSelector('#view-content .balance-primary .number-roll-strip');
