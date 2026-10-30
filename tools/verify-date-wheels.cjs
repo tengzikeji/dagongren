@@ -45,7 +45,8 @@ async function main(){
  async function capture(page,c,name){await page.screenshot({path:path.join(out,c.width+'-'+c.theme+'-'+(c.motion?'on':'off')+'-'+name+'.png')});}
  async function swipe(page,selector,direction,vertical=false){
   const locator=page.locator(selector);await locator.scrollIntoViewIfNeeded();const box=await locator.boundingBox(),size=page.viewportSize(),x=vertical?box.x+box.width/2:direction>0?Math.min(size.width-20,box.x+box.width-8):Math.max(20,box.x+8),y=Math.max(15,Math.min(size.height-135,box.y+box.height/2)),toX=vertical?x:Math.max(12,Math.min(size.width-12,x+(direction>0?-1:1)*size.width*.6)),toY=vertical?y-90:y;
-  const session=await page.context().newCDPSession(page);await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});for(let n=1;n<=10;n++){await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+(toX-x)*n/10,y:y+(toY-y)*n/10}]});await page.waitForTimeout(15);}await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await session.detach();await page.waitForTimeout(450);
+  const steps=!vertical&&Math.abs(toX-x)<size.width/5?3:10,delay=steps===3?5:15;
+  const session=await page.context().newCDPSession(page);await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});for(let n=1;n<=steps;n++){await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+(toX-x)*n/steps,y:y+(toY-y)*n/steps}]});await page.waitForTimeout(delay);}await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await session.detach();await page.waitForTimeout(450);
  }
  async function run(c){const {context,page}=await start(c);try{
   const heroColor=await page.locator('#view-content .balance-primary>strong').evaluate(node=>getComputedStyle(node).color);
