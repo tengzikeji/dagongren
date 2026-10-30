@@ -21,3 +21,14 @@ export function recordRangeLabel(range,year){
  if(range.start.slice(0,7)===range.end.slice(0,7)&&range.start.endsWith('-01')&&Number(range.end.slice(8))===daysInMonth(range.end.slice(0,7)))return Number(range.start.slice(5,7))+'月';
  return range.start.slice(5).replace('-','/')+'—'+range.end.slice(5).replace('-','/');
 }
+export function shiftRecordRangeYear(range,year){
+ recordDefaultRange(year);
+ const move=date=>{const month=year+date.slice(4,7);return month+'-'+String(Math.min(Number(date.slice(8)),daysInMonth(month))).padStart(2,'0');};
+ if(!range||!validDate(range.start)||!validDate(range.end))return null;
+ return {start:move(range.start),end:move(range.end)};
+}
+export function shiftRecordYearState(year,ranges={},entryMonthScope=''){
+ recordDefaultRange(year);const next={};
+ for(const kind of ['salary','entries']){const range=shiftRecordRangeYear(ranges[kind],year);next[kind]=range&&!recordRangeIsDefault(range,year)?range:null;}
+ return {recordYear:year,recordDateRanges:next,entryMonthScope:validMonth(entryMonthScope)?year+entryMonthScope.slice(4):''};
+}

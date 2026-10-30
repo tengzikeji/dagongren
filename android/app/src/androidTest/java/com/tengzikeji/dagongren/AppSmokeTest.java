@@ -116,19 +116,24 @@ public class AppSmokeTest {
         }finally{evaluate(scenario,"for(const a of window.__captureInfiniteAnimations||[])a.play();window.__captureInfiniteAnimations=[]");}
     }
 
+    private void selectWheelPart(ActivityScenario<MainActivity> scenario,String part,String value) throws Exception {
+        String number=String.valueOf(Integer.parseInt(value));Thread.sleep(160);
+        assertEquals("true",evaluate(scenario,"(()=>{const node=document.querySelector('.date-wheel-scroll[data-wheel-part=\""+part+"\"]');if(!node)return false;const rows=[...node.children],index=rows.findIndex(row=>row.dataset.wheelValue==='"+number+"');if(index<0||rows[index].getAttribute('aria-disabled')==='true')return false;node.scrollTo({top:index*rows[0].getBoundingClientRect().height,behavior:'instant'});node.dispatchEvent(new Event('scroll'));return true})()"));
+        waitTrue(scenario,"document.querySelector('.date-wheel-sheet')?.dataset['selected'+('"+part+"'[0].toUpperCase()+'"+part+"'.slice(1))]==='"+number+"'");Thread.sleep(180);
+    }
     private void selectCalendarMonth(ActivityScenario<MainActivity> scenario,String month) throws Exception {
-        evaluate(scenario,"document.querySelector('[data-action=month-picker]').click();var targetYear=Number('"+month+"'.slice(0,4));for(let n=0;n<25;n++){const current=parseInt(document.querySelector('.month-year span').textContent);if(current===targetYear)break;document.querySelector('[data-action=picker-year][data-delta=\"'+(current>targetYear?'-1':'1')+'\"]').click();}document.querySelector('[data-action=choose-month][data-month=\""+month+"\"]').click()");
+        evaluate(scenario,"document.querySelector('#app [data-action=month-picker]').click()");
+        waitTrue(scenario,"document.querySelectorAll('.date-wheel-scroll').length===2");selectWheelPart(scenario,"year",month.substring(0,4));selectWheelPart(scenario,"month",month.substring(5,7));
+        tapControl(scenario,".date-sheet-actions [data-date-action=confirm]");waitTrue(scenario,"!document.querySelector('#modal-root .modal')");
+    }
+    private void selectRecordYear(ActivityScenario<MainActivity> scenario,String year) throws Exception {
+        tapControl(scenario,"#app .record-year-trigger");waitTrue(scenario,"Boolean(document.querySelector('.date-wheel-sheet[data-wheel-kind=year]'))");selectWheelPart(scenario,"year",year);tapControl(scenario,".date-sheet-actions [data-date-action=confirm]");waitTrue(scenario,"!document.querySelector('#modal-root .modal')");
     }
     private void pickRecordDate(ActivityScenario<MainActivity> scenario,String id,String date) throws Exception {
-        tapControl(scenario,"[data-date-for=\""+id+"\"]");
-        waitTrue(scenario,"Boolean(document.querySelector('.record-date-sheet'))");
-        tapControl(scenario,".record-date-sheet [data-date-action=years]");
-        assertEquals("70",evaluate(scenario,"document.querySelectorAll('.date-years button').length"));
-        tapControl(scenario,"[data-date-year-value=\""+date.substring(0,4)+"\"]");
-        tapControl(scenario,"[data-date-month-value=\""+date.substring(0,7)+"\"]");
-        tapControl(scenario,".date-days [data-date-value=\""+date+"\"]");
-        tapControl(scenario,".date-sheet-actions [data-date-action=confirm]");
-        waitTrue(scenario,"!document.querySelector('.record-date-sheet')");
+        tapControl(scenario,"[data-date-for=\""+id+"\"]");waitTrue(scenario,"document.querySelectorAll('.date-wheel-scroll').length===3");
+        assertEquals("70",evaluate(scenario,"document.querySelectorAll('.date-wheel-scroll[data-wheel-part=year] [role=option]').length"));
+        selectWheelPart(scenario,"year",date.substring(0,4));selectWheelPart(scenario,"month",date.substring(5,7));selectWheelPart(scenario,"day",date.substring(8));
+        tapControl(scenario,".date-sheet-actions [data-date-action=confirm]");waitTrue(scenario,"!document.querySelector('.record-date-sheet')");
         assertEquals("\""+date+"\"",evaluate(scenario,"document.getElementById('"+id+"').value"));
     }
     private void seedEntryDateReview(ActivityScenario<MainActivity> scenario) throws Exception {
@@ -167,8 +172,7 @@ public class AppSmokeTest {
             for(String kind:new String[]{"advance","payment"}){
                 evaluate(scenario,"document.querySelector('#app [data-action=record-entry]').click();document.querySelector('[data-kind="+kind+"]').click();document.getElementById('cash-amount').value='123.45';document.getElementById('cash-amount').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('cash-note').value='收款草稿保留';window.__cashInterval={start:document.getElementById('cash-period').selectedOptions[0].dataset.start,end:document.getElementById('cash-period').selectedOptions[0].dataset.end};window.__cashBook=localStorage.getItem('dagongren.paybook.v1')");
                 tapControl(scenario,"[data-date-for=cash-date]");
-                tapControl(scenario,"[data-date-action=years]");
-                assertEquals("true",evaluate(scenario,"document.querySelector('[data-date-year-value=\"2089\"]').disabled&&!document.querySelector('[data-date-year-value=\"2020\"]').disabled"));
+                assertEquals("true",evaluate(scenario,"document.querySelector('.date-wheel-scroll[data-wheel-part=year] [data-wheel-value=\"2089\"]').getAttribute('aria-disabled')==='true'&&document.querySelector('.date-wheel-scroll[data-wheel-part=year] [data-wheel-value=\"2020\"]').getAttribute('aria-disabled')==='false'"));
                 pressAppBack(scenario);
                 assertEquals("true",evaluate(scenario,"Boolean(document.getElementById('"+kind+"-form'))&&!document.querySelector('.record-date-sheet')&&window.__cashBook===localStorage.getItem('dagongren.paybook.v1')"));
                 pickRecordDate(scenario,"cash-date","2024-02-29");
@@ -184,7 +188,7 @@ public class AppSmokeTest {
     @Test public void recordDateFiltersResetIndependentlyAndKeepLedger() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             seedEntryDateReview(scenario);
-            evaluate(scenario,"document.querySelector('[data-view=records]').click();document.querySelector('[data-action=record-year-picker]').click();document.querySelector('[data-action=choose-record-year][data-year=\"2024\"]').click();window.__filterBook=localStorage.getItem('dagongren.paybook.v1')");
+            evaluate(scenario,"document.querySelector('[data-view=records]').click()");selectRecordYear(scenario,"2024");evaluate(scenario,"window.__filterBook=localStorage.getItem('dagongren.paybook.v1')");
             assertEquals("\"已发\"",evaluate(scenario,"document.querySelector('[data-action=filter][data-filter=paid]').textContent"));
             assertEquals("true",evaluate(scenario,"document.querySelector('.salary-filters').lastElementChild.dataset.action==='record-date-filter'&&document.querySelector('[data-action=reset-record-date-filter]').disabled"));
             tapControl(scenario,"[data-action=record-date-filter]");
@@ -212,6 +216,73 @@ public class AppSmokeTest {
             assertEquals("1",evaluate(scenario,"document.querySelectorAll('#view-content .salary-record-list .month-pay-card').length"));
             tapControl(scenario,"[data-action=reset-record-date-filter]");
             assertEquals("true",evaluate(scenario,"document.querySelectorAll('#view-content .salary-record-list .month-pay-card').length>1&&window.__filterBook===localStorage.getItem('dagongren.paybook.v1')&&document.documentElement.scrollWidth<=innerWidth"));
+        }
+    }
+
+    @Test public void dateWheelPreferencesPersistAndVerticalWheelStaysInsideDialog() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            seedEntryDateReview(scenario);
+            evaluate(scenario,"document.querySelector('[data-view=settings]').click();window.__preferenceBook=localStorage.getItem('dagongren.paybook.v1')");
+            assertEquals("true",evaluate(scenario,"document.querySelector('#view-content').textContent.includes('个人偏好')&&!document.querySelector('#view-content').textContent.includes('显示偏好')"));
+            tapControl(scenario,"[data-action=toggle-date-sound]");tapControl(scenario,"[data-action=toggle-date-haptic]");
+            assertEquals("true",evaluate(scenario,"(()=>{const p=JSON.parse(localStorage.getItem('dagongren.date-feedback.v1'));return p.sound===false&&p.haptic===false&&window.__preferenceBook===localStorage.getItem('dagongren.paybook.v1')})()"));
+            evaluate(scenario,"document.querySelector('[data-action=company-settings]').click();window.__joinBefore=document.getElementById('join-date').value");
+            tapControl(scenario,"[data-date-for=join-date]");
+            assertEquals("3",evaluate(scenario,"document.querySelectorAll('.date-wheel-scroll').length"));
+            JSONObject rect=controlRect(scenario,".date-wheel-scroll[data-wheel-part=month]");int[] origin=new int[2];float[] density=new float[1];assertTrue(withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(origin);density[0]=activity.getResources().getDisplayMetrics().density;}));
+            int x=origin[0]+Math.round((float)((rect.getDouble("left")+rect.getDouble("right"))/2)*density[0]),y=origin[1]+Math.round((float)rect.getDouble("y")*density[0]);
+            evaluate(scenario,"window.__wheelBefore=document.querySelector('.date-wheel-sheet').dataset.wheelValue");
+            assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(x,y+Math.round(45*density[0]),x,y-Math.round(45*density[0]),30));
+            waitTrue(scenario,"document.querySelector('.date-wheel-sheet').dataset.wheelValue!==window.__wheelBefore");
+            assertEquals("true",evaluate(scenario,"document.querySelector('#app .bottom-nav [aria-current=page]').dataset.view==='settings'&&Boolean(document.querySelector('.date-wheel-sheet'))&&document.documentElement.scrollWidth<=innerWidth"));
+            paintedScreenshot(scenario,"date-wheel-vertical-native");pressAppBack(scenario);
+            assertEquals("true",evaluate(scenario,"document.getElementById('join-date').value===window.__joinBefore&&window.__preferenceBook===localStorage.getItem('dagongren.paybook.v1')"));
+            evaluate(scenario,"document.querySelector('.modal-close').click()");scenario.recreate();waitReady(scenario);evaluate(scenario,"document.querySelector('[data-view=settings]').click()");
+            assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=toggle-date-sound]').getAttribute('aria-checked')==='false'&&document.querySelector('[data-action=toggle-date-haptic]').getAttribute('aria-checked')==='false'"));
+            paintedScreenshot(scenario,"personal-date-preferences");
+        }
+    }
+    @Test public void journalFilterRowsAcceptNativeHorizontalSwipesWithoutChangingFilters() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            seedEntryDateReview(scenario);evaluate(scenario,"document.querySelector('[data-view=records]').click()");selectRecordYear(scenario,"2024");
+            evaluate(scenario,"document.querySelector('#view-content [data-action=detail-tab][data-tab=entries]').click();document.querySelector('#view-content [data-action=entry-filter][data-filter=subsidy]').click();window.__swipeFilterBook=localStorage.getItem('dagongren.paybook.v1')");
+            swipeFromControl(scenario,"#view-content .journal-filters",1);waitTrue(scenario,"document.querySelector('#app .bottom-nav [aria-current=page]').dataset.view==='settings'&&!document.querySelector('.page-swipe-layer')");
+            evaluate(scenario,"document.querySelector('#app .bottom-nav [data-view=records]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            swipeFromControl(scenario,"#view-content [data-action=record-date-filter]",-1);waitTrue(scenario,"document.querySelector('#app .bottom-nav [aria-current=page]').dataset.view==='calendar'&&!document.querySelector('.page-swipe-layer')");
+            assertEquals("false",evaluate(scenario,"Boolean(document.querySelector('#modal-root .modal'))"));
+            evaluate(scenario,"document.querySelector('#app .bottom-nav [data-view=records]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            assertEquals("true",evaluate(scenario,"document.querySelector('#view-content [data-action=entry-filter][data-filter=subsidy]').getAttribute('aria-pressed')==='true'&&window.__swipeFilterBook===localStorage.getItem('dagongren.paybook.v1')"));
+            tapControl(scenario,"#view-content [data-action=entry-filter][data-filter=all]");assertEquals("true",evaluate(scenario,"document.querySelector('#view-content [data-action=entry-filter][data-filter=all]').getAttribute('aria-pressed')==='true'"));
+            tapControl(scenario,"#view-content [data-action=record-date-filter]");waitTrue(scenario,"Boolean(document.getElementById('record-date-filter-form'))");
+        }
+    }
+    @Test public void recordYearAndBothDateFiltersShareYearAndKeepDraftCancellation() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            seedEntryDateReview(scenario);evaluate(scenario,"document.querySelector('[data-view=records]').click()");selectRecordYear(scenario,"2024");evaluate(scenario,"window.__linkedYearBook=localStorage.getItem('dagongren.paybook.v1')");
+            tapControl(scenario,"#view-content [data-action=record-date-filter]");pickRecordDate(scenario,"record-range-end","2024-02-29");tapControl(scenario,".modal-footer button[type=submit]");
+            tapControl(scenario,"#view-content [data-action=detail-tab][data-tab=entries]");tapControl(scenario,"#view-content [data-action=record-date-filter]");tapControl(scenario,"[data-date-for=record-range-year]");selectWheelPart(scenario,"year","2025");tapControl(scenario,".date-sheet-actions [data-date-action=confirm]");
+            assertEquals("true",evaluate(scenario,"document.getElementById('record-range-start').value==='2025-01-01'&&document.getElementById('record-range-end').value==='2025-12-31'&&document.querySelector('#app .record-year-trigger').textContent.includes('2024')"));
+            evaluate(scenario,"document.querySelector('.modal-close').click()");assertEquals("true",evaluate(scenario,"document.querySelector('#app .record-year-trigger').textContent.includes('2024')"));
+            tapControl(scenario,"#view-content [data-action=record-date-filter]");tapControl(scenario,"[data-date-for=record-range-year]");selectWheelPart(scenario,"year","2025");tapControl(scenario,".date-sheet-actions [data-date-action=confirm]");tapControl(scenario,".modal-footer button[type=submit]");
+            assertEquals("true",evaluate(scenario,"document.querySelector('#app .record-year-trigger').textContent.includes('2025')"));
+            tapControl(scenario,"#view-content [data-action=detail-tab][data-tab=salary]");tapControl(scenario,"#view-content [data-action=record-date-filter]");
+            assertEquals("true",evaluate(scenario,"document.getElementById('record-range-year').value==='2025'&&document.getElementById('record-range-end').value==='2025-02-28'"));
+            paintedScreenshot(scenario,"linked-year-date-filter");evaluate(scenario,"document.querySelector('.modal-close').click()");selectRecordYear(scenario,"2026");tapControl(scenario,"#view-content [data-action=record-date-filter]");
+            assertEquals("true",evaluate(scenario,"document.getElementById('record-range-start').value==='2026-01-01'&&document.getElementById('record-range-end').value==='2026-02-28'&&window.__linkedYearBook===localStorage.getItem('dagongren.paybook.v1')"));
+        }
+    }
+
+    @Test public void pendingWageDigitsKeepTheirColorWhileRollingAcrossThemes() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            seedEntryDateReview(scenario);
+            for(String theme:new String[]{"light","dark"}){
+                evaluate(scenario,"localStorage.setItem('dagongren.theme.v1','"+theme+"')");scenario.recreate();waitReady(scenario);
+                evaluate(scenario,"window.__pendingColor=getComputedStyle(document.querySelector('#view-content .balance-primary>strong')).color;document.querySelector('#app [data-action=record-entry]').click();document.querySelector('[data-kind=subsidy]').click();document.querySelector('#subsidy-form [name=amount]').value='12.34';document.getElementById('adjustment-category').value='餐补'");
+                tapControl(scenario,".modal-footer button[type=submit]");waitTrue(scenario,"Boolean(document.querySelector('#view-content .balance-primary .number-roll-strip'))");
+                assertEquals("true",evaluate(scenario,"(()=>{const root=document.querySelector('#view-content .balance-primary>strong'),animations=root.getAnimations({subtree:true});for(const a of animations)a.pause();let stable=true;for(const p of [0,.2,.5,.8,1]){for(const a of animations)a.currentTime=a.effect.getTiming().duration*p;for(const node of [root,...root.querySelectorAll('.number-roll-anchor,.number-roll,.number-roll-slot,.number-roll-strip,.number-roll-strip>span')])if(getComputedStyle(node).color!==window.__pendingColor)stable=false;}for(const a of animations)a.play();return stable})()"));
+                waitTrue(scenario,"!document.querySelector('#view-content .balance-primary .number-roll-strip')");
+                assertEquals("true",evaluate(scenario,"getComputedStyle(document.querySelector('#view-content .balance-primary>strong')).color===window.__pendingColor"));
+            }
         }
     }
 
@@ -518,7 +589,7 @@ public class AppSmokeTest {
             waitTrueLoading(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1),page=document.querySelector('.launch-page'),scene=document.querySelector('.launch-scene');if(!entry||!page||!scene)return false;window.__launchObserved=entry.detail;window.__launchObservedColors=[getComputedStyle(page).backgroundColor,getComputedStyle(scene).backgroundColor];if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];window.__launchContentSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='content-fading'){window.__launchContentSamples.push({opacity:Number(getComputedStyle(page).opacity),contentOpacity:Number(getComputedStyle(page.querySelector('.launch-scene')).opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity)})}if(page.dataset.phase==='fading'){const rect=page.getBoundingClientRect(),style=getComputedStyle(page);window.__launchBlendSamples.push({opacity:Number(style.opacity),contentOpacity:Number(getComputedStyle(page.querySelector('.launch-scene')).opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height,left:rect.left,top:rect.top,transform:style.transform,radius:style.borderRadius})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
             assertEquals("1",evaluateLoading(scenario,"window.__launchObserved.surfaces"));
             assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertFalse(activity.hasBitmapLaunchCover());assertTrue(activity.getWindow().getDecorView().isHardwareAccelerated());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
-            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.11'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface&&window.__launchObserved.strokeRenderer==='transform-clips'&&window.__launchObserved.appReleaseDelay===2100"));
+            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.12'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface&&window.__launchObserved.strokeRenderer==='transform-clips'&&window.__launchObserved.appReleaseDelay===2100"));
             assertEquals("false",evaluateLoading(scenario,"window.__launchObserved.oldBrand"));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObservedColors.length===2&&window.__launchObservedColors.every(color=>color==='"+(dark?"rgb(16, 24, 39)":"rgb(243, 245, 249)")+"')"));
             assertEquals("true",evaluateLoading(scenario,"!document.querySelector('.launch-edition')&&window.__launchObserved.animationNames.includes('launch-content-in')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false"));
@@ -647,7 +718,7 @@ public class AppSmokeTest {
             assertEquals("true",evaluate(scenario,"document.querySelector('.month-display').textContent===window.__beforeSwipe"));
             paintedScreenshot(scenario,"calendar-stable");
             evaluate(scenario,"document.querySelector('[data-view=records]').click();document.querySelector('[data-action=record-year-picker]').click()");
-            waitTrue(scenario,"Boolean(document.querySelector('.record-year-options'))");
+            waitTrue(scenario,"Boolean(document.querySelector('.date-wheel-sheet[data-wheel-kind=year]'))");
             paintedScreenshot(scenario,"record-year-picker");
             assertEquals("true",evaluate(scenario,"document.querySelector('.record-year-option[aria-pressed=false]').click();"+rollingLayoutCheck(".ledger-secondary .number")));
             evaluate(scenario,"document.querySelector('[data-action=detail-tab][data-tab=entries]').click()");
@@ -722,7 +793,7 @@ public class AppSmokeTest {
                     waitTrue(scenario,"document.querySelector('.bottom-nav [aria-current=page]').dataset.view==='records'&&!document.querySelector('.page-swipe-layer')");
                     assertEquals("true",evaluate(scenario,"document.querySelector('#app .record-year-trigger').textContent===window.__controlYear"));
                 }
-                tapControl(scenario,"#app .record-year-trigger");waitTrue(scenario,"Boolean(document.querySelector('.record-year-options'))");
+                tapControl(scenario,"#app .record-year-trigger");waitTrue(scenario,"Boolean(document.querySelector('.date-wheel-sheet[data-wheel-kind=year]'))");
                 evaluate(scenario,"globalThis.dagongrenBack()");waitTrue(scenario,"!document.querySelector('#modal-root .modal-overlay')");
                 assertEquals("true",evaluate(scenario,"localStorage.getItem('dagongren.paybook.v1')===window.__controlBook"));
                 evaluate(scenario,"document.querySelector('.bottom-nav [data-view=home]').click()");
@@ -792,7 +863,7 @@ public class AppSmokeTest {
     @Test public void calendarPushFinishesTogetherAcrossFourFiveSixWeeks() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
-            evaluate(scenario,"document.querySelector('[data-view=calendar]').click();document.querySelector('[data-action=month-picker]').click();while(!document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]')){const y=parseInt(document.querySelector('.month-year span').textContent);document.querySelector('[data-action=picker-year][data-delta=\"'+(y<2027?1:-1)+'\"]').click()}document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]').click()");
+            evaluate(scenario,"document.querySelector('[data-view=calendar]').click()");selectCalendarMonth(scenario,"2027-02");
             assertEquals("28",evaluate(scenario,"document.querySelector('#app .calendar-days').children.length"));
             assertEquals("true",evaluate(scenario,"window.__reviewPush=(selector,delta,type)=>{\n const host=document.querySelector(selector),r=host.getBoundingClientRect(),viewport=type==='page'?document.documentElement:host.closest('.calendar-grid-viewport'),width=viewport.clientWidth,x=innerWidth*.5,y=Math.max(5,Math.min(innerHeight-120,r.top+25));\n const dispatch=(name,x,t)=>{const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerId:709,pointerType:'mouse',isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});host.dispatchEvent(e);};\n const nav=document.querySelector('.bottom-nav'),navRect=nav.getBoundingClientRect();dispatch('pointerdown',x,1000);dispatch('pointermove',x-delta*width*.55,2000);dispatch('pointerup',x-delta*width*.55,2400);\n const track=document.querySelector(type==='page'?'.page-swipe-track':'.calendar-swipe-track');if(!track)return false;\n const a=track.getAnimations()[0],out=track.children[0],next=track.children[1];if(!a)return false;a.pause();let samples=[];\n for(const progress of [0,.25,.5,.75,1]){a.currentTime=a.effect.getTiming().duration*progress;\n  const o=out.getBoundingClientRect(),n=next.getBoundingClientRect(),bar=nav.getBoundingClientRect(),v=type==='page'?{left:0,right:innerWidth}:viewport.getBoundingClientRect();\n  samples.push({progress,gap:Math.abs((n.left-o.left)-delta*width),navStable:document.querySelector('.bottom-nav')===nav&&Math.abs(bar.top-navRect.top)<.5&&getComputedStyle(nav).opacity==='1'&&getComputedStyle(nav).visibility==='visible'&&getComputedStyle(nav).backdropFilter==='none',transparent:[...track.querySelectorAll('.balance-primary,.balance-primary .number,.balance-primary .number span')].every(e=>getComputedStyle(e).backgroundColor==='rgba(0, 0, 0, 0)'),end:progress!==1||(Math.abs(n.left-v.left)<.6&&(delta>0?o.right<=v.left+.6:o.left>=v.right-.6)),navOutside:type!=='page'||track.parentElement.getBoundingClientRect().bottom<=navRect.top+.6});\n }\n window.__pushSamples=samples;window.__heldPush=a;window.__heldHeight=null;a.currentTime=a.effect.getTiming().duration*.5;\n return samples.every(s=>s.gap<.6&&s.navStable&&s.transparent&&s.end&&s.navOutside);\n};true"));
             for(int direction:new int[]{1,1,1,-1,-1,-1}){
@@ -981,7 +1052,7 @@ public class AppSmokeTest {
     @Test public void calendarDateAreaFollowsFingerAndInterpolatesHeight() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);assertEquals("true",evaluate(scenario,"window.__dragInput=(name,x,y,t,selector)=>{if(name==='pointerdown')window.__dragNode=document.querySelector(selector);const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:771,isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});window.__dragNode.dispatchEvent(e);};window.__nextFrames=()=>{window.__framesReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>window.__framesReady=true));};true"));
-            evaluate(scenario,"document.querySelector('[data-view=calendar]').click();document.querySelector('[data-action=month-picker]').click();while(!document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]')){const y=parseInt(document.querySelector('.month-year span').textContent);document.querySelector('[data-action=picker-year][data-delta=\"'+(y<2027?1:-1)+'\"]').click()}document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]').click()");
+            evaluate(scenario,"document.querySelector('[data-view=calendar]').click()");selectCalendarMonth(scenario,"2027-02");
             evaluate(scenario,"window.__dragInput('pointerdown',250,200,0,'.calendar-panel-header');window.__dragInput('pointermove',230,200,1000);window.__dragInput('pointerup',230,200,1400)");
             waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')");
             assertEquals("true",evaluate(scenario,"!document.querySelector('.calendar-swipe-track')&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2027-02'"));
@@ -1024,7 +1095,7 @@ public class AppSmokeTest {
                 paintedScreenshot(scenario,"theme-"+theme+"-profile");
             evaluate(scenario,"document.querySelector('.app-info-footer').scrollIntoView({block:'center',behavior:'instant'})");
             waitTrue(scenario,"!document.getElementById('toast').classList.contains('show')");
-            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.11 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.12 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
                 paintedScreenshot(scenario,"theme-"+theme+"-copyright");
             evaluate(scenario,"document.querySelector('#app .profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 swipeRegion(scenario,".employment-progress",-1);

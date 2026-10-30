@@ -111,7 +111,7 @@ function snapshotFinalNumbers(source){
 }
 export function closeChoicePicker(){
  if(!uiActiveChoice)return false;const {panel,children,trigger,modal}=uiActiveChoice;uiActiveChoice=null;panel.remove();modal.classList.remove('choosing','record-date-choosing');
- for(const child of children){child.inert=false;child.removeAttribute('aria-hidden');}trigger?.focus({preventScroll:true});return true;
+ for(const child of children){child.inert=false;child.removeAttribute('aria-hidden');}trigger?.focus({preventScroll:true});panel.onDateWheelClose?.();return true;
 }
 export function openChoicePanel(root,trigger,panel){
  closeChoicePicker();const modal=root.querySelector('.modal');if(!modal)return false;

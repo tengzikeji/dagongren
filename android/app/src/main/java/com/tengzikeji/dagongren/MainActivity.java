@@ -5,9 +5,13 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.provider.Settings;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -47,6 +51,7 @@ public final class MainActivity extends Activity {
     private boolean firstLaunchFramePresented;
     private int systemBarIconUpdates;
     private Integer paintedWindowColor;
+    private long lastDateWheelFeedback;
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
@@ -229,6 +234,21 @@ public final class MainActivity extends Activity {
         runOnUiThread(()->{if(!isDestroyed())webView.evaluateJavascript("globalThis.dagongrenNativeResult && globalThis.dagongrenNativeResult("+JSONObject.quote(id)+","+result+");",null);});
     }
     public final class NativeFiles {
+        @JavascriptInterface public void dateWheelFeedback(boolean sound,boolean haptic){
+            runOnUiThread(()->{
+                if(isDestroyed()||isFinishing()||webView==null||!webView.hasWindowFocus())return;
+                long now=SystemClock.uptimeMillis();if(now-lastDateWheelFeedback<55)return;lastDateWheelFeedback=now;
+                if(haptic){
+                    boolean performed=false;
+                    if(Build.VERSION.SDK_INT>=34)performed=webView.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK);
+                    if(!performed)webView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+                }
+                if(sound){
+                    AudioManager audio=(AudioManager)getSystemService(AUDIO_SERVICE);
+                    if(audio!=null&&audio.getRingerMode()==AudioManager.RINGER_MODE_NORMAL&&Settings.System.getInt(getContentResolver(),Settings.System.SOUND_EFFECTS_ENABLED,1)!=0&&audio.getStreamVolume(AudioManager.STREAM_SYSTEM)>0)audio.playSoundEffect(AudioManager.FX_KEY_CLICK,.16f);
+                }
+            });
+        }
         @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
         @JavascriptInterface public boolean nativeLaunchPage(){return false;}
         @JavascriptInterface public void motionStyle(boolean enabled){
