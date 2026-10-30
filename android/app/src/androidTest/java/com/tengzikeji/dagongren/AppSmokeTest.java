@@ -203,6 +203,7 @@ public class AppSmokeTest {
             tapControl(scenario,".modal-footer button[type=submit]");
             waitTrue(scenario,"document.querySelectorAll('#view-content .ledger-group .ledger-entry').length===1");
             assertEquals("true",evaluate(scenario,"document.querySelector('#view-content .ledger-group').textContent.includes('二月餐补')&&!document.querySelector('#view-content .ledger-group').textContent.includes('一月餐补')"));
+            assertEquals("true",evaluate(scenario,"(()=>{const b=document.querySelector('#view-content .record-range-trigger'),r=b.getBoundingClientRect();return [...b.children].every(e=>{const c=e.getBoundingClientRect();return c.left>=r.left-1&&c.right<=r.right+1})})()"));
             paintedScreenshot(scenario,"entry-filter-range");
             tapControl(scenario,"[data-action=reset-record-date-filter]");
             waitTrue(scenario,"document.querySelectorAll('#view-content .ledger-group .ledger-entry').length===2");
