@@ -295,7 +295,10 @@ public class AppSmokeTest {
             assertEquals("true",evaluate(scenario,"document.documentElement.scrollWidth<=innerWidth"));
             waitTrue(scenario,"[...document.querySelectorAll('#app .data-chart *')].flatMap(e=>e.getAnimations()).every(a=>a.playState==='finished')");
             paintedScreenshot(scenario,"charts-home");
-            evaluate(scenario,"document.querySelector('[data-action=home-period-picker]').click();document.querySelector('[data-action=choose-home-period][data-month=\"2026-09\"]').click();document.querySelector('.month-account-head [data-metric=earned]').click()");
+            evaluate(scenario,"document.querySelector('[data-action=home-period-picker]').click()");
+            selectWheelPart(scenario,"year","2026");selectWheelPart(scenario,"month","9");tapControl(scenario,".date-sheet-actions [data-date-action=confirm]");
+            waitTrue(scenario,"!document.querySelector('#modal-root .modal')&&document.querySelector('.month-account').dataset.start==='2026-09-21'");
+            evaluate(scenario,"document.querySelector('.month-account-head [data-metric=earned]').click()");
             assertEquals("600001",evaluate(scenario,"Number(document.querySelector('.metric-total').dataset.total)"));
             assertEquals("true",evaluate(scenario,"document.querySelector('.metric-scope').textContent.includes('2026/09/21 — 2026/10/20')"));
             evaluate(scenario,"document.querySelector('.modal-close').click()");
@@ -720,7 +723,9 @@ public class AppSmokeTest {
             evaluate(scenario,"document.querySelector('[data-view=records]').click();document.querySelector('[data-action=record-year-picker]').click()");
             waitTrue(scenario,"Boolean(document.querySelector('.date-wheel-sheet[data-wheel-kind=year]'))");
             paintedScreenshot(scenario,"record-year-picker");
-            assertEquals("true",evaluate(scenario,"document.querySelector('.record-year-option[aria-pressed=false]').click();"+rollingLayoutCheck(".ledger-secondary .number")));
+            String previousYear=evaluate(scenario,"String(Number(document.querySelector('.date-wheel-sheet').dataset.selectedYear)-1)");
+            selectWheelPart(scenario,"year",previousYear);
+            assertEquals("true",evaluate(scenario,"document.querySelector('.date-sheet-actions [data-date-action=confirm]').click();"+rollingLayoutCheck(".ledger-secondary .number")));
             evaluate(scenario,"document.querySelector('[data-action=detail-tab][data-tab=entries]').click()");
             for(String kind:new String[]{"all","leave","overtime","subsidy","deduction","advance","payment"}){
                 evaluate(scenario,"document.querySelector('[data-action=entry-filter][data-filter="+kind+"]').click()");
