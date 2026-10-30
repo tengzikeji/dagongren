@@ -235,5 +235,5 @@ export function installNativeSync(api){
  globalThis.window?.addEventListener?.('online',foreground);
  globalThis.document?.addEventListener?.('visibilitychange',()=>{if(visible())foreground();else{clearTimeout(timer);clearTimeout(pollTimer);}});
  queueMicrotask(()=>{if(canAuto())schedule(500);});
- return {view,showConfig,run,schedule,feedback:feedbackState,submit,handleClick,status,reviewCleanup,confirmCleanup,cancelCleanupReview,isBusy:()=>busy||cleanupCommitting,configured:()=>!!config.configured,beforeCleanup(){cleanupGeneration++;clearTimeout(timer);clearTimeout(pollTimer);},foreground,fetchCalendar:year=>request('calendar-read',{year}),dispose(){disposed=true;clearTimeout(timer);clearTimeout(pollTimer);}};
+ return {view,showConfig,run,schedule,feedback:feedbackState,submit,handleClick,status,reviewCleanup,confirmCleanup,cancelCleanupReview,isBusy:()=>busy||cleanupCommitting,configured:()=>!!config.configured,canAutoSync:canAuto,beforeCleanup(){cleanupGeneration++;clearTimeout(timer);clearTimeout(pollTimer);},foreground,fetchCalendar:year=>request('calendar-read',{year}),dispose(){disposed=true;clearTimeout(timer);clearTimeout(pollTimer);}};
 }

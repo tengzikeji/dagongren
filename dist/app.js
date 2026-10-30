@@ -15,12 +15,14 @@ import { copyRecords, canonicalJSON, makeCleanupPlan, applyCleanupPlan, mergeDem
 import {snapshotBook} from './sync-tools.js';
 import {rememberDeletions} from './sync-merge.js';
 import { installNativeSync } from './native-sync.js';
-import {cloudButtonMarkup,updateCloudFeedback,bindPullRefresh} from './refresh.js';
+import {cloudButtonMarkup,updateCloudFeedback,bindPullRefresh,createRecordSyncFeedback} from './refresh.js';
 const isAndroid=typeof globalThis.AndroidFiles?.request==='function';
 let nativeSync=null;
 let bottomNavigation=null,pullRefresh=null,demoSyncTask=null,demoFeedback={state:'idle',source:'auto',message:'',revision:0};
-function syncFeedback(){return nativeSync?.feedback?.()||demoFeedback;}
-function syncFeedbackChanged(feedback){updateCloudFeedback(document,feedback,nativeSync?.status?.()||feedback.message);const button=document.querySelector?.('.sync-actions [data-action="sync-now"]');if(button){button.disabled=feedback.state==='syncing';button.textContent=feedback.state==='syncing'?'正在同步…':'立即同步';}}
+const recordSyncFeedback=createRecordSyncFeedback();
+function recordSyncEligible(){return !storageBlocked&&!db.sync.offline&&(nativeSync?nativeSync.canAutoSync():db.sync.demo&&db.sync.auto);}
+function syncFeedback(feedback=nativeSync?.feedback?.()||demoFeedback){return recordSyncFeedback.value(feedback,recordSyncEligible());}
+function syncFeedbackChanged(feedback){updateCloudFeedback(document,syncFeedback(feedback),nativeSync?.status?.()||feedback.message);const button=document.querySelector?.('.sync-actions [data-action="sync-now"]');if(button){button.disabled=feedback.state==='syncing';button.textContent=feedback.state==='syncing'?'正在同步…':'立即同步';}}
 function demoReport(state,message,source='manual'){demoFeedback={state,message,source,revision:demoFeedback.revision+1};syncFeedbackChanged(demoFeedback);return {...demoFeedback};}
 let calendarUpdater=null;
 
@@ -157,9 +159,9 @@ function persist() {
   try { rememberDeletions(db,persistedBook,Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));localStorage.setItem(STORAGE, JSON.stringify(db));persistedBook=snapshotBook(db); }
   catch { storageBlocked = true; toast('存储空间不足，当前修改暂未保存到本机。'); }
 }
-function changed(message) {
+function changed(message,manualRecord=false) {
   if (db.sync.demo||db.sync.connected) db.sync.pending++;
-  persist();render();toast(storageBlocked ? '本次修改仅暂存在页面中，请及时导出。' : message);
+  persist();if(manualRecord&&!storageBlocked)recordSyncFeedback.recordSaved(nativeSync?.feedback?.()||demoFeedback,recordSyncEligible());render();toast(storageBlocked ? '本次修改仅暂存在页面中，请及时导出。' : message);
   if ((db.sync.demo||db.sync.connected) && db.sync.auto && !db.sync.offline) scheduleDemoSync();
 }
 function toast(message) {
@@ -685,7 +687,7 @@ function confirmDeleteEntry(kind,month,id) {
   showModal('删除这笔'+name+'？',`<p class="modal-rule">删除后重新计算相应日期的计薪、收款抵扣和全部待发余额。</p><div class="modal-actions"><button class="btn btn-plain" data-action="modal-back">取消</button><button class="btn btn-danger" data-action="delete-entry" data-kind="${kind}" data-month="${month}" data-id="${esc(id)}">确认删除</button></div>`);
 }
 function deleteEntry(kind,month,id) {
-  const r=record(month),key={advance:'advances',payment:'payments',overtime:'overtime',subsidy:'subsidies',deduction:'deductions'}[kind];if(!key)return;const next={...r};if(kind==='payment'&&id==='legacy-payment')next.payment=null;else next[key]=(r[key]||[]).filter(x=>x.id!==id);db.months[month]=next;closeModal();changed('记录已删除，全部待发工资已更新。');
+  const r=record(month),key={advance:'advances',payment:'payments',overtime:'overtime',subsidy:'subsidies',deduction:'deductions'}[kind];if(!key)return;const next={...r};if(kind==='payment'&&id==='legacy-payment')next.payment=null;else next[key]=(r[key]||[]).filter(x=>x.id!==id);db.months[month]=next;closeModal();changed('记录已删除，全部待发工资已更新。',true);
 }
 function saveLedgerForm(formId,fd,error) {
  try{
@@ -701,7 +703,7 @@ function saveLedgerForm(formId,fd,error) {
    const date=fd.get('date');if(!validDate(date)||date>today)throw new Error('请填写不晚于今天的实际收款日期。');const range=previous?{start:previous.periodStart||month+'-01',end:previous.periodEnd||month+'-'+daysInMonth(month),company:previous.company??r.company??''}:cashRanges(month).find(value=>value.id===(fd.get('periodId')||editingTransaction.periodId));if(!range)throw new Error('请选择有效的工资结算区间。');if(!previous){month=validMonth(range.start.slice(0,7))?range.start.slice(0,7):db.defaults.joinDate.slice(0,7);r=record(month);}item={id:previous?.id||uid(),date,amountCents:readMoney(fd.get('amount')),note:String(fd.get('note')||'').trim(),periodStart:range.start,periodEnd:range.end,company:range.company};
    if(item.note.length>80)throw new Error('备注请控制在80字以内。');const next={...r};if(kind==='payment'&&item.id==='legacy-payment')next.payment=item;else next[key]=previous?(r[key]||[]).map(value=>value.id===item.id?item:value):[...(r[key]||[]),item];calculate(month,next,today);db.months[month]=next;
   }
-  recordYear=month.slice(0,4);closeModal();changed('已保存，计薪、明细与待发余额已更新。');
+  recordYear=month.slice(0,4);closeModal();changed('已保存，计薪、明细与待发余额已更新。',true);
  }catch(issue){error.textContent=issue.message;}
 }
 
@@ -933,7 +935,7 @@ document.addEventListener('click',e=>{
     if(item)showModal('删除这笔请假？',`<p class="modal-rule">删除${shortDate(item.date)}的${item.days}天请假后，系统会重新计算本月工资。你也可以之后重新登记。</p><div class="modal-actions"><button class="btn btn-plain" data-action="modal-back">暂不删除</button><button class="btn btn-danger" data-action="delete-leave" data-month="${m}" data-id="${esc(id)}">确认删除</button></div>`);
   }
   else if(action==='delete-leave'){
-    const m=button.dataset.month,r=record(m);db.months[m]={...r,leaves:r.leaves.filter(x=>x.id!==button.dataset.id)};closeModal();changed('请假记录已删除，工资已重新计算。');
+    const m=button.dataset.month,r=record(m);db.months[m]={...r,leaves:r.leaves.filter(x=>x.id!==button.dataset.id)};closeModal();changed('请假记录已删除，工资已重新计算。',true);
   }
   else if(action==='mark-paid')showPayment();
   else if(action==='payment-detail')showRecordDetail();
@@ -973,7 +975,7 @@ document.addEventListener('submit',e=>{
  const fd=new FormData(form),error=document.getElementById('form-error');
  if(['company-form','salary-form'].includes(form.id)){saveSettingsForm(form.id,fd,error);return;}
  if(form.id==='record-date-filter-form'){const kind=fd.get('kind'),range={start:fd.get('start'),end:fd.get('end')},year=String(fd.get('year')||range.start.slice(0,4)),issue=recordRangeIssue(range,year);if(!['salary','entries'].includes(kind)||issue){error.textContent=issue||'筛选类型无效。';return;}applyRecordYear(year);recordDateRanges={...recordDateRanges,[kind]:recordRangeIsDefault(range,year)?null:range};if(kind==='entries')entryMonthScope='';closeModal();render();return;}
- if(form.id==='leave-form'){const draft=getLeaveDraft();if(draft.error){error.textContent=draft.error;return;}db.months=draft.months;selectedMonth=draft.firstMonth;recordYear=selectedMonth.slice(0,4);if(entryMonthScope)entryMonthScope=selectedMonth;closeModal();changed('请假与本笔扣款选择已保存。');return;}
+ if(form.id==='leave-form'){const draft=getLeaveDraft();if(draft.error){error.textContent=draft.error;return;}db.months=draft.months;selectedMonth=draft.firstMonth;recordYear=selectedMonth.slice(0,4);if(entryMonthScope)entryMonthScope=selectedMonth;closeModal();changed('请假与本笔扣款选择已保存。',true);return;}
  saveLedgerForm(form.id,fd,error);
 });
 document.addEventListener('keydown',e=>{

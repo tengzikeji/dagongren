@@ -273,7 +273,7 @@ public class AppSmokeTest {
                 waitTrue(scenario,"document.querySelector('.date-wheel-sheet h3')?.textContent==='"+(page.equals("home")?"账目月份":"日历月份")+"'");
                 tapControl(scenario,".date-sheet-actions [data-date-action=cancel]");waitTrue(scenario,"!document.querySelector('#modal-root .modal')");
             }
-            evaluate(scenario,"window.__wheelBudget=null;import('./date-wheel.js').then(({createDateWheelModel})=>{let count=0;const started=performance.now(),wheel=createDateWheelModel({value:'2026-10-30',min:'2024-01-01',allowed:()=>{count++;return true}});for(const part of wheel.parts)wheel.options(part);window.__wheelBudget={count,ms:performance.now()-started,value:wheel.value()}})");
+            evaluate(scenario,"window.__wheelBudget=null;import(new URL('date-wheel.js',document.baseURI).href).then(({createDateWheelModel})=>{let count=0;const started=performance.now(),wheel=createDateWheelModel({value:'2026-10-30',min:'2024-01-01',allowed:()=>{count++;return true}});for(const part of wheel.parts)wheel.options(part);window.__wheelBudget={count,ms:performance.now()-started,value:wheel.value()}}).catch(error=>{window.__wheelBudget={error:String(error)}})");
             waitTrue(scenario,"window.__wheelBudget!==null");assertEquals("true",evaluate(scenario,"window.__wheelBudget.count<300&&window.__wheelBudget.value==='2026-10-30'"));
             android.util.Log.i("DagongrenMotion","WHEEL_INITIALIZATION="+evaluate(scenario,"JSON.stringify(window.__wheelBudget)"));
         }
@@ -1331,10 +1331,10 @@ public class AppSmokeTest {
         final String injection="""
             (()=>{const real=window.AndroidFiles,book=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));
             book.defaults.motion=false;book.sync={...book.sync,auto:false,nativeVersion:1};delete book.sync.baseBook;delete book.sync.baseline;
-            localStorage.setItem('dagongren.paybook.v1',JSON.stringify(book));window.__reviewBook=JSON.parse(JSON.stringify(book));window.__reviewReads=0;window.__reviewWrites=0;window.__reviewVersion=1;window.__reviewFailure=false;window.__reviewDelay=900;window.__reviewHoldReads=false;window.__reviewHeld=[];window.__releaseReviewReads=()=>{window.__reviewHoldReads=false;for(const reply of window.__reviewHeld.splice(0))reply();};
+            localStorage.setItem('dagongren.paybook.v1',JSON.stringify(book));window.__reviewBook=JSON.parse(JSON.stringify(book));window.__reviewReads=0;window.__reviewWrites=0;window.__reviewReadTimes=[];window.__reviewVersion=1;window.__reviewFailure=false;window.__reviewDelay=900;window.__reviewHoldReads=false;window.__reviewHeld=[];window.__releaseReviewReads=()=>{window.__reviewHoldReads=false;for(const reply of window.__reviewHeld.splice(0))reply();};
             window.AndroidFiles={shouldPlayIntro:()=>false,nativeLaunchPage:()=>false,introReady:()=>real.introReady(),introStyle:v=>real.introStyle(v),motionStyle:v=>real.motionStyle(v),systemDark:()=>real.systemDark(),themeStyle:v=>real.themeStyle(v),fingerprint:v=>real.fingerprint(v),status:()=>JSON.stringify({configured:true,username:'sync-review@example.invalid',path:'打工人/工资账本.json'}),request(id,action,payload){
             if(action==='calendar-read'){setTimeout(()=>globalThis.dagongrenNativeResult(id,{ok:false,error:'测试不访问外部网络'}),0);return;}
-            if(action==='read'){window.__reviewReads++;const reply=()=>globalThis.dagongrenNativeResult(id,window.__reviewFailure?{ok:false,error:'测试网络中断，本机记录保留'}:{ok:true,data:{exists:true,etag:'"'+window.__reviewVersion+'"',envelope:{format:'dagongren.webdav.v2',book:JSON.parse(JSON.stringify(window.__reviewBook))}}});if(window.__reviewHoldReads)window.__reviewHeld.push(reply);else setTimeout(reply,window.__reviewDelay);return;}
+            if(action==='read'){window.__reviewReads++;window.__reviewReadTimes.push(performance.now());const reply=()=>globalThis.dagongrenNativeResult(id,window.__reviewFailure?{ok:false,error:'测试网络中断，本机记录保留'}:{ok:true,data:{exists:true,etag:'"'+window.__reviewVersion+'"',envelope:{format:'dagongren.webdav.v2',book:JSON.parse(JSON.stringify(window.__reviewBook))}}});if(window.__reviewHoldReads)window.__reviewHeld.push(reply);else setTimeout(reply,window.__reviewDelay);return;}
             if(action==='write'){window.__reviewWrites++;const data=JSON.parse(payload);window.__reviewBook=JSON.parse(data.content);window.__reviewVersion++;setTimeout(()=>globalThis.dagongrenNativeResult(id,{ok:true,data:{saved:true}}),20);return;}
             setTimeout(()=>globalThis.dagongrenNativeResult(id,{ok:false,error:'不支持的测试操作'}),0);
             }};})()
@@ -1399,6 +1399,33 @@ public class AppSmokeTest {
             evaluate(scenario,"window.__releaseReviewReads()");
             waitTrue(scenario,"document.querySelector('.pull-refresh').dataset.state==='success'");
             assertEquals("5",evaluate(scenario,"window.__reviewReads"));
+        }
+    }
+    @Test public void savedRecordsShowSyncImmediatelyWithoutStartingRequestsEarly() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            resetBook(scenario);installSyncReviewFixture(scenario);
+            evaluate(scenario,"document.querySelector('.sync-cloud-button').click();document.querySelector('[data-action=toggle-auto]').click()");
+            waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='success'");
+            for(String page:new String[]{"home","calendar","records","settings"}){
+                evaluate(scenario,"document.querySelector('#app .bottom-nav [data-view="+page+"]').click()");
+                waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+                evaluate(scenario,"window.__reviewHoldReads=true;document.querySelector('#app [data-action=record-entry]').click();document.querySelector('[data-kind=subsidy]').click();document.querySelector('#subsidy-form [name=amount]').value='12.34';document.getElementById('adjustment-category').value='餐补';window.__recordReadsBefore=window.__reviewReads;window.__recordWritesBefore=window.__reviewWrites;window.__recordSavedAt=performance.now();document.querySelector('#subsidy-form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));window.__recordSpinner=document.querySelector('.cloud-sync-badge .sync-spinner');window.__recordImmediate={state:document.querySelector('.cloud-sync-badge').dataset.state,reads:window.__reviewReads,writes:window.__reviewWrites,formClosed:!document.getElementById('subsidy-form')}");
+                assertEquals("true",evaluate(scenario,"window.__recordImmediate.state==='syncing'&&window.__recordImmediate.reads===window.__recordReadsBefore&&window.__recordImmediate.writes===window.__recordWritesBefore&&window.__recordImmediate.formClosed&&Boolean(window.__recordSpinner)&&document.querySelector('.sync-cloud-button').getAttribute('aria-label').includes('正在同步')"));
+                assertEquals("true",evaluate(scenario,"getComputedStyle(window.__recordSpinner).animationName==='sync-spin'&&document.body.classList.contains('motion-off')"));
+                waitTrue(scenario,"window.__reviewHeld.length>0");
+                assertEquals("true",evaluate(scenario,"window.__reviewReadTimes[window.__recordReadsBefore]-window.__recordSavedAt>=2350&&document.querySelector('.cloud-sync-badge .sync-spinner')===window.__recordSpinner"));
+                android.util.Log.i("DagongrenMotion","RECORD_SYNC_"+page+"="+evaluate(scenario,"JSON.stringify({immediate:window.__recordImmediate,requestDelay:window.__reviewReadTimes[window.__recordReadsBefore]-window.__recordSavedAt})"));
+                if(page.equals("home"))paintedScreenshot(scenario,"record-save-syncing");
+                evaluate(scenario,"window.__releaseReviewReads()");
+                waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='success'&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).sync.pending===0");
+                assertEquals("true",evaluate(scenario,"window.__reviewReads===window.__recordReadsBefore+1&&window.__reviewWrites===window.__recordWritesBefore+1"));
+            }
+            evaluate(scenario,"document.querySelector('.sync-cloud-button').click();document.querySelector('[data-action=toggle-auto]').click();document.querySelector('#app .bottom-nav [data-view=home]').click()");
+            waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            evaluate(scenario,"document.querySelector('#app [data-action=record-entry]').click();document.querySelector('[data-kind=subsidy]').click();document.querySelector('#subsidy-form [name=amount]').value='5';document.getElementById('adjustment-category').value='餐补';window.__recordReadsBefore=window.__reviewReads;document.querySelector('#subsidy-form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}))");
+            assertEquals("true",evaluate(scenario,"document.querySelector('.cloud-sync-badge').dataset.state!=='syncing'&&window.__reviewReads===window.__recordReadsBefore"));
+            evaluate(scenario,"document.querySelector('.sync-cloud-button').click();document.querySelector('[data-action=sync-now]').click()");
+            waitTrue(scenario,"document.querySelector('.cloud-sync-badge').dataset.state==='success'&&window.__reviewReads===window.__recordReadsBefore+1");
         }
     }
     @Test public void automaticSyncBadgesFollowRealResultAndMotionPreference() throws Exception {

@@ -36,3 +36,11 @@ test('旧版触发距离不再刷新，拖动提示延后出现',async()=>{const
 function badgeFixture(options){const f=fixture(options);let calls=0;const target={animate(){calls++;}},badge={dataset:{state:'success',revision:'7'},querySelector:()=>target};const button={dataset:{},closest:()=>false,setAttribute(){},querySelector:()=>badge},root={querySelectorAll:()=>[button]};return {...f,badge,root,update:feedback=>f.context.update(root,feedback),calls:()=>calls};}
 test('云同步结果只响应一次同步事件，重复绘制、导航及修改不重播',()=>{const f=badgeFixture({motion:true}),state={state:'success',source:'auto',revision:7};f.update(state);assert.equal(f.calls(),2);f.update(state);f.update(state);assert.equal(f.calls(),2);f.update({...state,state:'idle'});assert.equal(f.calls(),2);f.update({...state,state:'error',revision:8});assert.equal(f.calls(),4);});
 test('自动与手动同步反馈均独立于应用动效开关，并尊重系统减少动态效果',()=>{for(const [options,source,count] of [[{motion:false},'auto',2],[{motion:false},'pull',2],[{motion:true,reduced:true},'pull',0]]){const f=badgeFixture(options);f.update({state:'success',source,revision:7});assert.equal(f.calls(),count);}});
+test('保存后的等待动画与真实同步共用转圈节点，不因同步开始而重播',()=>{
+ const f=badgeFixture({motion:false});let replacements=0,html='';
+ Object.defineProperty(f.badge,'innerHTML',{get:()=>html,set:value=>{html=value;replacements++;}});
+ f.update({state:'syncing',source:'auto',revision:7});assert.equal(replacements,1);
+ f.update({state:'syncing',source:'auto',revision:8});assert.equal(replacements,1);
+ assert.equal(f.badge.dataset.revision,'8');
+ f.update({state:'success',source:'auto',revision:9});assert.equal(replacements,2);assert.equal(f.calls(),2);
+});

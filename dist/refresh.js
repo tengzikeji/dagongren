@@ -1,5 +1,17 @@
 const cloudPath='<path d="M9 26h14a7 7 0 0 0 1-13.9A9 9 0 0 0 6.3 12 7.1 7.1 0 0 0 9 26Z"/>';
 const shapes={syncing:'<circle class="sync-ring-track" cx="12" cy="12" r="8"/><path class="sync-ring-arc" d="M12 4a8 8 0 0 1 8 8"/>',success:'<path class="sync-result-stroke" d="m5 12 4.5 4.5L19 7"/>',error:'<path class="sync-result-stroke" d="m6 6 12 12M18 6 6 18"/>',attention:'<path d="M12 5v9M12 18h.01"/>'};
+// This only bridges the badge from a saved record to the next real sync event.
+// It owns no timer, request, persisted state or sync scheduling.
+export function createRecordSyncFeedback(){
+ let queuedRevision=null;
+ return {
+  recordSaved(feedback,eligible){queuedRevision=eligible&&feedback.state!=='syncing'?(feedback.revision||0):null;},
+  value(feedback,eligible){
+   if(!eligible||feedback.state==='syncing'||queuedRevision!==(feedback.revision||0))queuedRevision=null;
+   return queuedRevision===null?feedback:{...feedback,state:'syncing',source:'auto',message:'正在同步'};
+  }
+ };
+}
 export function syncBadgeMarkup(state){return shapes[state]?'<svg class="'+(state==='syncing'?'sync-spinner':'sync-result')+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+shapes[state]+'</svg>':'';}
 export function cloudButtonMarkup(feedback={state:'idle'}){
  const state=feedback.state||'idle',source=feedback.source||'auto';
@@ -15,7 +27,8 @@ export function updateCloudFeedback(root,feedback,description=''){
   const badge=button.querySelector('.cloud-sync-badge');button.dataset.syncState=state;button.dataset.syncSource=source;button.setAttribute('aria-busy',String(state==='syncing'));
   button.setAttribute('aria-label','云同步：'+(feedback.message||description||'点击配置')+'；点击查看设置与同步');
   if(badge){
-   if(badge.dataset.state!==state||badge.dataset.revision!==revision){badge.innerHTML=syncBadgeMarkup(state);badge.dataset.revision=revision;}
+   if(badge.dataset.state!==state||(state!=='syncing'&&badge.dataset.revision!==revision))badge.innerHTML=syncBadgeMarkup(state);
+   badge.dataset.revision=revision;
    badge.dataset.state=state;badge.dataset.source=source;
    // Result motion belongs to a sync event, never to a render or navigation.
    // WAAPI preserves the running effect when renderStable retains these SVG nodes.
