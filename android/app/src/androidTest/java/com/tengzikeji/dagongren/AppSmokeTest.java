@@ -259,16 +259,16 @@ public class AppSmokeTest {
     @Test public void recordYearAndBothDateFiltersShareYearAndKeepDraftCancellation() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             seedEntryDateReview(scenario);evaluate(scenario,"document.querySelector('[data-view=records]').click()");selectRecordYear(scenario,"2024");evaluate(scenario,"window.__linkedYearBook=localStorage.getItem('dagongren.paybook.v1')");
-            tapControl(scenario,"#view-content [data-action=record-date-filter]");pickRecordDate(scenario,"record-range-end","2024-02-29");tapControl(scenario,".modal-footer button[type=submit]");
+            tapControl(scenario,"#view-content [data-action=record-date-filter]");pickRecordDate(scenario,"record-range-end","2024-02-29");tapControl(scenario,".modal-footer button[type=submit]");waitTrue(scenario,"!document.getElementById('record-date-filter-form')");
             tapControl(scenario,"#view-content [data-action=detail-tab][data-tab=entries]");tapControl(scenario,"#view-content [data-action=record-date-filter]");tapControl(scenario,"[data-date-for=record-range-year]");selectWheelPart(scenario,"year","2025");tapControl(scenario,".date-sheet-actions [data-date-action=confirm]");
-            assertEquals("true",evaluate(scenario,"document.getElementById('record-range-start').value==='2025-01-01'&&document.getElementById('record-range-end').value==='2025-12-31'&&document.querySelector('#app .record-year-trigger').textContent.includes('2024')"));
+            waitTrue(scenario,"document.getElementById('record-range-start')?.value==='2025-01-01'&&document.getElementById('record-range-end')?.value==='2025-12-31'&&document.querySelector('#view-content .record-year-trigger').textContent.includes('2024')");
             evaluate(scenario,"document.querySelector('.modal-close').click()");assertEquals("true",evaluate(scenario,"document.querySelector('#app .record-year-trigger').textContent.includes('2024')"));
             tapControl(scenario,"#view-content [data-action=record-date-filter]");tapControl(scenario,"[data-date-for=record-range-year]");selectWheelPart(scenario,"year","2025");tapControl(scenario,".date-sheet-actions [data-date-action=confirm]");tapControl(scenario,".modal-footer button[type=submit]");
-            assertEquals("true",evaluate(scenario,"document.querySelector('#app .record-year-trigger').textContent.includes('2025')"));
+            waitTrue(scenario,"!document.getElementById('record-date-filter-form')&&document.querySelector('#view-content .record-year-trigger').textContent.includes('2025')");
             tapControl(scenario,"#view-content [data-action=detail-tab][data-tab=salary]");tapControl(scenario,"#view-content [data-action=record-date-filter]");
-            assertEquals("true",evaluate(scenario,"document.getElementById('record-range-year').value==='2025'&&document.getElementById('record-range-end').value==='2025-02-28'"));
+            waitTrue(scenario,"document.getElementById('record-range-year')?.value==='2025'&&document.getElementById('record-range-end')?.value==='2025-02-28'");
             paintedScreenshot(scenario,"linked-year-date-filter");evaluate(scenario,"document.querySelector('.modal-close').click()");selectRecordYear(scenario,"2026");tapControl(scenario,"#view-content [data-action=record-date-filter]");
-            assertEquals("true",evaluate(scenario,"document.getElementById('record-range-start').value==='2026-01-01'&&document.getElementById('record-range-end').value==='2026-02-28'&&window.__linkedYearBook===localStorage.getItem('dagongren.paybook.v1')"));
+            waitTrue(scenario,"document.getElementById('record-range-start')?.value==='2026-01-01'&&document.getElementById('record-range-end')?.value==='2026-02-28'&&window.__linkedYearBook===localStorage.getItem('dagongren.paybook.v1')");
         }
     }
 
@@ -723,7 +723,7 @@ public class AppSmokeTest {
             evaluate(scenario,"document.querySelector('[data-view=records]').click();document.querySelector('[data-action=record-year-picker]').click()");
             waitTrue(scenario,"Boolean(document.querySelector('.date-wheel-sheet[data-wheel-kind=year]'))");
             paintedScreenshot(scenario,"record-year-picker");
-            String previousYear=evaluate(scenario,"String(Number(document.querySelector('.date-wheel-sheet').dataset.selectedYear)-1)");
+            String previousYear=evaluate(scenario,"Number(document.querySelector('.date-wheel-sheet').dataset.selectedYear)-1");
             selectWheelPart(scenario,"year",previousYear);
             assertEquals("true",evaluate(scenario,"document.querySelector('.date-sheet-actions [data-date-action=confirm]').click();"+rollingLayoutCheck(".ledger-secondary .number")));
             evaluate(scenario,"document.querySelector('[data-action=detail-tab][data-tab=entries]').click()");
@@ -1297,8 +1297,9 @@ public class AppSmokeTest {
     private void nativePull(ActivityScenario<MainActivity> scenario) throws Exception {
         waitTrue(scenario,"!document.getElementById('app').classList.contains('swipe-busy')&&!document.getElementById('app').classList.contains('pull-dragging')");
         evaluate(scenario,"window.__pullPaints=[];window.__pullToastBefore=document.getElementById('toast').textContent;if(!window.__pullPaintWatch){window.__pullPaintWatch=true;document.addEventListener('touchmove',()=>requestAnimationFrame(()=>{const c=document.querySelector('#app .workspace .content'),t=getComputedStyle(c).transform,y=t==='none'?0:new DOMMatrixReadOnly(t).m42;window.__pullPaints.push({y,state:document.querySelector('.pull-refresh').dataset.state})}),{capture:true,passive:true})}");
-        evaluate(scenario,"window.scrollTo({top:0,behavior:'instant'});window.__pullTouchEvents=[];if(!window.__pullTouchTracking){window.__pullTouchTracking=true;for(const type of ['touchstart','touchmove','touchend','touchcancel','pointercancel'])document.addEventListener(type,e=>{if(window.__pullTouchEvents.length<60)window.__pullTouchEvents.push({type:e.type,cancelable:e.cancelable,y:e.touches?.[0]?.clientY,state:document.querySelector('.pull-refresh')?.dataset.state})},true)}");awaitInputWindow(scenario);
+        evaluate(scenario,"window.scrollTo({top:0,behavior:'instant'});window.__pullTouchEvents=[];if(!window.__pullTouchTracking){window.__pullTouchTracking=true;for(const type of ['touchstart','touchmove','touchend','touchcancel','pointercancel'])document.addEventListener(type,e=>{if(window.__pullTouchEvents.length<60)window.__pullTouchEvents.push({type:e.type,cancelable:e.cancelable,y:e.touches?.[0]?.clientY,state:document.querySelector('.pull-refresh')?.dataset.state})},true)}");
         waitTrue(scenario,"document.getElementById('app').classList.contains('pull-refresh-ready')&&getComputedStyle(document.getElementById('app')).touchAction.includes('pan-down')");
+        awaitInputWindow(scenario);
         int[] origin=new int[2];float[] density=new float[1];
         assertTrue(withActivity(activity->{WebView web=activity.findViewById(R.id.web_view);web.getLocationOnScreen(origin);density[0]=activity.getResources().getDisplayMetrics().density;}));
         float x=Float.parseFloat(evaluate(scenario,"innerWidth*.45"));
