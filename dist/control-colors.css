@@ -1,0 +1,39 @@
+body{--control-surface:#ffffff;--control-neutral:#f4f7fc;--control-ink:#233c5d;--control-muted:#586d87;--control-border:#d4dfed;--control-selected:#e8f0ff;--control-selected-ink:#1d4a92;--control-selected-border:#6b90cb;--control-primary:#285dc6;--control-primary-border:#285dc6;--control-danger:#ad3e52;--control-danger-soft:#fff0f3;--control-danger-ink:#9f3548}
+body[data-theme=dark]{--control-surface:#192538;--control-neutral:#25364e;--control-ink:#dfebfa;--control-muted:#b0c0d6;--control-border:#465e7c;--control-selected:#284264;--control-selected-ink:#d4e5ff;--control-selected-border:#799cc9;--control-primary:#3b6ac8;--control-primary-border:#7ba0e9;--control-danger:#a83c51;--control-danger-soft:#452a37;--control-danger-ink:#ffc2cf}
+body[data-theme] :is(.entry-form,.record-date-sheet,.entry-date-field){--entry-accent:var(--control-selected-ink);--entry-accent-soft:var(--control-selected);--entry-surface:var(--control-neutral);--entry-strong:var(--control-selected-ink)}
+.modal.modal-v2,.modal.modal-v2 .choice-sheet{color:var(--control-ink);background:var(--control-surface)}
+.modal.modal-v2 :is(.modal-heading h2,.choice-header h3,.field>label,.select-trigger strong,.choice-card-copy strong){color:var(--control-ink)}
+.modal.modal-v2 :is(.modal-kicker,.modal-description,.field-note,.entry-date-meta,.entry-date-copy small,.entry-optional,.select-trigger small,.choice-header small,.choice-card-copy small,.choice small,.choice-amount small,.choice-group-label,.date-wheel-hint,.theme-option-copy>span){color:var(--control-muted)}
+.modal.modal-v2 :is(.btn-plain,.btn-ghost,.date-cancel,.select-trigger,.entry-date-trigger,.choice-back,.choice-close,.modal-back,.modal-close){background:var(--control-neutral);border-color:var(--control-border);color:var(--control-ink);box-shadow:none}
+.modal.modal-v2 .date-sheet-tools>button{color:var(--control-selected-ink)}
+.modal.modal-v2 .metric-switches>button{background:var(--control-neutral);color:var(--control-ink);border-color:var(--control-border);box-shadow:none}
+.modal.modal-v2 .btn-primary{background:var(--control-primary);border-color:var(--control-primary-border);color:#fff;box-shadow:none}
+.modal.modal-v2 .btn-danger,.cleanup-panel .btn-danger{background:var(--control-danger);border-color:var(--control-danger);color:#fff;box-shadow:none}
+.modal.modal-v2 :is(.choice-card,.record-entry-menu>button,.choice){background:var(--control-surface);border-color:var(--control-border);color:var(--control-ink);box-shadow:none}
+.modal.modal-v2 :is(.choice-card.selected,.choice.selected){background:var(--control-selected);border-color:var(--control-selected-border);color:var(--control-selected-ink)}
+.modal.modal-v2 :is(.choice-card.selected .choice-card-copy strong,.choice-card.selected .choice-card-copy small,.choice.selected strong,.choice.selected small,.choice-tick,.choice-amount b){color:var(--control-selected-ink)}
+.modal.modal-v2 .record-entry-menu>button .entry-kind-copy strong{color:var(--control-ink)}
+.modal.modal-v2 .record-entry-menu>button .entry-kind-copy small{color:var(--control-muted)}
+.modal.modal-v2 .record-entry-menu>button:active{background:var(--control-selected);border-color:var(--control-selected-border)}
+.modal.modal-v2 .theme-option{background:var(--control-surface);border-color:var(--control-border);color:var(--control-ink)}
+.modal.modal-v2 .theme-option[aria-pressed=true]{background:var(--control-selected);border-color:var(--control-selected-border);color:var(--control-selected-ink)}
+.modal.modal-v2 .theme-selected{background:transparent;color:var(--control-selected-ink)}
+.modal.modal-v2 .theme-option[aria-pressed=false] .theme-selected{color:var(--control-muted)}
+.modal.modal-v2 .choice-filters button,body[data-theme] :is(.record-filter-grid>.filter,.record-filter-grid>.record-range-trigger,.filter){background:var(--control-neutral);border-color:var(--control-border);color:var(--control-ink);box-shadow:none}
+.modal.modal-v2 .choice-filters button.active,body[data-theme] :is(.record-filter-grid>.filter.active,.record-filter-grid>.filter[aria-pressed=true],.record-filter-grid>.record-range-trigger.is-filtered,.filter.active){background:var(--control-selected);border-color:var(--control-selected-border);color:var(--control-selected-ink);font-weight:650;box-shadow:none}
+body[data-theme] :is(.detail-tabs button,.metric-switches button,.profile-chart-switch button){color:var(--control-muted)}
+body[data-theme] :is(.detail-tabs button.active,.metric-switches button.active,.profile-chart-switch button.active){background:var(--control-selected);color:var(--control-selected-ink);border-color:var(--control-selected-border);box-shadow:none}
+body[data-theme] :is(.cleanup-scope-card,.cleanup-cloud-option){background:var(--control-surface);border-color:var(--control-border);color:var(--control-ink)}
+body[data-theme] :is(.cleanup-scope-card[aria-pressed=true],.cleanup-cloud-option.selected){background:var(--control-selected);border-color:var(--control-selected-border);color:var(--control-selected-ink)}
+.modal.modal-v2 .notice.gray{background:var(--control-neutral);border-color:var(--control-border);color:var(--control-muted)}
+.modal.modal-v2 .error{color:var(--control-danger-ink)}
+body[data-theme] .record-filter-caption>button:not(:disabled),.record-range-year{color:var(--control-selected-ink)}
+.modal.modal-v2 :is(button,[role=listbox],input,select,textarea):focus-visible,.record-filter-grid>button:focus-visible{outline:2px solid var(--control-selected-border);outline-offset:2px}
+.modal.modal-v2 button:disabled,.record-filter-caption>button:disabled{opacity:.48;box-shadow:none}
+.date-wheel-option[aria-disabled=true]{opacity:.32}
+/* Keep the center button's hit target fixed while only its icon responds to a press. */
+button.record-launcher:active:not(:disabled){transform:translateX(-50%)}
+button.record-launcher:active:not(:disabled) .record-plus{transform:scale(.96)}
+body[data-theme] .detail-tabs>button[data-tab]{background:#fff;color:#000;border:1px solid #d4dfed;box-shadow:none}
+body[data-theme] .detail-tabs>button[data-tab][aria-pressed=true]{background:#285dc6;border-color:#285dc6;color:#fff;font-weight:700}
+.modal.metric-dialog{height:min(720px,calc(var(--visible-height,100dvh) - 32px))}

@@ -62,3 +62,20 @@ test('合并移动事件仍按按下与松开距离判断，慢短滑与纵滑�
 });
 
 test('单手起手4像素即可识别横向，轻微晃动不借速度翻页',()=>{assert.equal(swipeAxis(4,1),'x');assert.equal(swipeAxis(1,4),'y');assert.equal(swipeAxis(3,2),'pending');assert.equal(swipeDecision(-9,393,-2000).complete,false);assert.equal(swipeDecision(-12,393,-480).complete,true);});
+
+import {bindPageSwipe} from '../dist/gestures.js';
+test('滚动后的延迟刷新不会取消已经开始、尚未锁定方向的触摸',async()=>{
+ const priorWindow=globalThis.window,priorDocument=globalThis.document,windowEvents=new Map(),rootEvents=new Map();
+ globalThis.window={addEventListener:(name,handler)=>windowEvents.set(name,handler)};
+ globalThis.document={documentElement:{clientWidth:400}};
+ const root={addEventListener:(name,handler)=>rootEvents.set(name,handler),querySelector:()=>null,dataset:{},classList:{add(){},remove(){}}};
+ let controller;
+ try{
+  controller=bindPageSwipe(root,{current:()=> 'records'});
+  windowEvents.get('scroll')();
+  rootEvents.get('touchstart')({touches:[{identifier:1,clientX:240,clientY:230}],timeStamp:0,target:{closest:()=>null}});
+  assert.equal(controller.isPending(),true);
+  await new Promise(resolve=>setTimeout(resolve,110));
+  assert.equal(controller.isPending(),true,'The delayed scroll callback discarded the new touch');
+ }finally{controller?.cancel(false);globalThis.window=priorWindow;globalThis.document=priorDocument;}
+});

@@ -5,11 +5,16 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.provider.Settings;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -34,10 +39,8 @@ public final class MainActivity extends Activity {
     private static final int SAVE_FILE=7101;
     private WebView webView;
     private View systemSplashView;
-    private static final int LAUNCH_COLOR=Color.rgb(16,30,61);
     private boolean darkAppearance;
-    private android.animation.ValueAnimator launchTransition;
-    private final android.graphics.drawable.ColorDrawable windowCanvas=new android.graphics.drawable.ColorDrawable(LAUNCH_COLOR);
+    private final android.graphics.drawable.ColorDrawable windowCanvas=new android.graphics.drawable.ColorDrawable(Color.rgb(243,245,249));
     private CredentialVault vault;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final ExecutorService calendarWorker=Executors.newSingleThreadExecutor();
@@ -46,14 +49,29 @@ public final class MainActivity extends Activity {
     private volatile boolean launchIntro=true;
     private boolean launchSurfacePrepared=false,launchNotified=false;
     private boolean firstLaunchFramePresented;
+    private int systemBarIconUpdates;
+    private Integer paintedWindowColor;
+    private long lastDateWheelHaptic;
+    private boolean dateWheelFeedbackScheduled;
 
     @Override @SuppressLint({"SetJavaScriptEnabled","JavascriptInterface"})
     public void onCreate(Bundle state) {
+        NativeTheme.apply(this);
+        // Resolve the saved app theme before the first DecorView is created.
+        refreshAppearance();
         super.onCreate(state); vault=new CredentialVault(this);launchIntro=state==null;
         refreshAppearance();
+        // Match the starting theme before attaching content or changing insets.
+        getWindow().setBackgroundDrawable(windowCanvas);
+        if(Build.VERSION.SDK_INT>=29){getWindow().setStatusBarContrastEnforced(false);getWindow().setNavigationBarContrastEnforced(false);}
+        applyAppearance();
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(launchIntro?LAUNCH_COLOR:appearanceColor());
+        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(appearanceColor());
         if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(window->{
+            // The platform may restore theme attributes while attaching its splash.
+            // Reassert our selected scheme before the splash and live page exchange.
+            applyAppearance();
+            getWindow().setDecorFitsSystemWindows(false);
             // Keep the real system splash over the attached, hardware-rendered WebView.
             // Never hold pre-draw: WebView must be allowed to submit its first frame.
             if(launchNotified)window.remove();
@@ -88,7 +106,7 @@ public final class MainActivity extends Activity {
 
     private void initializeWebView(FrameLayout root){
         webView=new WebView(this);webView.setId(R.id.web_view);
-        webView.setBackgroundColor(launchIntro?LAUNCH_COLOR:appearanceColor());
+        webView.setBackgroundColor(appearanceColor());
         WebSettings settings=webView.getSettings();
         settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
         settings.setOffscreenPreRaster(launchIntro);
@@ -122,32 +140,36 @@ public final class MainActivity extends Activity {
         webView.loadUrl(HOME);
     }
 
-    private boolean systemIsDark(){return (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES;}
+    private boolean systemIsDark(){android.app.UiModeManager manager=getSystemService(android.app.UiModeManager.class);if(manager!=null){int mode=manager.getNightMode();if(mode==android.app.UiModeManager.MODE_NIGHT_YES)return true;if(mode==android.app.UiModeManager.MODE_NIGHT_NO)return false;}return (android.content.res.Resources.getSystem().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES;}
     private int appearanceColor(){return darkAppearance?Color.rgb(16,24,39):Color.rgb(243,245,249);}
     private void refreshAppearance(){
         String mode=getSharedPreferences("appearance",MODE_PRIVATE).getString("mode","system");
         darkAppearance="dark".equals(mode)||("system".equals(mode)&&systemIsDark());
+        getTheme().applyStyle(darkAppearance?R.style.LaunchBarsDark:R.style.LaunchBarsLight,true);
     }
     private void applyAppearance(){
-        if(launchTransition!=null){launchTransition.cancel();launchTransition=null;}
-        paintAppearance(launchIntro?LAUNCH_COLOR:appearanceColor(),launchIntro||darkAppearance);
+        paintAppearance(appearanceColor(),darkAppearance);
     }
     @SuppressWarnings("deprecation") private void paintAppearance(int color,boolean darkBars){
-        windowCanvas.setColor(color);getWindow().setBackgroundDrawable(windowCanvas);
-        getWindow().getDecorView().setBackgroundColor(color);getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
-        getWindow().getDecorView().setSystemUiVisibility(darkBars?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        if(paintedWindowColor==null||paintedWindowColor!=color){
+            paintedWindowColor=color;windowCanvas.setColor(color);
+            getWindow().getDecorView().setBackgroundColor(color);getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
+        }
+        // Change icon appearance without resetting layout/visibility flags on each frame.
+        if(Build.VERSION.SDK_INT>=30){
+            WindowInsetsController controller=getWindow().getInsetsController();
+            if(controller!=null){int mask=WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,desired=darkBars?0:mask;if((controller.getSystemBarsAppearance()&mask)!=desired){controller.setSystemBarsAppearance(desired,mask);systemBarIconUpdates++;}}
+        }else{
+            View decor=getWindow().getDecorView();int mask=View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            int flags=decor.getSystemUiVisibility(),next=(flags&~mask)|(darkBars?0:mask);if(flags!=next)decor.setSystemUiVisibility(next);
+        }
         // The live HTML covers the WebView during the intro; changing its native
         // background every animation frame unnecessarily invalidates Chromium.
         if(webView!=null){if(!launchIntro)webView.setBackgroundColor(color);if(webView.getParent() instanceof View)((View)webView.getParent()).setBackgroundColor(color);}
     }
-    private void fadeLaunchAppearance(int duration){
-        if(!launchIntro||isDestroyed())return;
-        if(launchTransition!=null)launchTransition.cancel();
-        launchTransition=android.animation.ValueAnimator.ofArgb(LAUNCH_COLOR,appearanceColor());
-        launchTransition.setDuration(Math.max(0,Math.min(1000,duration)));
-        launchTransition.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
-        launchTransition.addUpdateListener(animation->{if(!isDestroyed())paintAppearance((Integer)animation.getAnimatedValue(),darkAppearance||animation.getAnimatedFraction()<.6f);});
-        launchTransition.start();
+    private void fadeLaunchAppearance(int duration,int elapsed){
+        // Launch, home and system bars share the selected theme throughout.
+        // Retain this bridge for compatibility; no color interpolation is needed.
     }
     @Override public void onConfigurationChanged(Configuration config){
         super.onConfigurationChanged(config);refreshAppearance();applyAppearance();
@@ -174,6 +196,7 @@ public final class MainActivity extends Activity {
     private void completeLaunchSurface(){
         if(launchNotified||!launchSurfacePrepared||isDestroyed())return;
         if(Build.VERSION.SDK_INT>=31&&systemSplashView!=null){((android.window.SplashScreenView)systemSplashView).remove();systemSplashView=null;}
+        applyAppearance();
         notifyLaunchSurface();
     }
     private void notifyLaunchSurface(){
@@ -185,6 +208,7 @@ public final class MainActivity extends Activity {
 
     public boolean isLaunchSurfaceReady(){return launchNotified;}
     public boolean isFirstLaunchFramePresented(){return firstLaunchFramePresented;}
+    public int getSystemBarIconUpdateCount(){return systemBarIconUpdates;}
     public boolean hasBitmapLaunchCover(){return getWindow().getDecorView().findViewWithTag("dagongren-launch-page")!=null;}
     public boolean isNativeMotionEnabled(){return getSharedPreferences("appearance",MODE_PRIVATE).getBoolean("motionEnabled",true);}
 
@@ -211,6 +235,28 @@ public final class MainActivity extends Activity {
         runOnUiThread(()->{if(!isDestroyed())webView.evaluateJavascript("globalThis.dagongrenNativeResult && globalThis.dagongrenNativeResult("+JSONObject.quote(id)+","+result+");",null);});
     }
     public final class NativeFiles {
+        @JavascriptInterface public void dateWheelFeedback(boolean sound,boolean haptic){
+            runOnUiThread(()->{
+                if(isDestroyed()||isFinishing()||webView==null||!webView.hasWindowFocus())return;
+                // Every centered wheel value gets its sound immediately. Only
+                // haptic requests may be combined into the next display frame.
+                if(sound){
+                    AudioManager audio=(AudioManager)getSystemService(AUDIO_SERVICE);
+                    if(audio!=null&&audio.getRingerMode()==AudioManager.RINGER_MODE_NORMAL&&Settings.System.getInt(getContentResolver(),Settings.System.SOUND_EFFECTS_ENABLED,1)!=0&&audio.getStreamVolume(AudioManager.STREAM_SYSTEM)>0)audio.playSoundEffect(AudioManager.FX_KEY_CLICK,.65f);
+                }
+                if(!haptic||dateWheelFeedbackScheduled)return;dateWheelFeedbackScheduled=true;
+                webView.postOnAnimation(()->{
+                    dateWheelFeedbackScheduled=false;
+                    if(isDestroyed()||isFinishing()||webView==null||!webView.hasWindowFocus())return;
+                    long now=SystemClock.uptimeMillis();
+                    if(now-lastDateWheelHaptic>=8){
+                        lastDateWheelHaptic=now;boolean performed=false;
+                        if(Build.VERSION.SDK_INT>=34)performed=webView.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK);
+                        if(!performed)webView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+                    }
+                });
+            });
+        }
         @JavascriptInterface public boolean shouldPlayIntro(){return launchIntro;}
         @JavascriptInterface public boolean nativeLaunchPage(){return false;}
         @JavascriptInterface public void motionStyle(boolean enabled){
@@ -223,11 +269,12 @@ public final class MainActivity extends Activity {
             if(!"system".equals(mode)&&!"light".equals(mode)&&!"dark".equals(mode))return;
             runOnUiThread(()->{
                 android.content.SharedPreferences preferences=getSharedPreferences("appearance",MODE_PRIVATE);
-                if(!mode.equals(preferences.getString("mode","system")))preferences.edit().putString("mode",mode).apply();
+                if(!mode.equals(preferences.getString("mode","system"))){preferences.edit().putString("mode",mode).apply();NativeTheme.apply(MainActivity.this,mode);}
                 boolean previous=darkAppearance;refreshAppearance();if(previous!=darkAppearance)applyAppearance();
             });
         }
-        @JavascriptInterface public void introTransition(int duration){runOnUiThread(()->fadeLaunchAppearance(duration));}
+        @JavascriptInterface public void introTransition(int duration){runOnUiThread(()->fadeLaunchAppearance(duration,0));}
+        @JavascriptInterface public void introTransitionAt(int duration,int elapsed){runOnUiThread(()->fadeLaunchAppearance(duration,elapsed));}
         @JavascriptInterface public void introStyle(boolean active){runOnUiThread(()->{if(!active){launchIntro=false;if(webView!=null)webView.getSettings().setOffscreenPreRaster(false);}applyAppearance();});}
         @JavascriptInterface public String status(){
             try{return CredentialVault.publicConfig(vault.load()).toString();}
@@ -303,6 +350,6 @@ public final class MainActivity extends Activity {
     @Override protected void onPause(){if(webView!=null)webView.onPause();super.onPause();}
     @Override protected void onDestroy(){
         if(Build.VERSION.SDK_INT>=31&&systemSplashView!=null){((android.window.SplashScreenView)systemSplashView).remove();systemSplashView=null;}
-        if(launchTransition!=null){launchTransition.cancel();launchTransition=null;}worker.shutdownNow();calendarWorker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
+        worker.shutdownNow();calendarWorker.shutdownNow();if(webView!=null){webView.removeJavascriptInterface("AndroidFiles");webView.destroy();}super.onDestroy();
     }
 }

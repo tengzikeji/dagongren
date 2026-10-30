@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {getCalendarDataset} from '../dist/calendar-data.js';
 import {calendarDay,calendarCoverage,hasOfficialSchedule,holidayName,isMakeupDate,statutoryYearDates} from '../dist/calendar.js';
 
-test('2020—2040逐日农历覆盖完整，闰月不丢失，每年24节气',()=>{
+test('2020—2089逐日农历覆盖完整，闰月不丢失，每年24节气',()=>{
  let count=0,leapMonths=0;
- for(let year=2020;year<=2040;year++){
+ for(let year=2020;year<=2089;year++){
   const source=getCalendarDataset()[year],length=(Date.UTC(year+1,0,1)-Date.UTC(year,0,1))/86400000;
   assert.equal(source.days.split('|').length,length);assert.equal(Object.keys(source.terms).length,24);
   for(let n=0;n<length;n++){
@@ -14,7 +14,7 @@ test('2020—2040逐日农历覆盖完整，闰月不丢失，每年24节气',()
    if(day.lunarMonth.startsWith('闰')&&day.lunarDay===1)leapMonths++;count++;
   }
  }
- assert.equal(count,7671);assert.ok(leapMonths>=7);
+ assert.equal(count,25568);assert.ok(leapMonths>=7);
 });
 test('跨年元旦及2020春节延长假期按通知展示',()=>{
  assert.equal(holidayName('2022-12-31'),'元旦');assert.equal(holidayName('2023-12-30'),'元旦');
@@ -42,6 +42,6 @@ test('法定日期与连休不同，2025增加除夕和五一第二天',()=>{
  assert.equal(statutoryYearDates(2024).length,11);assert.equal(statutoryYearDates(2025).length,13);
 });
 test('超出收录范围安全返回，未来节日不伪称官方连休',()=>{
- assert.equal(calendarDay('2041-01-01').lunar,'');assert.equal(calendarDay('2019-12-31').official,false);
+ assert.equal(calendarDay('2090-01-01').lunar,'');assert.equal(calendarDay('2019-12-31').official,false);
  const future=calendarDay('2027-02-06');assert.equal(future.festival,'春节');assert.equal(future.holiday,'');
 });

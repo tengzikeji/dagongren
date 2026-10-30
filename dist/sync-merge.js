@@ -20,7 +20,7 @@ export function rememberDeletions(book,previous,revision){
  if(Object.keys(markers).length)book.tombstones=markers;else delete book.tombstones;return changed;
 }
 function conflictLabel(parts){
- const names={defaults:'工资设置',salaryCents:'月薪',company:'工作主体',joinDate:'入职日期',payday:'发薪日',periodMode:'发薪周期',periodStartDay:'账期起始日',leaves:'请假',overtime:'加班',subsidies:'补贴',deductions:'扣款',advances:'预支',payments:'实发工资',payment:'实发工资',months:'月份账本'};
+ const names={defaults:'工资设置',salaryCents:'月薪',company:'工作主体',joinDate:'入职日期',leaveDate:'离职日期',accrualDisabled:'基础计薪状态',payday:'发薪日',periodMode:'发薪周期',periodStartDay:'账期起始日',leaves:'请假',overtime:'加班',subsidies:'补贴',deductions:'扣款',advances:'预支',payments:'实发工资',payment:'实发工资',months:'月份账本'};
  return parts.filter(x=>!String(x).startsWith('id:')).map(x=>String(x).startsWith('date:')?String(x).slice(5):names[x]||x).join(' · ');
 }
 export function mergeBooks(base,local,remote,resolution=''){

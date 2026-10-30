@@ -5,7 +5,7 @@ export function daysInMonth(month) {
 }
 
 export function validMonth(month) {
-  return /^\d{4}-(0[1-9]|1[0-2])$/.test(month) && Number(month.slice(0, 4)) >= 2020 && Number(month.slice(0, 4)) <= 2040;
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(month) && Number(month.slice(0, 4)) >= 2020 && Number(month.slice(0, 4)) <= 2089;
 }
 
 export function validDate(date) {
@@ -58,12 +58,15 @@ export function salaryRateForDate(date,salaryCents,settings={}) {
   const period=payPeriodForDate(date,settings),divisor=Math.round((Date.parse(period.end+'T00:00:00Z')-Date.parse(period.start+'T00:00:00Z'))/86400000)+1;
   return {...period,divisor,dailyCents:cents(Number(salaryCents),'固定工资')/divisor};
 }
+export function baseAccruesOnDate(date,record){return record.accrualDisabled!==true&&(!record.joinDate||date>=record.joinDate)&&(!record.leaveDate||date<=record.leaveDate);}
 export function calculate(month,record,asOf=chinaDate(),settings=record,rounding=new Map()) {
   if(!validMonth(month)||!validDate(asOf))throw new Error('计薪日期无效');
-  const salaryCents=cents(Number(record.salaryCents),'月薪'),monthDays=daysInMonth(month),joinDate=record.joinDate||month+'-01',custom=settings.periodMode==='custom';
+  const salaryCents=cents(Number(record.salaryCents),'月薪'),monthDays=daysInMonth(month),joinDate=record.joinDate||month+'-01',leaveDate=record.leaveDate||'',custom=settings.periodMode==='custom';
   const reference=asOf.startsWith(month)?asOf:month+'-'+monthDays,rate=salaryRateForDate(reference,salaryCents,settings),divisor=rate.divisor,rates=[];
   for(let date=month+'-01';date.startsWith(month+'-');){const value=salaryRateForDate(date,salaryCents,settings),to=value.end<month+'-'+monthDays?value.end:month+'-'+monthDays;rates.push({...value,from:date,to});date=shiftDay(to,1);}
   if(!validDate(joinDate))throw new Error('入职日期无效');
+  if(leaveDate&&(!validDate(leaveDate)||leaveDate<joinDate))throw new Error('离职日期不能早于入职日期。');
+  if(record.accrualDisabled!==undefined&&typeof record.accrualDisabled!=='boolean')throw new Error('基础计薪状态无效。');
   const leaves=list(record,'leaves'),seen=new Set(),overtime=list(record,'overtime'),otIds=new Set();
   for(const item of leaves){if(!validDate(item.date)||!item.date.startsWith(month+'-')||![.5,1].includes(item.days)||seen.has(item.date)||(item.deduct!==undefined&&typeof item.deduct!=='boolean'))throw new Error('请假记录无效或重复');seen.add(item.date);}
   for(const item of overtime){if(!item.id||otIds.has(item.id)||!validDate(item.date)||!item.date.startsWith(month+'-'))throw new Error('加班日期或编号无效');otIds.add(item.id);overtimeAmount(item);}
@@ -77,11 +80,15 @@ export function calculate(month,record,asOf=chinaDate(),settings=record,rounding
   let accruedDays=0,leaveDays=0,holidayLeaveDays=0,adjustedLeaveDays=0,deductLeaveDays=0,previousNet=0,previousGross=0,baseCents=0,overtimeCents=0,subsidyCents=0,wageDeductionCents=0;const daily=[];
   for(let day=1;day<=monthDays;day++){
     const date=month+'-'+String(day).padStart(2,'0');if(date<joinDate||date>asOf)continue;
-    accruedDays++;const leave=leaves.find(x=>x.date===date);
+    const accrues=baseAccruesOnDate(date,record),leave=accrues?leaves.find(x=>x.date===date):null;
+    const ot=overtime.filter(x=>x.date===date).reduce((n,item)=>n+overtimeAmount(item),0),subsidy=subsidies.filter(x=>x.date===date).reduce((n,x)=>n+x.amountCents,0),deduction=deductions.filter(x=>x.date===date).reduce((n,x)=>n+x.amountCents,0);
+    if(!accrues&&!ot&&!subsidy&&!deduction)continue;
+    if(accrues)accruedDays++;
     if(leave){leaveDays+=leave.days;if(isStatutory(date))holidayLeaveDays+=leave.days;if(isAdjustedDay(date))adjustedLeaveDays+=leave.days;if(leaveDeducts(leave,record))deductLeaveDays+=leave.days;}
     const dailyRate=salaryRateForDate(date,salaryCents,settings);
     let gross,net;
-    if(custom){
+    if(!accrues){gross=previousGross;net=previousNet;}
+    else if(custom){
       // Keep cent rounding cumulative within one company, salary and pay period, including across months.
       const key=JSON.stringify([dailyRate.start,record.company||'',salaryCents,joinDate]),state=rounding.get(key)||{days:0,leave:0,gross:0,net:0};
       state.days++;if(leave&&leaveDeducts(leave,record))state.leave+=leave.days;
@@ -89,18 +96,17 @@ export function calculate(month,record,asOf=chinaDate(),settings=record,rounding
       gross=previousGross+nextGross-state.gross;net=previousNet+nextNet-state.net;
       Object.assign(state,{gross:nextGross,net:nextNet});rounding.set(key,state);
     }else{gross=Math.round(salaryCents*accruedDays/divisor);net=Math.round(salaryCents*(accruedDays-deductLeaveDays)/divisor);}
-    const ot=overtime.filter(x=>x.date===date).reduce((n,item)=>n+overtimeAmount(item),0),subsidy=subsidies.filter(x=>x.date===date).reduce((n,x)=>n+x.amountCents,0),deduction=deductions.filter(x=>x.date===date).reduce((n,x)=>n+x.amountCents,0);
     daily.push({date,amountCents:net-previousNet+ot+subsidy-deduction,grossCents:gross-previousGross,leaveDeductionCents:gross-previousGross-(net-previousNet),overtimeCents:ot,subsidyCents:subsidy,wageDeductionCents:deduction,divisor:dailyRate.divisor,dailyCents:dailyRate.dailyCents,periodStart:dailyRate.start,periodEnd:dailyRate.end});previousNet=net;previousGross=gross;baseCents=gross;overtimeCents+=ot;subsidyCents+=subsidy;wageDeductionCents+=deduction;
   }
   const expectedCents=previousNet+overtimeCents+subsidyCents-wageDeductionCents,advanceCents=list(record,'advances').filter(x=>x.date<=asOf).reduce((n,x)=>n+x.amountCents,0),paymentCents=wagePayments(record).filter(x=>x.date<=asOf).reduce((n,x)=>n+x.amountCents,0),receivedCents=advanceCents+paymentCents,remainingCents=Math.max(0,expectedCents-receivedCents);
-  return {salaryCents,divisor,dailyCents:salaryCents/divisor,rates,joinDate,accruedDays,leaveDays,holidayLeaveDays,adjustedLeaveDays,deductLeaveDays,baseCents,deductionCents:baseCents-previousNet,overtimeCents,subsidyCents,wageDeductionCents,expectedCents,advanceCents,paymentCents,receivedCents,remainingCents,deductionCarryCents:Math.max(0,-expectedCents),excessCents:Math.max(0,receivedCents-Math.max(0,expectedCents)),plannedLeaveDays:leaves.reduce((n,x)=>n+x.days,0),daily,status:remainingCents?(receivedCents?'partial':'unpaid'):expectedCents<0?'offset':asOf>=month+'-'+monthDays?'paid':accruedDays?'current':'future'};
+  return {salaryCents,divisor,dailyCents:salaryCents/divisor,rates,joinDate,leaveDate,accruedDays,leaveDays,holidayLeaveDays,adjustedLeaveDays,deductLeaveDays,baseCents,deductionCents:baseCents-previousNet,overtimeCents,subsidyCents,wageDeductionCents,expectedCents,advanceCents,paymentCents,receivedCents,remainingCents,deductionCarryCents:Math.max(0,-expectedCents),excessCents:Math.max(0,receivedCents-Math.max(0,expectedCents)),plannedLeaveDays:leaves.reduce((n,x)=>n+x.days,0),daily,status:remainingCents?(receivedCents?'partial':'unpaid'):expectedCents<0?'offset':asOf>=month+'-'+monthDays?'paid':accruedDays?'current':'future'};
 }
 export function calculateBook(months,settings,asOf=chinaDate()) {
   const byMonth={},chunks=[],receipts=[],periods=new Map(),rounding=new Map();
   const periodFor=(date,company)=>{const range=payPeriodForDate(date,settings),id=range.start+'|'+encodeURIComponent(company);if(!periods.has(id))periods.set(id,{...range,id,company,expectedCents:0,remainingCents:0,receivedCents:0,advanceCents:0,paymentCents:0,unappliedCents:0,deductionCarryCents:0,baseCents:0,deductionCents:0,overtimeCents:0,subsidyCents:0,wageDeductionCents:0,accruedDays:0});return periods.get(id);};
   for(const [month,r] of Object.entries(months).sort(([a],[b])=>a.localeCompare(b))){
     const value=calculate(month,r,asOf,settings,rounding),company=r.company||'';byMonth[month]={...value,receivedCents:0,advanceCents:0,paymentCents:0,remainingCents:0,excessCents:0,deductionCarryCents:0,settlementCents:0};
-    for(const item of value.daily){const p=periodFor(item.date,company),chunk={...item,month,company,periodId:p.id,settlementCents:Math.max(0,item.amountCents),remainingCents:Math.max(0,item.amountCents),deductionCarryCents:0,adjustmentOffsets:[]};chunks.push(chunk);p.expectedCents+=item.amountCents;p.accruedDays++;for(const key of ['baseCents','deductionCents','overtimeCents','subsidyCents','wageDeductionCents'])p[key]+=item[{baseCents:'grossCents',deductionCents:'leaveDeductionCents'}[key]||key];}
+    for(const item of value.daily){const p=periodFor(item.date,company),chunk={...item,month,company,periodId:p.id,settlementCents:Math.max(0,item.amountCents),remainingCents:Math.max(0,item.amountCents),deductionCarryCents:0,adjustmentOffsets:[]};chunks.push(chunk);p.expectedCents+=item.amountCents;if(baseAccruesOnDate(item.date,r))p.accruedDays++;for(const key of ['baseCents','deductionCents','overtimeCents','subsidyCents','wageDeductionCents'])p[key]+=item[{baseCents:'grossCents',deductionCents:'leaveDeductionCents'}[key]||key];}
     for(const [kind,items] of [['advance',list(r,'advances')],['payment',wagePayments(r)]])for(const item of items){
       if(item.date>asOf)continue;
       receipts.push({...item,kind,month,company:item.company??company,periodStart:item.periodStart||month+'-01',periodEnd:item.periodEnd||month+'-'+daysInMonth(month),allocations:[],unappliedCents:item.amountCents});
@@ -127,6 +133,7 @@ export function migrateBook(saved,defaults,asOf=chinaDate()) {
   const book=JSON.parse(JSON.stringify(saved)),earliest=Object.keys(book.months).sort()[0],oldSettings={...defaults,...book.defaults};
   book.version=2;book.defaults={...oldSettings,joinDate:oldSettings.joinDate||earliest&&earliest+'-01'||asOf,periodMode:oldSettings.periodMode||'calendar',periodStartDay:oldSettings.periodStartDay||1};book.excludedMonths=Array.isArray(book.excludedMonths)?book.excludedMonths:[];
   if(!validDate(book.defaults.joinDate))throw new Error('入职日期无效');cents(Number(book.defaults.salaryCents),'默认月薪');
+  if(book.defaults.leaveDate&&(!validDate(book.defaults.leaveDate)||book.defaults.leaveDate<book.defaults.joinDate))throw new Error('离职日期不能早于入职日期。');
   if(saved.version===1){
     const excluded=new Set(book.excludedMonths);
     if(!earliest)for(let month=book.defaults.joinDate.slice(0,7);month<=asOf.slice(0,7);month=shiftMonth(month,1))excluded.add(month);
@@ -138,17 +145,18 @@ export function migrateBook(saved,defaults,asOf=chinaDate()) {
     }
     book.excludedMonths=[...excluded];
   }
-  const upgrade=records=>{for(const [month,r] of Object.entries(records||{})){if(!validMonth(month))throw new Error('月份无效');r.company=r.company??book.defaults.company??'';r.joinDate=r.joinDate||(r.company===book.defaults.company?book.defaults.joinDate:month+'-01');r.leaves=(r.leaves||[]).map(item=>({...item,deduct:leaveDeducts(item,oldSettings)}));delete r.delays;for(const item of [...(r.advances||[]),...(r.payments||[]),...(r.payment?[r.payment]:[])])delete item.delayAllocations;calculate(month,r,asOf);}};
+  const upgrade=records=>{for(const [month,r] of Object.entries(records||{})){if(!validMonth(month))throw new Error('月份无效');r.company=r.company??book.defaults.company??'';r.joinDate=r.joinDate||(r.company===book.defaults.company?book.defaults.joinDate:month+'-01');if(r.leaveDate===undefined&&book.defaults.leaveDate&&r.company===book.defaults.company&&r.joinDate===book.defaults.joinDate)r.leaveDate=book.defaults.leaveDate;r.leaves=(r.leaves||[]).map(item=>({...item,deduct:leaveDeducts(item,oldSettings)}));delete r.delays;for(const item of [...(r.advances||[]),...(r.payments||[]),...(r.payment?[r.payment]:[])])delete item.delayAllocations;calculate(month,r,asOf);}};
   upgrade(book.months);upgrade(book.sync?.cloudMonths);payPeriodForDate(asOf,book.defaults);return book;
 }
 export function ensureAccrualMonths(book,asOf=chinaDate()) {
   const join=book.defaults.joinDate;if(!validDate(join)||join>asOf)return false;
-  let changed=false;for(let month=join.slice(0,7);month<=asOf.slice(0,7);month=shiftMonth(month,1)){if(!book.months[month]&&!(book.excludedMonths||[]).includes(month)){book.months[month]={...book.defaults,leaves:[],overtime:[],advances:[],payments:[],payment:null};changed=true;}}
+  const end=book.defaults.leaveDate&&book.defaults.leaveDate<asOf?book.defaults.leaveDate:asOf;if(!validDate(end)||end<join)return false;
+  let changed=false;for(let month=join.slice(0,7);month<=end.slice(0,7);month=shiftMonth(month,1)){if(!book.months[month]&&!(book.excludedMonths||[]).includes(month)){book.months[month]={...book.defaults,leaves:[],overtime:[],advances:[],payments:[],payment:null};changed=true;}}
   return changed;
 }
 export function rebuildAccrualFromJoin(book,asOf=chinaDate()){
  const join=book.defaults.joinDate;if(!validDate(join)||join>asOf)return false;
- const start=join.slice(0,7),end=asOf.slice(0,7);
+ const start=join.slice(0,7),end=(book.defaults.leaveDate&&book.defaults.leaveDate<asOf?book.defaults.leaveDate:asOf).slice(0,7);
  book.excludedMonths=(book.excludedMonths||[]).filter(month=>month<start||month>end);
  return ensureAccrualMonths(book,asOf);
 }

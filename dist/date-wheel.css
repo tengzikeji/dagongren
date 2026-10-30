@@ -1,0 +1,26 @@
+.modal.record-date-choosing{min-height:min(616px,calc(var(--visible-height,100dvh) - 32px))}
+.date-wheel-sheet{--wheel-row:clamp(28px,calc((var(--visible-height,100dvh) - 444px)/5),44px);--wheel-label:24px;animation:date-wheel-enter .12s ease-out both}
+@keyframes date-wheel-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.date-wheel-body{display:flex;flex-direction:column;justify-content:center;gap:14px;overflow-y:auto;padding:16px 20px}
+.date-wheel-body .date-selection{margin:0;padding:11px 15px;text-align:center;flex-shrink:0}
+.date-wheel-body .date-selection>strong{font-size:24px;letter-spacing:.2px;line-height:1.4}
+.date-wheel-body .date-selection>p{font-size:11px;line-height:18px;overflow-wrap:anywhere;min-height:36px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.date-wheel-stage{position:relative;flex-shrink:0;width:100%;isolation:isolate}
+.date-wheel-columns{position:relative;display:grid;grid-template-columns:repeat(var(--wheel-columns),minmax(0,1fr));gap:8px;max-width:440px;margin:0 auto}
+.date-wheel-sheet[data-wheel-kind=year] .date-wheel-columns,.date-wheel-sheet[data-wheel-kind=day] .date-wheel-columns{max-width:210px}
+.date-wheel-column{min-width:0;text-align:center}
+.date-wheel-label{height:var(--wheel-label);font-size:11px;color:var(--muted);line-height:var(--wheel-label);font-weight:550}
+.date-wheel-scroll{height:calc(var(--wheel-row)*5);padding-block:calc(var(--wheel-row)*2);overflow-y:auto;overflow-x:hidden;scroll-snap-type:y mandatory;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:none;-webkit-mask-image:linear-gradient(transparent,#000 23%,#000 77%,transparent);mask-image:linear-gradient(transparent,#000 23%,#000 77%,transparent);outline-offset:-3px;border-radius:12px;position:relative}
+.date-wheel-scroll::-webkit-scrollbar{display:none}
+.date-wheel-option{height:var(--wheel-row);line-height:var(--wheel-row);scroll-snap-align:center;scroll-snap-stop:normal;white-space:nowrap;color:var(--muted);font-size:19px;font-weight:450;font-variant-numeric:tabular-nums;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+.date-wheel-option[aria-selected=true]{color:var(--entry-strong);font-size:23px;font-weight:700}
+.date-wheel-option[aria-disabled=true]{opacity:.25}
+.date-wheel-band{position:absolute;inset-inline:0;top:calc(var(--wheel-label) + var(--wheel-row)*2);height:var(--wheel-row);z-index:-1;background:var(--entry-accent-soft);border-top:1px solid color-mix(in srgb,var(--entry-accent) 25%,transparent);border-bottom:1px solid color-mix(in srgb,var(--entry-accent) 25%,transparent);border-radius:12px;pointer-events:none}
+.date-wheel-hint{text-align:center;font-size:10px;color:var(--muted);line-height:1.8;margin:0}
+.date-wheel-sheet .date-sheet-tools{gap:10px;line-height:1.6}.date-wheel-sheet .date-sheet-tools>span{text-align:right}
+.date-wheel-sheet[data-wheel-kind=day] [data-date-action=today]{display:none}
+.entry-date-year .entry-date-trigger,.entry-date-month .entry-date-trigger,.entry-date-day .entry-date-trigger{min-height:54px;padding-block:9px}
+.entry-date-field [data-date-weekday]:empty,.entry-date-meta:empty{display:none}
+.record-range-summary .entry-date-field{margin:0;width:100%}.record-range-summary .entry-date-field>label{font-size:11px;color:var(--muted)}.record-range-summary .entry-date-trigger{min-height:56px}
+.entry-preference-note{color:var(--muted);font-size:10px;line-height:1.7}
+@media(max-width:350px){.date-wheel-body{padding:12px 13px;gap:10px}.date-wheel-body .date-selection>strong{font-size:22px}.date-wheel-option{font-size:18px}.date-wheel-option[aria-selected=true]{font-size:21px}.date-wheel-sheet .date-sheet-header{padding-top:13px;padding-bottom:11px}}

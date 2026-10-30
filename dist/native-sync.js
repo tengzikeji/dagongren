@@ -70,13 +70,14 @@ export function installNativeSync(api){
  }
  async function performRun(resolution='normal',silent=false,source='manual'){
   runSource=source;
+  const notify=()=>!silent&&runSource!=='pull';
   if(disposed||busy||cleanupReview)return report('attention','请等待当前网盘操作完成');
   if(db().sync.pendingCleanup){if(!silent)reviewCleanup(db().sync.pendingCleanup.options);return report('attention','请先核对上次云端清理结果');}
-  if(!config.configured){if(!silent)showConfig();return report('attention','请先配置坚果云');}
+  if(!config.configured){if(notify())showConfig();return report('attention','请先配置坚果云');}
   if(silent&&api.interacting?.()){schedule(150);return {...feedback};}
-  if(api.storageBlocked()){if(!silent)message('本机存储不可用，已暂停同步，请先导出账本。');return report('error','本机存储不可用');}
-  if(!online()){lastError='网络已断开，修改保存在本机，联网后会自动补齐。';armPoll();if(!silent)api.toast(lastError);return report('error',lastError);}
-  if(api.editing?.()){if(!silent)api.toast('请先保存或取消当前编辑，自动同步会在编辑完成后继续。');schedule();return report('attention','请先保存或取消当前编辑');}
+  if(api.storageBlocked()){if(notify())message('本机存储不可用，已暂停同步，请先导出账本。');return report('error','本机存储不可用');}
+  if(!online()){lastError='网络已断开，修改保存在本机，联网后会自动补齐。';armPoll();if(notify())api.toast(lastError);return report('error',lastError);}
+  if(api.editing?.()){if(notify())api.toast('请先保存或取消当前编辑，自动同步会在编辑完成后继续。');schedule();return report('attention','请先保存或取消当前编辑');}
   let succeeded=false;
   const generation=cleanupGeneration,cancelled=()=>cleanupGeneration!==generation||(silent&&runSource!=='pull'&&!db().sync.auto);busy=true;clearTimeout(timer);clearTimeout(pollTimer);lastAttempt=Date.now();report('syncing','正在同步');
   try{
@@ -99,12 +100,12 @@ export function installNativeSync(api){
     }else if(choosing)action=resolution;
     if(action==='conflict'){lastError='请先确认这次同步要保留的账本。';conflictDialog(remoteHash,localHash);return;}
     if(choosing)api.closeModal();
-    if(action==='same'){adopt(local,local);succeeded=true;if(!silent)api.toast('本机与网盘账本一致。');return;}
+    if(action==='same'){adopt(local,local);succeeded=true;if(notify())api.toast('本机与网盘账本一致。');return;}
     if(action==='download')candidate=canMerge?candidate:remoteBook;
     if(!candidate)throw new Error('网盘账本不存在，本机记录保留。');
     candidate=migrateBook(snapshotBook(candidate),api.defaults,api.today());ensureAccrualMonths(candidate,api.today());
     rememberDeletions(candidate,local,requestPrefix+'-'+(++sequence));calculateBook(candidate.months,candidate.defaults,api.today());candidate=snapshotBook(candidate);
-    if(action==='download'&&signature(candidate)===remoteHash){saveBeforeReplace(db());adopt(candidate,remoteBook);succeeded=true;if(!silent)api.toast('网盘的新记录已合并到本机。');return;}
+    if(action==='download'&&signature(candidate)===remoteHash){saveBeforeReplace(db());adopt(candidate,remoteBook);succeeded=true;if(notify())api.toast('网盘的新记录已合并到本机。');return;}
     if(remote.exists&&(!remote.etag||remote.etag.startsWith('W/')))throw new Error('网盘未提供可用于防冲突的版本标识，本次未覆盖网盘账本。');
     saveBeforeReplace(db());
     try{await request('write',{content:canonicalJSON(candidate),exists:remote.exists,etag:remote.etag||''});}
@@ -117,12 +118,12 @@ export function installNativeSync(api){
      if(rebased.conflicts.length){lastError='同步期间同一笔记录又有修改，请确认冲突部分。';conflictDialog(signature(candidate),signature(db()),rebased.conflicts,true);}
     }else adopt(candidate,candidate);
     succeeded=!conflict&&!db().sync.pending;
-    if(!silent&&!conflict)api.toast(action==='merge'?'两端不同的新记录已自动合并。':'账本已同步到坚果云。');return;
+    if(notify()&&!conflict)api.toast(action==='merge'?'两端不同的新记录已自动合并。':'账本已同步到坚果云。');return;
    }
   }catch(error){
    if(cancelled())return;
    failures++;lastError=/[\u4e00-\u9fff]/.test(error.message||'')?error.message:'同步未完成，修改保存在本机，稍后会自动重试。';
-   if(error.code===429)failures=Math.max(failures,4);if(!silent)api.toast(lastError);
+   if(error.code===429)failures=Math.max(failures,4);if(notify())api.toast(lastError);
   }finally{
    busy=false;
    if(cancelled())report('idle','同步已暂停');
@@ -146,7 +147,7 @@ export function installNativeSync(api){
   if(api.storageBlocked()){api.toast('本机存储不可用，未清理任何记录。');return;}
   const epoch=++cleanupEpoch;cleanupReview=null;cleanupRetryOptions={...options,target:'both'};busy=true;clearTimeout(timer);clearTimeout(pollTimer);
   const title='确认清理本机及云端？',e=api.esc;
-  const reviewBody=plan=>'<div class="cloud-cleanup-review" '+(!plan?'id="cloud-cleanup-loading" aria-busy="true"':'')+'><div class="notice">将清理两端账本中相同范围的记录。默认工资设置、连接配置及范围外的记录保留。</div><div class="detail-line"><span>清理范围</span><strong>'+e(cleanupRange(cleanupRetryOptions))+'</strong></div><div class="detail-line"><span>本机记录</span><strong>'+(plan?e(cleanupCount(plan.local)):'正在核对…')+'</strong></div><div class="detail-line"><span>云端记录</span><strong>'+(plan?e(cleanupCount(plan.cloud)):'正在核对…')+'</strong></div><div class="detail-line"><span>云端账号</span><strong>'+e(config.username||'当前已配置账号')+'</strong></div><p class="field-note">仅处理当前配置的打工人账本；'+e(config.path||'当前账本路径')+'。确认前会再次检查版本。清理完成后，自动同步开关保持原选择。</p></div><div class="error" id="cloud-cleanup-error" role="alert"></div><div class="modal-actions"><button class="btn btn-plain" data-action="modal-back">取消</button><button id="cloud-cleanup-confirm" class="btn btn-danger" data-action="native-cleanup-confirm" '+(!plan?'disabled':'')+'>确认清理</button></div>';
+  const reviewBody=plan=>'<div class="cloud-cleanup-review" '+(!plan?'id="cloud-cleanup-loading" aria-busy="true"':'')+'><div class="notice">将清理两端账本中相同范围的记录。默认工资设置、连接配置及范围外的记录保留。</div><div class="detail-line"><span>工作主体</span><strong>'+e(typeof cleanupRetryOptions.company==='string'?cleanupRetryOptions.company||'未命名主体':'全部主体')+'</strong></div><div class="detail-line"><span>清理范围</span><strong>'+e(cleanupRange(cleanupRetryOptions))+'</strong></div><div class="detail-line"><span>本机记录</span><strong>'+(plan?e(cleanupCount(plan.local)):'正在核对…')+'</strong></div><div class="detail-line"><span>云端记录</span><strong>'+(plan?e(cleanupCount(plan.cloud)):'正在核对…')+'</strong></div><div class="detail-line"><span>云端账号</span><strong>'+e(config.username||'当前已配置账号')+'</strong></div><p class="field-note">仅处理当前配置的打工人账本；'+e(config.path||'当前账本路径')+'。确认前会再次检查版本。清理完成后，自动同步开关保持原选择。</p></div><div class="error" id="cloud-cleanup-error" role="alert"></div><div class="modal-actions"><button class="btn btn-plain" data-action="modal-back">取消</button><button id="cloud-cleanup-confirm" class="btn btn-danger" data-action="native-cleanup-confirm" '+(!plan?'disabled':'')+'>确认清理</button></div>';
   api.showModal(title,reviewBody(null),true);
   try{
    const response=request('read').then(data=>({data}),error=>({error}));
@@ -183,7 +184,7 @@ export function installNativeSync(api){
    cloudProcessed=true;
    const fresh=buildPairedCleanup(snapshotBook(db()),remoteBook,context.options,revision);if(fresh.plan.signature!==context.plan.signature)throw new Error('清理期间本机记录发生变化，已保留本机记录，请重新核对。');
    const next={...fresh.local,sync:{...db().sync,pausedByCleanup:false,cleanupTarget:'both',pending:0}};delete next.sync.pendingCleanup;
-   const message='已清理'+cleanupRange(context.options)+'：本机'+context.plan.local.months+'个月，云端'+context.plan.cloud.months+'个月。自动同步开关保持原选择。';
+   const message='已清理'+cleanupRange(context.options)+(context.options.company!==undefined?'（'+(typeof context.options.company==='string'?context.options.company||'未命名主体':'全部主体')+'）':'')+'：本机'+context.plan.local.months+'个月，云端'+context.plan.cloud.months+'个月。自动同步开关保持原选择。';
    next.sync.logs=[{text:message,icon:'trash',time:new Date().toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit'})},...(next.sync.logs||[])].slice(0,20);
    localStorage.setItem('dagongren.paybook.v1',JSON.stringify(next));api.replaceBook(next);cleanupReview=null;lastError='';failures=0;conflict=null;
    api.closeModal();if(api.cleanupComplete)api.cleanupComplete(message);else{api.render();api.toast(message);}return true;
@@ -234,5 +235,5 @@ export function installNativeSync(api){
  globalThis.window?.addEventListener?.('online',foreground);
  globalThis.document?.addEventListener?.('visibilitychange',()=>{if(visible())foreground();else{clearTimeout(timer);clearTimeout(pollTimer);}});
  queueMicrotask(()=>{if(canAuto())schedule(500);});
- return {view,showConfig,run,schedule,feedback:feedbackState,submit,handleClick,status,reviewCleanup,confirmCleanup,cancelCleanupReview,isBusy:()=>busy||cleanupCommitting,configured:()=>!!config.configured,beforeCleanup(){cleanupGeneration++;clearTimeout(timer);clearTimeout(pollTimer);},foreground,fetchCalendar:year=>request('calendar-read',{year}),dispose(){disposed=true;clearTimeout(timer);clearTimeout(pollTimer);}};
+ return {view,showConfig,run,schedule,feedback:feedbackState,submit,handleClick,status,reviewCleanup,confirmCleanup,cancelCleanupReview,isBusy:()=>busy||cleanupCommitting,configured:()=>!!config.configured,canAutoSync:canAuto,beforeCleanup(){cleanupGeneration++;clearTimeout(timer);clearTimeout(pollTimer);},foreground,fetchCalendar:year=>request('calendar-read',{year}),dispose(){disposed=true;clearTimeout(timer);clearTimeout(pollTimer);}};
 }

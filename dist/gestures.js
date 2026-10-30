@@ -20,7 +20,8 @@ export function swipeDecision(dx,width,velocity=0,axis='x'){
 export function swipeOffset(dx,width,boundary=false){return boundary?Math.sign(dx)*Math.min(width*.35,Math.abs(dx)*.4):Math.max(-width,Math.min(width,dx));}
 export function calendarSwipeDelta(dx,dy,duration=0,width=400){if(duration>30000||swipeAxis(dx,dy)!=='x')return 0;const d=swipeDecision(dx,width,duration>0?dx*1000/duration:0);return d.complete?d.delta:0;}
 const owners=new WeakMap();
-const reduced=()=>document.body.classList.contains('motion-off')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+// Direct manipulation and its settling animation are independent of decorative motion.
+const reduced=()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const mark=(name,detail)=>{try{performance.mark(name,{detail});}catch{}};
 function stripIds(node){node.removeAttribute?.('id');for(const n of node.querySelectorAll?.('[id]')||[])n.removeAttribute('id');return node;}
 function copy(node){return stripIds(node.cloneNode(true));}
@@ -114,7 +115,7 @@ function calendarScene(root,api,cache,delta){
   update(dx){this.offset=swipeOffset(dx,width,!item);track.style.transform='translate3d('+this.offset+'px,0,0)';resize(this.offset);},progress:resize,
   dispose(){track.remove();grid.style.visibility=visibility;viewport.style.height=height;viewport.classList.remove('calendar-month-switching');delete viewport.dataset.swipeProgress;},
   commit(){if(item)api.commit(delta);},
-  notify(completed,velocity,duration){mark(completed?'dagongren.calendar.slide':'dagongren.calendar.rebound',{from:this.from,to:completed?this.to:this.from,direction:delta,duration,velocity,sharedTrack:true,datesOnly:true,boundary:!item});}
+  notify(completed,velocity,duration){mark(completed?'dagongren.calendar.slide':'dagongren.calendar.rebound',{from:this.from,to:completed?this.to:this.from,direction:delta,duration,velocity,sharedTrack:true,datesOnly:true,trigger:this.trigger||'swipe',boundary:!item});}
  };
 }
 // Measure adjacent month grids before horizontal movement, keeping the current grid visible.
@@ -136,7 +137,7 @@ function prepareCalendarScene(root,api,cache,snapshot){
    update(dx){this.offset=swipeOffset(dx,width,!item);track.style.transform='translate3d('+this.offset+'px,0,0)';resize(this.offset);},progress:resize,
    dispose(){layer.remove();grid.style.visibility=visibility;viewport.style.height=height;viewport.classList.remove('calendar-month-switching');delete viewport.dataset.swipeProgress;},
    commit(){if(item)api.commit(delta);},
-   notify(completed,velocity,duration){mark(completed?'dagongren.calendar.slide':'dagongren.calendar.rebound',{from:this.from,to:completed?this.to:this.from,direction:delta,duration,velocity,sharedTrack:true,datesOnly:true,boundary:!item,prepared:true});}
+   notify(completed,velocity,duration){mark(completed?'dagongren.calendar.slide':'dagongren.calendar.rebound',{from:this.from,to:completed?this.to:this.from,direction:delta,duration,velocity,sharedTrack:true,datesOnly:true,trigger:this.trigger||'swipe',boundary:!item,prepared:true});}
   };
  },dispose(){if(!active)layer.remove();}};
 }
@@ -190,14 +191,15 @@ function bindInput(root,config){
  root.addEventListener('touchcancel',e=>{if(gesture?.touch)end(gesture.x+gesture.dx,gesture.y,e.timeStamp,e,true);},{passive:true});
  root.addEventListener('click',e=>{if(e.isTrusted&&Date.now()<blockedUntil&&config.ownsClick(e.target)){e.preventDefault();e.stopImmediatePropagation();}},true);
  const controller={cancel:clear,isBusy:()=>busy||Boolean(scene),isPending:()=>Boolean(gesture&&!scene),discardPrepared(){if(!scene){staged?.dispose();staged=null;}},preload(){if(gesture||busy||scene||owners.get(root)||config.blocked?.())return false;staged?.dispose();staged=null;config.warm?.();staged=config.prepare?.()||null;return Boolean(staged);},start(delta,trigger='tap'){
-  owners.get(root)?.cancel(false);clear(false);config.warm?.();scene=config.scene(delta);if(!scene)return false;scene.trigger=trigger;root.dataset.swipeTrigger=trigger;root.classList.add('swipe-busy');if(config.page)root.classList.add('page-transitioning');owners.set(root,controller);gesture={x:0,y:0,id:-1,touch:false,axis:'x',dx:0,delta,samples:[{x:0,t:0}]};scene.update(0);if(trigger==='tap'){scene.commit();scene.committed=true;const live=root.querySelector('.workspace .content');if(live)live.style.visibility='hidden';scene.update(0);}settle(true,0);return true;
+  owners.get(root)?.cancel(false);clear(false);config.warm?.();scene=config.scene(delta);if(!scene)return false;scene.trigger=trigger;root.dataset.swipeTrigger=trigger;root.classList.add('swipe-busy');if(config.page)root.classList.add('page-transitioning');owners.set(root,controller);gesture={x:0,y:0,id:-1,touch:false,axis:'x',dx:0,delta,samples:[{x:0,t:0}]};scene.update(0);if(trigger==='tap'&&config.page){scene.commit();scene.committed=true;const live=root.querySelector('.workspace .content');if(live)live.style.visibility='hidden';scene.update(0);}settle(true,0);return true;
  }};return controller;
 }
 export function bindPageSwipe(root,api){
  let cache=new Map(),idle=0,tapTarget=null,snapshot=null;
  const warm=()=>{const from=api.current();for(const to of [...[-1,1].map(d=>pageSwipeTarget(from,d)),tapTarget].filter(Boolean))if(!cache.has(to)){const node=contentFrom(api.preview?.(to),'.workspace .content');if(node)cache.set(to,stripIds(node));}if(!snapshot){const content=root.querySelector('.workspace .content');if(content)snapshot=stripIds(api.snapshot?.(content)||content.cloneNode(true));}};
  const controller=bindInput(root,{page:true,blocked:()=>api.blocked?.()||!VIEWS.includes(api.current()),width:()=>document.documentElement.clientWidth,
-  accept:(target,x)=>x>=0&&x<=document.documentElement.clientWidth&&!target.closest?.('.calendar-grid-viewport,.profile-name-viewport,.entry-filters,.record-year-trigger,input,textarea,select,.select-trigger,[role=dialog],.bottom-nav,.side-nav,.record-launcher')&&(api.current()==='calendar'||!target.closest?.('.month-control,.month-toolbar')),ownsClick:()=>true,warm,
+  // Picker buttons can start a page swipe; bindInput keeps taps and suppresses a completed drag's click.
+  accept:(target,x)=>x>=0&&x<=document.documentElement.clientWidth&&!target.closest?.('.calendar-grid-viewport,.profile-name-viewport,input,textarea,select,.select-trigger,[role=dialog],.bottom-nav,.side-nav,.record-launcher'),ownsClick:()=>true,warm,
   prepare:()=>preparePageScene(root,api,cache,snapshot),
   scene:delta=>{const target=tapTarget;tapTarget=null;return pageScene(root,api,cache,delta,target);},
   settled:(completed,to)=>{cache.clear();snapshot=null;api.settled?.(completed,to);},commit:delta=>{const to=pageSwipeTarget(api.current(),delta);if(to)api.navigate(to);}
@@ -205,14 +207,17 @@ export function bindPageSwipe(root,api){
  if(!controller)return;
  controller.invalidate=()=>{if(controller.isPending())controller.cancel(false);controller.discardPrepared();cache.clear();snapshot=null;if(idle){if(typeof cancelIdleCallback==='function')cancelIdleCallback(idle);else clearTimeout(idle);}const prepare=()=>{idle=0;if(!root.inert&&!controller.isBusy())controller.preload();};idle=typeof requestIdleCallback==='function'?requestIdleCallback(prepare,{timeout:300}):setTimeout(prepare,0);};
  controller.prepare=()=>controller.preload();
- let scrollTimer=0;globalThis.window?.addEventListener?.('scroll',()=>{controller.discardPrepared();clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>controller.invalidate(),80);},{passive:true});globalThis.window?.addEventListener?.('resize',()=>controller.invalidate(),{passive:true});
+ // A delayed scroll refresh must not cancel a touch that began after scrolling.
+ let scrollTimer=0;globalThis.window?.addEventListener?.('scroll',()=>{controller.discardPrepared();clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{if(!controller.isPending()&&!controller.isBusy())controller.invalidate();},80);},{passive:true});globalThis.window?.addEventListener?.('resize',()=>controller.invalidate(),{passive:true});
  controller.navigate=to=>{const from=api.current(),a=VIEWS.indexOf(from),b=VIEWS.indexOf(to);if(a<0||b<0||a===b||api.blocked?.())return false;tapTarget=to;warm();const ok=controller.start(Math.sign(b-a),'tap');if(!ok){tapTarget=null;api.navigate(to);api.settled?.(true,to);}return true;};return controller;
 }
 export function bindCalendarSwipe(root,api){
- if(typeof api==='function')api={commit:api};let cache=new Map(),idle=0,snapshot=null;
+ if(typeof api==='function')api={commit:api};let cache=new Map(),idle=0,snapshot=null,pendingTap=0;
  const warm=()=>{for(const delta of [-1,1])if(!cache.has(delta)){const p=api.preview?.(delta);if(p){const grid=contentFrom(p.markup,'.calendar-days');if(grid)cache.set(delta,{month:p.month,grid:stripIds(grid)});}}if(!snapshot){const grid=root.querySelector('.view-calendar .calendar-grid-viewport>.calendar-days');if(grid)snapshot=copy(grid);}};
  const controller=bindInput(root,{width:()=>root.querySelector('.view-calendar .calendar-grid-viewport')?.clientWidth||400,blocked:()=>api.blocked?.(),accept:target=>Boolean(target.closest?.('.view-calendar .calendar-grid-viewport')),ownsClick:target=>Boolean(target.closest?.('.calendar-grid-viewport')),warm,
-  prepare:()=>prepareCalendarScene(root,api,cache,snapshot),scene:delta=>calendarScene(root,api,cache,delta),commit:delta=>api.commit(delta),settled:completed=>{cache.clear();snapshot=null;api.settled?.(completed);}});
+  prepare:()=>prepareCalendarScene(root,api,cache,snapshot),scene:delta=>calendarScene(root,api,cache,delta),commit:delta=>api.commit(delta),settled:completed=>{pendingTap=0;cache.clear();snapshot=null;api.settled?.(completed);}});
  if(!controller)return;controller.prepare=()=>controller.preload();controller.invalidate=()=>{if(controller.isPending())controller.cancel(false);controller.discardPrepared();cache.clear();snapshot=null;if(idle)clearTimeout(idle);idle=setTimeout(()=>{idle=0;if(!root.inert&&!controller.isBusy()&&!api.blocked?.())controller.preload();},0);};
+ const cancel=controller.cancel;controller.cancel=(flush=true)=>{pendingTap=0;cancel(flush);};
+ controller.navigate=delta=>{if(![-1,1].includes(delta)||api.blocked?.())return false;const previous=pendingTap;controller.cancel(false);if(previous)api.commit(previous);cache.clear();snapshot=null;warm();if(!cache.has(delta))return false;pendingTap=delta;const ok=controller.start(delta,'tap');if(!ok){pendingTap=0;api.commit(delta);api.settled?.(true);}return true;};
  let scrollTimer=0;globalThis.window?.addEventListener?.('scroll',()=>{controller.discardPrepared();clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>controller.invalidate(),80);},{passive:true});globalThis.window?.addEventListener?.('resize',()=>controller.invalidate(),{passive:true});return controller;
 }
