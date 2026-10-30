@@ -4,7 +4,8 @@ body[data-theme] :is(.entry-form,.record-date-sheet,.entry-date-field){--entry-a
 .modal.modal-v2,.modal.modal-v2 .choice-sheet{color:var(--control-ink);background:var(--control-surface)}
 .modal.modal-v2 :is(.modal-heading h2,.choice-header h3,.field>label,.select-trigger strong,.choice-card-copy strong){color:var(--control-ink)}
 .modal.modal-v2 :is(.modal-kicker,.modal-description,.field-note,.entry-date-meta,.entry-date-copy small,.entry-optional,.select-trigger small,.choice-header small,.choice-card-copy small,.choice small,.choice-amount small,.choice-group-label,.date-wheel-hint,.theme-option-copy>span){color:var(--control-muted)}
-.modal.modal-v2 :is(.btn-plain,.btn-ghost,.select-trigger,.entry-date-trigger,.choice-back,.modal-back,.modal-close){background:var(--control-neutral);border-color:var(--control-border);color:var(--control-ink);box-shadow:none}
+.modal.modal-v2 :is(.btn-plain,.btn-ghost,.date-cancel,.select-trigger,.entry-date-trigger,.choice-back,.choice-close,.modal-back,.modal-close){background:var(--control-neutral);border-color:var(--control-border);color:var(--control-ink);box-shadow:none}
+.modal.modal-v2 .date-sheet-tools>button{color:var(--control-selected-ink)}
 .modal.modal-v2 .btn-primary{background:var(--control-primary);border-color:var(--control-primary-border);color:#fff;box-shadow:none}
 .modal.modal-v2 .btn-danger,.cleanup-panel .btn-danger{background:var(--control-danger);border-color:var(--control-danger);color:#fff;box-shadow:none}
 .modal.modal-v2 :is(.choice-card,.record-entry-menu>button,.choice){background:var(--control-surface);border-color:var(--control-border);color:var(--control-ink);box-shadow:none}
