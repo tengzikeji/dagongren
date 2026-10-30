@@ -219,4 +219,18 @@ console.log('Passed wheel integration: shared years across all three entry point
  ui.click('open-cleanup');assert.match(ui.el('app').innerHTML,/id="cleanup-company" value="\*"/);ui.click('cleanup-company-picker');assert.match(ui.el('modal-root').innerHTML,/全部主体/);assert.match(ui.el('modal-root').innerHTML,/公司乙/);ui.click('cleanup-company-select',{company:'subject:'+encodeURIComponent('公司甲')});ui.click('cleanup-scope',{scope:'all'});ui.click('review-cleanup');assert.match(ui.el('modal-root').innerHTML,/id="cleanup-review-company">公司甲/);ui.click('confirm-cleanup');
  assert.equal(ui.data().months['2026-09'].company,'公司乙');assert.equal(ui.data().months['2026-10'].accrualDisabled,true);assert.equal(ui.data().months['2026-10'].payments[0].id,'foreign-cash');assert.equal(ui.calc('2026-10').baseCents,0);ui.click('open-cleanup');assert.match(ui.el('app').innerHTML,/id="cleanup-company" value="\*"/);
 }
-console.log('Passed employment and company cleanup: inclusive end date, late-date recalculation, preserved receipts/history, resumed accrual, default all companies and safe per-company cleanup.');
+{
+ const ui=boot(fixture);ui.click('open-cleanup');ui.click('cleanup-scope',{scope:'all'});ui.click('review-cleanup');ui.click('confirm-cleanup');assert.deepEqual(Object.keys(ui.data().months),[]);
+ ui.click('nav',{view:'settings'});ui.click('company-settings');ui.submit('company-form',{company:'公司甲',joinDate:'2026-09-21',leaveDate:''});assert.deepEqual(Object.keys(ui.data().months).sort(),['2026-09','2026-10']);for(const month of Object.values(ui.data().months)){assert.equal(month.leaves.length,0);assert.equal(month.payments.length,0);}assert(ui.book().expectedCents>0);
+}
+{
+ const ui=boot(fixture);ui.click('open-cleanup');ui.click('cleanup-scope',{scope:'month'});ui.change('cleanup-month','2026-09');ui.click('review-cleanup');ui.click('confirm-cleanup');assert.equal(ui.data().months['2026-09'],undefined);
+ ui.click('nav',{view:'settings'});ui.click('company-settings');ui.submit('company-form',{company:'公司甲',joinDate:'2026-09-21',leaveDate:'2026-10-10'});assert.equal(ui.data().months['2026-09'],undefined);
+ ui.click('company-settings');ui.submit('company-form',{company:'公司甲',joinDate:'2026-09-21',leaveDate:''});assert.equal(ui.data().months['2026-09'],undefined);
+}
+{
+ const next=clone(fixture);next.months['2026-10'].payments=[{id:'carrier-cash',date:'2026-10-22',amountCents:10000,company:'公司乙',periodStart:'2026-09-21',periodEnd:'2026-10-20'}];const ui=boot(next);ui.click('open-cleanup');ui.click('cleanup-company-select',{company:'subject:'+encodeURIComponent('公司甲')});ui.click('cleanup-scope',{scope:'all'});ui.click('review-cleanup');ui.click('confirm-cleanup');
+ ui.click('nav',{view:'settings'});ui.click('company-settings');ui.submit('company-form',{company:'公司甲',joinDate:'2026-09-21',leaveDate:'2026-10-10'});assert.equal(ui.data().months['2026-10'].accrualDisabled,true);assert.equal(ui.data().months['2026-09'],undefined);
+ ui.click('company-settings');ui.submit('company-form',{company:'公司甲',joinDate:'2026-09-21',leaveDate:'2026-10-10'});assert.equal(ui.data().months['2026-10'].accrualDisabled,undefined);assert(ui.data().months['2026-09']);assert(ui.calc('2026-10').baseCents>0);assert.equal(ui.data().months['2026-10'].payments[0].id,'carrier-cash');assert.equal(ui.data().months['2026-10'].leaves.length,0);
+}
+console.log('Passed employment and company cleanup: inclusive end date, preserved cash/history, resumed accrual, default all companies, safe subject cleanup, explicit base rebuilding and no restoration for end-date-only edits.');
