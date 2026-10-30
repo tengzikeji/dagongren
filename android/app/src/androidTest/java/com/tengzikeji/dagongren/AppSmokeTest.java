@@ -191,26 +191,26 @@ public class AppSmokeTest {
             assertEquals("\"2024-01-01\"",evaluate(scenario,"document.getElementById('record-range-start').value"));
             pickRecordDate(scenario,"record-range-end","2024-01-31");
             tapControl(scenario,".modal-footer button[type=submit]");
-            waitTrue(scenario,"document.querySelectorAll('.salary-record-list .month-pay-card').length===1");
+            waitTrue(scenario,"document.querySelectorAll('#view-content .salary-record-list .month-pay-card').length===1");
             tapControl(scenario,"[data-action=detail-tab][data-tab=entries]");
             assertEquals("8",evaluate(scenario,"document.querySelector('.journal-filters').children.length"));
-            assertEquals("2",evaluate(scenario,"document.querySelectorAll('.ledger-group .ledger-entry').length"));
+            assertEquals("2",evaluate(scenario,"document.querySelectorAll('#view-content .ledger-group .ledger-entry').length"));
             tapControl(scenario,"[data-action=entry-filter][data-filter=subsidy]");
             tapControl(scenario,"[data-action=record-date-filter]");
             assertEquals("\"2024-12-31\"",evaluate(scenario,"document.getElementById('record-range-end').value"));
             pickRecordDate(scenario,"record-range-start","2024-02-01");
             pickRecordDate(scenario,"record-range-end","2024-02-29");
             tapControl(scenario,".modal-footer button[type=submit]");
-            waitTrue(scenario,"document.querySelectorAll('.ledger-group .ledger-entry').length===1");
-            assertEquals("true",evaluate(scenario,"document.querySelector('.ledger-group').textContent.includes('二月餐补')&&!document.querySelector('.ledger-group').textContent.includes('一月餐补')"));
+            waitTrue(scenario,"document.querySelectorAll('#view-content .ledger-group .ledger-entry').length===1");
+            assertEquals("true",evaluate(scenario,"document.querySelector('#view-content .ledger-group').textContent.includes('二月餐补')&&!document.querySelector('#view-content .ledger-group').textContent.includes('一月餐补')"));
             paintedScreenshot(scenario,"entry-filter-range");
             tapControl(scenario,"[data-action=reset-record-date-filter]");
-            waitTrue(scenario,"document.querySelectorAll('.ledger-group .ledger-entry').length===2");
+            waitTrue(scenario,"document.querySelectorAll('#view-content .ledger-group .ledger-entry').length===2");
             assertEquals("true",evaluate(scenario,"document.querySelector('[data-action=entry-filter][data-filter=subsidy]').getAttribute('aria-pressed')==='true'"));
             tapControl(scenario,"[data-action=detail-tab][data-tab=salary]");
-            assertEquals("1",evaluate(scenario,"document.querySelectorAll('.salary-record-list .month-pay-card').length"));
+            assertEquals("1",evaluate(scenario,"document.querySelectorAll('#view-content .salary-record-list .month-pay-card').length"));
             tapControl(scenario,"[data-action=reset-record-date-filter]");
-            assertEquals("true",evaluate(scenario,"document.querySelectorAll('.salary-record-list .month-pay-card').length>1&&window.__filterBook===localStorage.getItem('dagongren.paybook.v1')&&document.documentElement.scrollWidth<=innerWidth"));
+            assertEquals("true",evaluate(scenario,"document.querySelectorAll('#view-content .salary-record-list .month-pay-card').length>1&&window.__filterBook===localStorage.getItem('dagongren.paybook.v1')&&document.documentElement.scrollWidth<=innerWidth"));
         }
     }
 
@@ -791,7 +791,7 @@ public class AppSmokeTest {
     @Test public void calendarPushFinishesTogetherAcrossFourFiveSixWeeks() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);
-            evaluate(scenario,"document.querySelector('[data-view=calendar]').click();document.querySelector('[data-action=month-picker]').click();while(!document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]')){const y=parseInt(document.querySelector('.month-year>span').textContent);document.querySelector('[data-action=picker-year][data-delta=\"'+(y<2027?1:-1)+'\"]').click()}document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]').click()");
+            evaluate(scenario,"document.querySelector('[data-view=calendar]').click();document.querySelector('[data-action=month-picker]').click();while(!document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]')){const y=parseInt(document.querySelector('.month-year span').textContent);document.querySelector('[data-action=picker-year][data-delta=\"'+(y<2027?1:-1)+'\"]').click()}document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]').click()");
             assertEquals("28",evaluate(scenario,"document.querySelector('#app .calendar-days').children.length"));
             assertEquals("true",evaluate(scenario,"window.__reviewPush=(selector,delta,type)=>{\n const host=document.querySelector(selector),r=host.getBoundingClientRect(),viewport=type==='page'?document.documentElement:host.closest('.calendar-grid-viewport'),width=viewport.clientWidth,x=innerWidth*.5,y=Math.max(5,Math.min(innerHeight-120,r.top+25));\n const dispatch=(name,x,t)=>{const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerId:709,pointerType:'mouse',isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});host.dispatchEvent(e);};\n const nav=document.querySelector('.bottom-nav'),navRect=nav.getBoundingClientRect();dispatch('pointerdown',x,1000);dispatch('pointermove',x-delta*width*.55,2000);dispatch('pointerup',x-delta*width*.55,2400);\n const track=document.querySelector(type==='page'?'.page-swipe-track':'.calendar-swipe-track');if(!track)return false;\n const a=track.getAnimations()[0],out=track.children[0],next=track.children[1];if(!a)return false;a.pause();let samples=[];\n for(const progress of [0,.25,.5,.75,1]){a.currentTime=a.effect.getTiming().duration*progress;\n  const o=out.getBoundingClientRect(),n=next.getBoundingClientRect(),bar=nav.getBoundingClientRect(),v=type==='page'?{left:0,right:innerWidth}:viewport.getBoundingClientRect();\n  samples.push({progress,gap:Math.abs((n.left-o.left)-delta*width),navStable:document.querySelector('.bottom-nav')===nav&&Math.abs(bar.top-navRect.top)<.5&&getComputedStyle(nav).opacity==='1'&&getComputedStyle(nav).visibility==='visible'&&getComputedStyle(nav).backdropFilter==='none',transparent:[...track.querySelectorAll('.balance-primary,.balance-primary .number,.balance-primary .number span')].every(e=>getComputedStyle(e).backgroundColor==='rgba(0, 0, 0, 0)'),end:progress!==1||(Math.abs(n.left-v.left)<.6&&(delta>0?o.right<=v.left+.6:o.left>=v.right-.6)),navOutside:type!=='page'||track.parentElement.getBoundingClientRect().bottom<=navRect.top+.6});\n }\n window.__pushSamples=samples;window.__heldPush=a;window.__heldHeight=null;a.currentTime=a.effect.getTiming().duration*.5;\n return samples.every(s=>s.gap<.6&&s.navStable&&s.transparent&&s.end&&s.navOutside);\n};true"));
             for(int direction:new int[]{1,1,1,-1,-1,-1}){
@@ -980,7 +980,7 @@ public class AppSmokeTest {
     @Test public void calendarDateAreaFollowsFingerAndInterpolatesHeight() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             resetBook(scenario);assertEquals("true",evaluate(scenario,"window.__dragInput=(name,x,y,t,selector)=>{if(name==='pointerdown')window.__dragNode=document.querySelector(selector);const e=new PointerEvent(name,{bubbles:true,cancelable:true,pointerType:'mouse',pointerId:771,isPrimary:true,button:0,clientX:x,clientY:y});Object.defineProperty(e,'timeStamp',{value:t});window.__dragNode.dispatchEvent(e);};window.__nextFrames=()=>{window.__framesReady=false;requestAnimationFrame(()=>requestAnimationFrame(()=>window.__framesReady=true));};true"));
-            evaluate(scenario,"document.querySelector('[data-view=calendar]').click();document.querySelector('[data-action=month-picker]').click();while(!document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]')){const y=parseInt(document.querySelector('.month-year>span').textContent);document.querySelector('[data-action=picker-year][data-delta=\"'+(y<2027?1:-1)+'\"]').click()}document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]').click()");
+            evaluate(scenario,"document.querySelector('[data-view=calendar]').click();document.querySelector('[data-action=month-picker]').click();while(!document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]')){const y=parseInt(document.querySelector('.month-year span').textContent);document.querySelector('[data-action=picker-year][data-delta=\"'+(y<2027?1:-1)+'\"]').click()}document.querySelector('[data-action=choose-month][data-month=\"2027-02\"]').click()");
             evaluate(scenario,"window.__dragInput('pointerdown',250,200,0,'.calendar-panel-header');window.__dragInput('pointermove',230,200,1000);window.__dragInput('pointerup',230,200,1400)");
             waitTrue(scenario,"!document.querySelector('.page-swipe-layer')&&!document.getElementById('app').classList.contains('nav-lifting')");
             assertEquals("true",evaluate(scenario,"!document.querySelector('.calendar-swipe-track')&&document.querySelector('[data-calendar-month]').dataset.calendarMonth==='2027-02'"));
