@@ -142,6 +142,43 @@ public class AppSmokeTest {
         evaluate(scenario,"const defaults={salaryCents:600000,company:'日期筛选验收',joinDate:'2024-01-01',periodMode:'calendar',periodStartDay:1,payday:15,motion:true};const r=()=>({...defaults,leaves:[],overtime:[],subsidies:[],deductions:[],advances:[],payments:[]});const jan=r(),feb=r();jan.subsidies=[{id:'jan-s',date:'2024-01-10',category:'一月餐补',amountCents:1200}];feb.subsidies=[{id:'feb-s',date:'2024-02-10',category:'二月餐补',amountCents:2300}];localStorage.setItem('dagongren.paybook.v1',JSON.stringify({version:2,defaults,months:{'2024-01':jan,'2024-02':feb},excludedMonths:[],sync:{auto:false,nativeVersion:1,pending:0,logs:[]}}))");
         scenario.recreate();waitReady(scenario);
     }
+    @Test public void employmentEndDateStopsBaseWagesAndPreservesSavedEntries() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            seedEntryDateReview(scenario);
+            evaluate(scenario,"document.querySelector('#app .bottom-nav [data-view=settings]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            evaluate(scenario,"document.querySelector('#view-content .profile-edit[data-action=company-settings]').click()");
+            assertEquals("true",evaluate(scenario,"Boolean(document.getElementById('leave-date'))&&document.getElementById('leave-date').value===''&&(()=>{const a=getComputedStyle(document.querySelector('[data-date-for=join-date]')),b=getComputedStyle(document.querySelector('[data-date-for=leave-date]'));return ['backgroundColor','borderRadius','minHeight'].every(key=>a[key]===b[key])})()"));
+            evaluate(scenario,"document.querySelector('[data-date-for=leave-date]').scrollIntoView({block:'center',behavior:'instant'})");
+            paintedScreenshot(scenario,"employment-dates");pickRecordDate(scenario,"leave-date","2024-02-10");paintedScreenshot(scenario,"employment-end-date-form");
+            evaluate(scenario,"document.querySelector('.modal-footer button[type=submit]').click()");waitTrue(scenario,"!document.querySelector('#company-form')");
+            assertEquals("true",evaluate(scenario,"JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.leaveDate==='2024-02-10'&&document.querySelector('.employment-chart').dataset.asOf==='2024-02-10'&&document.querySelector('.profile-leave').textContent.includes('已离职')"));
+            evaluate(scenario,"window.__employmentResult=null;import(new URL('payroll.js',document.baseURI).href).then(({calculateBook})=>{const b=JSON.parse(localStorage.getItem('dagongren.paybook.v1')),c=calculateBook(b.months,b.defaults,'2026-10-30');window.__employmentResult={expected:c.expectedCents,jan:b.months['2024-01'].subsidies[0].id,feb:b.months['2024-02'].subsidies[0].id}})");
+            waitTrue(scenario,"window.__employmentResult!==null");assertEquals("true",evaluate(scenario,"window.__employmentResult.expected===810397&&window.__employmentResult.jan==='jan-s'&&window.__employmentResult.feb==='feb-s'"));
+            scenario.recreate();waitReady(scenario);evaluate(scenario,"document.querySelector('#app .bottom-nav [data-view=settings]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            evaluate(scenario,"document.querySelector('#view-content .profile-edit[data-action=company-settings]').click()");
+            assertEquals("true",evaluate(scenario,"document.getElementById('leave-date').value==='2024-02-10'"));
+            evaluate(scenario,"document.getElementById('leave-date').value='2023-12-31';document.querySelector('.modal-footer button[type=submit]').click()");
+            assertEquals("true",evaluate(scenario,"document.getElementById('form-error').textContent.includes('离职日期')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.leaveDate==='2024-02-10'"));
+        }
+    }
+    @Test public void cleanupCompanyDefaultsToAllAndPreservesOtherCompanyCash() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            seedEntryDateReview(scenario);
+            evaluate(scenario,"const b=JSON.parse(localStorage.getItem('dagongren.paybook.v1'));b.defaults.company='乙公司';b.months['2024-01'].company='甲公司';for(const [month,r] of Object.entries(b.months))if(month!=='2024-01')r.company='乙公司';b.months['2024-01'].payments=[{id:'foreign-cash',company:'乙公司',date:'2024-02-20',amountCents:10000,periodStart:'2024-02-01',periodEnd:'2024-02-29'}];localStorage.setItem('dagongren.paybook.v1',JSON.stringify(b))");
+            scenario.recreate();waitReady(scenario);String otherBefore=evaluate(scenario,"JSON.stringify(JSON.parse(localStorage.getItem('dagongren.paybook.v1')).months['2024-02'])");
+            evaluate(scenario,"document.querySelector('#app .bottom-nav [data-view=settings]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");
+            evaluate(scenario,"document.querySelector('#view-content [data-action=open-cleanup]').click()");
+            assertEquals("true",evaluate(scenario,"document.getElementById('cleanup-company').value==='*'&&document.getElementById('cleanup-company-value').textContent==='全部主体'"));
+            evaluate(scenario,"document.querySelector('#cleanup-company-trigger').click()");waitTrue(scenario,"Boolean(document.querySelector('.cleanup-company-list'))");paintedScreenshot(scenario,"cleanup-company-picker");
+            evaluate(scenario,"[...document.querySelectorAll('[data-action=cleanup-company-select]')].find(button=>button.dataset.company==='subject:'+encodeURIComponent('甲公司')).click()");
+            evaluate(scenario,"document.querySelector('#view-content [data-action=cleanup-scope][data-scope=all]').click();document.querySelector('#view-content [data-action=review-cleanup]').click()");
+            assertEquals("true",evaluate(scenario,"document.getElementById('cleanup-review-company').textContent==='甲公司'"));paintedScreenshot(scenario,"cleanup-company-confirm");
+            evaluate(scenario,"document.querySelector('.modal-footer [data-action=confirm-cleanup]').click()");waitTrue(scenario,"!document.querySelector('#modal-root .modal')");
+            assertEquals(otherBefore,evaluate(scenario,"JSON.stringify(JSON.parse(localStorage.getItem('dagongren.paybook.v1')).months['2024-02'])"));
+            assertEquals("true",evaluate(scenario,"(()=>{const b=JSON.parse(localStorage.getItem('dagongren.paybook.v1')),r=b.months['2024-01'];return r.accrualDisabled===true&&r.subsidies.length===0&&r.payments.length===1&&r.payments[0].id==='foreign-cash'&&b.defaults.company==='乙公司'})()"));
+            evaluate(scenario,"document.querySelector('#app .bottom-nav [data-view=settings]').click()");waitTrue(scenario,"!document.querySelector('.page-swipe-layer')");evaluate(scenario,"document.querySelector('#view-content [data-action=open-cleanup]').click()");assertEquals("true",evaluate(scenario,"document.getElementById('cleanup-company').value==='*'"));
+        }
+    }
     @Test public void redesignedEntryDatesCrossMonthsAndReach2089() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             seedEntryDateReview(scenario);
@@ -663,7 +700,7 @@ public class AppSmokeTest {
             waitTrueLoading(scenario,"(()=>{const entry=performance.getEntriesByName('dagongren.launch.playing').at(-1),page=document.querySelector('.launch-page'),scene=document.querySelector('.launch-scene');if(!entry||!page||!scene)return false;window.__launchObserved=entry.detail;window.__launchObservedColors=[getComputedStyle(page).backgroundColor,getComputedStyle(scene).backgroundColor];if(!window.__launchFrameWatching){window.__launchFrameWatching=true;window.__launchBlendSamples=[];window.__launchContentSamples=[];const sample=()=>{const page=document.querySelector('.launch-page');if(!page)return;if(page.dataset.phase==='content-fading'){window.__launchContentSamples.push({opacity:Number(getComputedStyle(page).opacity),contentOpacity:Number(getComputedStyle(page.querySelector('.launch-scene')).opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity)})}if(page.dataset.phase==='fading'){const rect=page.getBoundingClientRect(),style=getComputedStyle(page);window.__launchBlendSamples.push({opacity:Number(style.opacity),contentOpacity:Number(getComputedStyle(page.querySelector('.launch-scene')).opacity),homeOpacity:Number(getComputedStyle(document.getElementById('app')).opacity),width:rect.width,height:rect.height,left:rect.left,top:rect.top,transform:style.transform,radius:style.borderRadius})}requestAnimationFrame(sample)};requestAnimationFrame(sample)}return true})()");
             assertEquals("1",evaluateLoading(scenario,"window.__launchObserved.surfaces"));
             assertTrue(withActivity(activity->{assertTrue(activity.isFirstLaunchFramePresented());assertFalse(activity.hasBitmapLaunchCover());assertTrue(activity.getWindow().getDecorView().isHardwareAccelerated());assertNull(activity.getWindow().getDecorView().findViewWithTag("dagongren-native-launch"));}));
-            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.14'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface&&window.__launchObserved.strokeRenderer==='transform-clips'&&window.__launchObserved.appReleaseDelay===2100"));
+            assertEquals(evaluateLoading(scenario,"JSON.stringify(window.__launchObserved)"),"true",evaluateLoading(scenario,"!window.__launchObserved.nativeFade&&window.__launchObserved.animationVersion==='1.3.5-beta.15'&&!window.__launchObserved.prelude&&window.__launchObserved.appReadyAtStart===false&&window.__launchObserved.liveScene&&!window.__launchObserved.bitmapSurface&&window.__launchObserved.strokeRenderer==='transform-clips'&&window.__launchObserved.appReleaseDelay===2100"));
             assertEquals("false",evaluateLoading(scenario,"window.__launchObserved.oldBrand"));
             assertEquals("true",evaluateLoading(scenario,"window.__launchObservedColors.length===2&&window.__launchObservedColors.every(color=>color==='"+(dark?"rgb(16, 24, 39)":"rgb(243, 245, 249)")+"')"));
             assertEquals("true",evaluateLoading(scenario,"!document.querySelector('.launch-edition')&&window.__launchObserved.animationNames.includes('launch-content-in')&&JSON.parse(localStorage.getItem('dagongren.paybook.v1')).defaults.motion===false"));
@@ -1171,7 +1208,7 @@ public class AppSmokeTest {
                 paintedScreenshot(scenario,"theme-"+theme+"-profile");
             evaluate(scenario,"document.querySelector('.app-info-footer').scrollIntoView({block:'center',behavior:'instant'})");
             waitTrue(scenario,"!document.getElementById('toast').classList.contains('show')");
-            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.14 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
+            assertEquals("true",evaluate(scenario,"(()=>{const f=document.querySelector('.app-info-footer'),r=f.getBoundingClientRect(),nav=document.querySelector('.bottom-nav').getBoundingClientRect();return f.textContent.includes('安卓版 1.3.5-beta.15 测试版')&&f.textContent.includes('腾子科技·版权所有')&&f.textContent.includes('联系电话：18937027607')&&r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top})()"));
                 paintedScreenshot(scenario,"theme-"+theme+"-copyright");
             evaluate(scenario,"document.querySelector('#app .profile-chart-panel').scrollIntoView({block:'center',behavior:'instant'})");
                 swipeRegion(scenario,".employment-progress",-1);

@@ -1,6 +1,6 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const root=path.join(__dirname,'../dist'),out=process.env.WHEEL_SCREENSHOTS||path.join(__dirname,'../../outputs/beta13-browser');
+const root=path.join(__dirname,'../dist'),out=process.env.WHEEL_SCREENSHOTS||path.join(__dirname,'../../outputs/beta15-browser');
 fs.mkdirSync(out,{recursive:true});
 const errors=[],checks=[],colorFailures=[];
 async function main(){
@@ -111,6 +111,28 @@ async function main(){
   await page.locator('.date-sheet-actions [data-date-action=cancel]').tap();await close(page);assert.equal(await page.evaluate(()=>localStorage.getItem('dagongren.paybook.v1')),beforeBook);checks.push({c,case:'one-sound-per-wheel-value-at-changing-speeds'});await nav(page,'home');
  }
 
+ async function employmentAndCompanyReview(page,c){
+  await nav(page,'settings');
+  const initial=await page.evaluate(()=>JSON.parse(localStorage.getItem('dagongren.paybook.v1'))),oldCompany=initial.defaults.company;
+  await page.locator('#view-content .profile-edit[data-action=company-settings]').tap();await layout(page);
+  assert.equal(await page.locator('[data-date-for=join-date]').count(),1);assert.equal(await page.locator('[data-date-for=leave-date]').count(),1);
+  const matching=await page.evaluate(()=>{const start=getComputedStyle(document.querySelector('[data-date-for=join-date]')),end=getComputedStyle(document.querySelector('[data-date-for=leave-date]'));return ['backgroundColor','borderRadius','minHeight','color'].every(key=>start[key]===end[key]);});assert(matching,'Employment date fields must use the same picker style');
+  await capture(page,c,'employment-dialog');await pick(page,'leave-date','2024-02-10');await page.locator('.modal-footer button[type=submit]').tap();await page.waitForFunction(()=>!document.querySelector('#company-form'));
+  const ended=await page.evaluate(()=>JSON.parse(localStorage.getItem('dagongren.paybook.v1')));assert.equal(ended.defaults.leaveDate,'2024-02-10');assert.deepEqual(Object.keys(ended.months).sort(),Object.keys(initial.months).sort());
+  for(const [month,record] of Object.entries(initial.months))for(const key of ['leaves','overtime','subsidies','deductions','advances','payments','payment'])assert.deepEqual(ended.months[month][key],record[key],'Employment edits must preserve '+month+' '+key);
+  assert.equal(await page.locator('.employment-chart').getAttribute('data-as-of'),'2024-02-10');assert((await page.locator('.profile-leave').innerText()).includes('已离职'));await capture(page,c,'employment-ended');
+  await page.locator('#view-content .profile-edit[data-action=company-settings]').tap();await page.locator('[data-date-for=leave-date]').tap();assert.equal(await page.locator('.date-wheel-scroll').count(),3);await page.locator('[data-date-action=clear]').tap();assert.equal(await page.locator('#leave-date').inputValue(),'');await close(page);assert.equal((await page.evaluate(()=>JSON.parse(localStorage.getItem('dagongren.paybook.v1')))).defaults.leaveDate,'2024-02-10');
+  await page.locator('#view-content .profile-edit[data-action=company-settings]').tap();await page.locator('#leave-date').evaluate(input=>{input.value='2023-12-31';});await page.locator('.modal-footer button[type=submit]').tap();assert((await page.locator('#form-error').innerText()).includes('离职日期'));assert.equal((await page.evaluate(()=>JSON.parse(localStorage.getItem('dagongren.paybook.v1')))).defaults.leaveDate,'2024-02-10');await close(page);checks.push({c,case:'employment-date-picker-save-clear-validation-history'});
+  const nextCompany='清理主体乙 · '+'某某单位'.repeat(8),currentMonth=await page.evaluate(()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit'}).format(new Date()));
+  await page.locator('#view-content .profile-edit[data-action=company-settings]').tap();await page.locator('#company-name').fill(nextCompany);await page.locator('[data-date-for=leave-date]').tap();await page.locator('[data-date-action=clear]').tap();await pick(page,'join-date',currentMonth+'-01');await page.locator('.modal-footer button[type=submit]').tap();await page.waitForFunction(()=>!document.querySelector('#company-form'));
+  const beforeCleanup=await page.evaluate(()=>JSON.parse(localStorage.getItem('dagongren.paybook.v1')));assert.equal(beforeCleanup.defaults.company,nextCompany);assert.equal(beforeCleanup.defaults.leaveDate,'');
+  await page.locator('#view-content [data-action=open-cleanup]').tap();assert.equal(await page.locator('#cleanup-company').inputValue(),'*');assert.equal(await page.locator('#cleanup-company-value').innerText(),'全部主体');await capture(page,c,'cleanup-all-company');
+  await page.locator('#cleanup-company-trigger').tap();await layout(page);assert.equal(await page.locator('.cleanup-company-list [data-company="*"]').getAttribute('aria-pressed'),'true');await capture(page,c,'cleanup-company-picker');
+  await page.locator('[data-action=cleanup-company-select][data-company='+JSON.stringify('subject:'+encodeURIComponent(oldCompany))+']').tap();assert.equal(await page.locator('#cleanup-company-value').innerText(),oldCompany);await page.locator('#view-content [data-action=cleanup-scope][data-scope=all]').tap();await page.locator('#view-content [data-action=review-cleanup]').tap();await layout(page);assert.equal(await page.locator('#cleanup-review-company').innerText(),oldCompany);await capture(page,c,'cleanup-company-confirm');checks.push({c,case:'cleanup-company-default-all-selection-and-review'});
+  await page.locator('.modal-footer [data-action=confirm-cleanup]').tap();await page.waitForFunction(()=>!document.querySelector('#modal-root .modal'));const cleaned=await page.evaluate(()=>JSON.parse(localStorage.getItem('dagongren.paybook.v1')));assert.deepEqual(cleaned.months[currentMonth],beforeCleanup.months[currentMonth]);assert.equal(cleaned.defaults.company,nextCompany);assert(!Object.values(cleaned.months).some(record=>record.company===oldCompany));
+  await nav(page,'settings');await page.locator('#view-content [data-action=open-cleanup]').tap();assert.equal(await page.locator('#cleanup-company').inputValue(),'*');await capture(page,c,'cleanup-company-complete');checks.push({c,case:'cleanup-company-delete-preserves-other-employer'});
+ }
+
  async function run(c){const {context,page}=await start(c);try{
   await deviceFeedbackReview(page,c);
   await feedbackAndPullReview(page,c);
@@ -146,6 +168,7 @@ async function main(){
   const muted=await page.evaluate(()=>window.__feedback.length);await page.locator('#view-content [data-action=month-picker]').tap();await swipe(page,'.date-wheel-scroll[data-wheel-part=month]',1,true);assert.equal(await page.evaluate(()=>window.__feedback.length),muted);await page.locator('.date-sheet-actions [data-date-action=cancel]').tap();
   await nav(page,'settings');await page.locator('#view-content [data-action=toggle-date-haptic]').tap();await page.locator('#view-content .setting-row[data-action=salary-settings]').filter({hasText:'固定月薪'}).tap();await page.locator('[data-date-for=payday]').tap();const tick=await page.evaluate(()=>window.__feedback.length);await page.locator('.date-wheel-scroll').press('ArrowDown');await page.waitForTimeout(200);assert((await page.evaluate(()=>window.__feedback.length))>tick);assert.deepEqual(await page.evaluate(()=>window.__feedback.at(-1)),{sound:false,haptic:true});await page.locator('.date-sheet-actions [data-date-action=cancel]').tap();await close(page);
   await page.reload();await page.waitForSelector('#app .record-launcher');await nav(page,'settings');assert.equal(await page.locator('#view-content [data-action=toggle-date-sound]').getAttribute('aria-checked'),'false');assert.equal(await page.locator('#view-content [data-action=toggle-date-haptic]').getAttribute('aria-checked'),'true');await layout(page);checks.push({c,case:'year-linkage-swipes-preferences'});
+  await employmentAndCompanyReview(page,c);
  }catch(error){await page.screenshot({path:path.join(out,'failure-'+c.width+'-'+c.theme+'.png')}).catch(()=>{});throw error;}finally{await context.close();}}
  try{for(const theme of ['light','dark'])for(const size of [{width:320,height:568},{width:393,height:777},{width:430,height:932}])await run({...size,theme,motion:true});await run({width:393,height:777,theme:'dark',motion:false});assert.deepEqual(errors,[]);assert.deepEqual(colorFailures,[],'Popup/filter contrast below 4.5:1');console.log(JSON.stringify({passed:checks.length,configurations:7,errors}));}finally{await browser.close();}
 }

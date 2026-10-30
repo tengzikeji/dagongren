@@ -50,7 +50,7 @@ for(const target of ['local','cloud','both']){
  const ui=boot(fixture);ui.click('open-cleanup');ui.click('review-cleanup');const before=ui.data();ui.failWrites();ui.click('confirm-cleanup');assert.deepEqual(ui.data(),before);assert.match(ui.el('cleanup-error').textContent,/无法保存/);
 }
 {
- const ui=boot(fixture);ui.click('prepare-cleanup-demo');ui.click('record-kind',{kind:'overtime'});ui.submit('overtime-form',{mode:'custom',date:'2026-10-22',amount:'50',note:'同步'});ui.flush(700);ui.flush(1000);assert.deepEqual(ui.data().months,ui.data().sync.cloudMonths);ui.click('export');const csv=await ui.blobs[0].text();assert.doesNotMatch(csv,/拖发|记到账/);for(const word of ['发薪账期','入职日期','本笔是否扣款','工资区间开始','发工资']){if(word!=='发工资')assert.ok(csv.includes(word));}const rows=csv.trim().split('\r\n').map(line=>[...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m=>m[1]));for(const row of rows)assert.equal(row.length,24);
+ const ui=boot(fixture);ui.click('prepare-cleanup-demo');ui.click('record-kind',{kind:'overtime'});ui.submit('overtime-form',{mode:'custom',date:'2026-10-22',amount:'50',note:'同步'});ui.flush(700);ui.flush(1000);assert.deepEqual(ui.data().months,ui.data().sync.cloudMonths);ui.click('export');const csv=await ui.blobs[0].text();assert.doesNotMatch(csv,/拖发|记到账/);for(const word of ['发薪账期','入职日期','本笔是否扣款','工资区间开始','发工资']){if(word!=='发工资')assert.ok(csv.includes(word));}const rows=csv.trim().split('\r\n').map(line=>[...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m=>m[1]));for(const row of rows)assert.equal(row.length,25);
  assert.deepEqual(ui.data().defaults,ui.data().sync.cloudDefaults);
 }
 {
@@ -82,7 +82,7 @@ for(const target of ['local','cloud','both']){
 }
 {
  const ui=boot(fixture);ui.click('nav',{view:'settings'});assert.match(ui.el('app').innerHTML,/界面动效/);ui.click('toggle-motion');assert.equal(ui.data().defaults.motion,false);ui.click('toggle-motion');assert.equal(ui.data().defaults.motion,true);const css=inner.match(/<style>([\s\S]*?)<\/style>/)[1];for(const name of ['quiet-scan','page-enter','card-enter','sheet-in','prefers-reduced-motion','motion-off'])assert.ok(css.includes(name));
- ui.click('prepare-cleanup-demo');ui.click('record-kind',{kind:'subsidy'});ui.submit('subsidy-form',{category:'__custom__',customCategory:'夜间项目',date:'2026-10-22',amount:'123.45',note:'导出测试'});ui.click('record-kind',{kind:'deduction'});ui.submit('deduction-form',{category:'餐费',date:'2026-10-22',amount:'23.45',note:'导出测试'});ui.flush(700);ui.flush(1000);assert.deepEqual(ui.data().months,ui.data().sync.cloudMonths);ui.click('export');const csv=await ui.blobs[0].text();const rows=csv.trim().split('\r\n').map(line=>[...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m=>m[1]));for(const row of rows)assert.equal(row.length,24);const s=rows.find(x=>x[0]==='补贴'),d=rows.find(x=>x[0]==='扣款');assert.equal(s[19],'夜间项目');assert.equal(s[20],'123.45');assert.equal(s[12],'');assert.equal(d[21],'23.45');assert.equal(d[22],'已生效');ui.click('open-cleanup');ui.click('quick-cleanup',{target:'both'});assert.match(ui.el('modal-root').innerHTML,/补贴1笔/);assert.match(ui.el('modal-root').innerHTML,/扣款1笔/);ui.click('confirm-cleanup');assert.deepEqual(ui.data().months,{});assert.deepEqual(ui.data().sync.cloudMonths,{});
+ ui.click('prepare-cleanup-demo');ui.click('record-kind',{kind:'subsidy'});ui.submit('subsidy-form',{category:'__custom__',customCategory:'夜间项目',date:'2026-10-22',amount:'123.45',note:'导出测试'});ui.click('record-kind',{kind:'deduction'});ui.submit('deduction-form',{category:'餐费',date:'2026-10-22',amount:'23.45',note:'导出测试'});ui.flush(700);ui.flush(1000);assert.deepEqual(ui.data().months,ui.data().sync.cloudMonths);ui.click('export');const csv=await ui.blobs[0].text();const rows=csv.trim().split('\r\n').map(line=>[...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m=>m[1]));for(const row of rows)assert.equal(row.length,25);const s=rows.find(x=>x[0]==='补贴'),d=rows.find(x=>x[0]==='扣款');assert.equal(s[19],'夜间项目');assert.equal(s[20],'123.45');assert.equal(s[12],'');assert.equal(d[21],'23.45');assert.equal(d[22],'已生效');ui.click('open-cleanup');ui.click('quick-cleanup',{target:'both'});assert.match(ui.el('modal-root').innerHTML,/补贴1笔/);assert.match(ui.el('modal-root').innerHTML,/扣款1笔/);ui.click('confirm-cleanup');assert.deepEqual(ui.data().months,{});assert.deepEqual(ui.data().sync.cloudMonths,{});
 }
 
 {
@@ -102,7 +102,7 @@ for(const target of ['local','cloud','both']){
   assert.ok(html.includes('form="'+form+'"'));assert.ok(html.indexOf('</form>')<html.indexOf('modal-footer'));
  }
 }
-console.log('Passed: all prior wage, leave, pay-period, cash, sync, cleanup, and migration flows; six record types; preset/custom adjustment CRUD; dated accrual; exact metric drilldowns by month/year/day/period; negative-wage carry and receipt preservation; date-specific calendar records; monthly filters; motion preferences; and aligned 24-column exports. These are calculation and VM interaction checks, not browser or Android visual tests.');
+console.log('Passed: all prior wage, leave, pay-period, cash, sync, cleanup, and migration flows; six record types; preset/custom adjustment CRUD; dated accrual; exact metric drilldowns by month/year/day/period; negative-wage carry and receipt preservation; date-specific calendar records; monthly filters; motion preferences; and aligned 25-column exports. These are calculation and VM interaction checks, not browser or Android visual tests.');
 
 {
  const ui=boot(fixture);assert.match(ui.el('app').innerHTML,/settlement-chart/);ui.click('nav',{view:'calendar'});
@@ -201,3 +201,22 @@ console.log('Passed date filter integration: inclusive ranges, independent defau
  ui.click('salary-settings');assert.match(ui.el('modal-root').innerHTML,/data-date-for="payday"/);assert.match(ui.el('modal-root').innerHTML,/data-date-for="period-start"/);
 }
 console.log('Passed wheel integration: shared years across all three entry points, independent month/day ranges, local sound/haptic switches and unchanged financial payload.');
+
+{
+ const next=clone(fixture);next.months['2026-10'].payments=[{id:'left-payment',date:'2026-10-21',amountCents:10000,company:'公司甲',periodStart:'2026-09-21',periodEnd:'2026-10-20'}];
+ const ui=boot(next);ui.click('company-settings');assert.match(ui.el('modal-root').innerHTML,/data-date-for="leave-date"/);assert.match(ui.el('modal-root').innerHTML,/未设置 · 仍在职/);
+ ui.submit('company-form',{company:'公司甲',joinDate:'2026-09-21',leaveDate:'2026-10-10'});assert.equal(ui.data().defaults.leaveDate,'2026-10-10');assert.equal(ui.book().expectedCents,400000);assert.equal(ui.book().receivedCents,10000);assert.equal(ui.data().months['2026-10'].payments[0].id,'left-payment');
+ ui.advance('2026-11-05T04:00:00Z');assert.equal(ui.book().expectedCents,400000);assert.equal(ui.data().months['2026-11'],undefined);
+ ui.click('nav',{view:'settings'});assert.match(ui.el('app').innerHTML,/截至离职日/);assert.match(ui.el('app').innerHTML,/已离职/);
+ const before=JSON.stringify(ui.data());ui.click('company-settings');ui.submit('company-form',{company:'公司甲',joinDate:'2026-09-21',leaveDate:'2026-09-20'});assert.match(ui.el('form-error').textContent,/离职日期/);assert.equal(JSON.stringify(ui.data()),before);
+ ui.submit('company-form',{company:'公司甲',joinDate:'2026-09-21',leaveDate:''});assert(ui.data().months['2026-11']);assert(ui.book().expectedCents>400000);
+}
+{
+ const next=clone(fixture);next.months['2025-01']={...r(),company:'公司甲',joinDate:'2025-01-01'};const ui=boot(next),old=ui.calc('2025-01');ui.click('company-settings');ui.submit('company-form',{company:'公司甲',joinDate:'2026-09-21',leaveDate:'2026-10-10'});assert.equal(ui.data().months['2025-01'].joinDate,'2025-01-01');assert.equal(ui.data().months['2025-01'].leaveDate,undefined);assert.equal(ui.calc('2025-01').expectedCents,old.expectedCents);
+}
+{
+ const next=clone(fixture);next.months['2026-09'].company='公司乙';next.months['2026-10'].payments=[{id:'foreign-cash',date:'2026-10-22',amountCents:10000,company:'公司乙',periodStart:'2026-09-21',periodEnd:'2026-10-20'}];const ui=boot(next);
+ ui.click('open-cleanup');assert.match(ui.el('app').innerHTML,/id="cleanup-company" value="\*"/);ui.click('cleanup-company-picker');assert.match(ui.el('modal-root').innerHTML,/全部主体/);assert.match(ui.el('modal-root').innerHTML,/公司乙/);ui.click('cleanup-company-select',{company:'subject:'+encodeURIComponent('公司甲')});ui.click('cleanup-scope',{scope:'all'});ui.click('review-cleanup');assert.match(ui.el('modal-root').innerHTML,/id="cleanup-review-company">公司甲/);ui.click('confirm-cleanup');
+ assert.equal(ui.data().months['2026-09'].company,'公司乙');assert.equal(ui.data().months['2026-10'].accrualDisabled,true);assert.equal(ui.data().months['2026-10'].payments[0].id,'foreign-cash');assert.equal(ui.calc('2026-10').baseCents,0);ui.click('open-cleanup');assert.match(ui.el('app').innerHTML,/id="cleanup-company" value="\*"/);
+}
+console.log('Passed employment and company cleanup: inclusive end date, late-date recalculation, preserved receipts/history, resumed accrual, default all companies and safe per-company cleanup.');
