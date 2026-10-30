@@ -207,7 +207,8 @@ export function bindPageSwipe(root,api){
  if(!controller)return;
  controller.invalidate=()=>{if(controller.isPending())controller.cancel(false);controller.discardPrepared();cache.clear();snapshot=null;if(idle){if(typeof cancelIdleCallback==='function')cancelIdleCallback(idle);else clearTimeout(idle);}const prepare=()=>{idle=0;if(!root.inert&&!controller.isBusy())controller.preload();};idle=typeof requestIdleCallback==='function'?requestIdleCallback(prepare,{timeout:300}):setTimeout(prepare,0);};
  controller.prepare=()=>controller.preload();
- let scrollTimer=0;globalThis.window?.addEventListener?.('scroll',()=>{controller.discardPrepared();clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>controller.invalidate(),80);},{passive:true});globalThis.window?.addEventListener?.('resize',()=>controller.invalidate(),{passive:true});
+ // A delayed scroll refresh must not cancel a touch that began after scrolling.
+ let scrollTimer=0;globalThis.window?.addEventListener?.('scroll',()=>{controller.discardPrepared();clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{if(!controller.isPending()&&!controller.isBusy())controller.invalidate();},80);},{passive:true});globalThis.window?.addEventListener?.('resize',()=>controller.invalidate(),{passive:true});
  controller.navigate=to=>{const from=api.current(),a=VIEWS.indexOf(from),b=VIEWS.indexOf(to);if(a<0||b<0||a===b||api.blocked?.())return false;tapTarget=to;warm();const ok=controller.start(Math.sign(b-a),'tap');if(!ok){tapTarget=null;api.navigate(to);api.settled?.(true,to);}return true;};return controller;
 }
 export function bindCalendarSwipe(root,api){
