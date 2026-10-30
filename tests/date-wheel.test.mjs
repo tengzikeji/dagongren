@@ -61,9 +61,9 @@ test('日期滚轮初始化按可用性短路，不遍历完整七十年日期',
 });
 test('快速滚动时触感逐帧跟随，音效独立限频，程序定位不产生排队反馈',()=>{
  let time=100;const calls=[],feedback=createWheelFeedback({storage:{getItem:()=>null},bridge:{dateWheelFeedback:(sound,haptic)=>calls.push({time,sound,haptic})},now:()=>time});
- for(let frame=0;frame<5;frame++){time=100+frame*16;assert(feedback.tick({userInitiated:true}));}
- assert.deepEqual(calls.map(call=>call.haptic),[true,true,true,true,true]);
- assert.deepEqual(calls.map(call=>call.sound),[true,false,true,false,true]);
+ for(let frame=0;frame<9;frame++){time=100+frame*8;assert(feedback.tick({userInitiated:true}));}
+ assert.deepEqual(calls.map(call=>call.haptic),Array(9).fill(true));
+ assert.deepEqual(calls.map(call=>call.sound),[true,false,false,false,true,false,false,false,true]);
  time=165;assert.equal(feedback.tick({userInitiated:true}),false);
- time=500;assert.equal(feedback.tick(),false);assert.equal(calls.length,5);
+ time=500;assert.equal(feedback.tick(),false);assert.equal(calls.length,9);
 });

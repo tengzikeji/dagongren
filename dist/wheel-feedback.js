@@ -7,7 +7,7 @@ export function createWheelFeedback({storage=globalThis.localStorage,bridge=glob
   set(key,enabled){if(!['sound','haptic'].includes(key)||typeof enabled!=='boolean')throw new Error('日期反馈设置无效。');const next={...preferences,[key]:enabled};if(!storage?.setItem)throw new Error('个人偏好暂时无法保存。');storage.setItem(dateFeedbackStorageKey,JSON.stringify(next));preferences=next;return {...preferences};},
   tick({userInitiated=false}={}){
    const {sound,haptic}=preferences;if(!userInitiated||!sound&&!haptic)return false;
-   const time=now(),playSound=sound&&(time<lastSound||time-lastSound>=32),playHaptic=haptic&&(time<lastHaptic||time-lastHaptic>=14);
+   const time=now(),playSound=sound&&(time<lastSound||time-lastSound>=32),playHaptic=haptic&&(time<lastHaptic||time-lastHaptic>=8);
    if(!playSound&&!playHaptic)return false;if(playSound)lastSound=time;if(playHaptic)lastHaptic=time;
    if(typeof bridge?.dateWheelFeedback==='function'){try{bridge.dateWheelFeedback(playSound,playHaptic);return true;}catch{return false;}}
    try{
