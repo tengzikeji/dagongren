@@ -131,6 +131,7 @@ public class AppSmokeTest {
     }
     private void pickRecordDate(ActivityScenario<MainActivity> scenario,String id,String date) throws Exception {
         tapControl(scenario,"[data-date-for=\""+id+"\"]");waitTrue(scenario,"document.querySelectorAll('.date-wheel-scroll').length===3");
+        assertEquals("true",evaluate(scenario,"document.querySelector('.date-wheel-sheet h3').textContent===document.getElementById('"+id+"').dataset.recordDate"));
         assertEquals("70",evaluate(scenario,"document.querySelectorAll('.date-wheel-scroll[data-wheel-part=year] [role=option]').length"));
         selectWheelPart(scenario,"year",date.substring(0,4));selectWheelPart(scenario,"month",date.substring(5,7));selectWheelPart(scenario,"day",date.substring(8));
         tapControl(scenario,".date-sheet-actions [data-date-action=confirm]");waitTrue(scenario,"!document.querySelector('.record-date-sheet')");
